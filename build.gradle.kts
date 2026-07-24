@@ -32,8 +32,6 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
 
-    // .env 파일을 환경변수 소스로 자동 로드 (application.yml의 ${...} 참조에 주입)
-    implementation("me.paulschwarz:spring-dotenv:4.0.0")
 
     compileOnly("org.projectlombok:lombok")
     developmentOnly("org.springframework.boot:spring-boot-devtools")

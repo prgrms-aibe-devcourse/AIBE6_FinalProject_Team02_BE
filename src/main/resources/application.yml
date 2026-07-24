@@ -1,6 +1,10 @@
 spring:
   application:
     name: backend_catcheat
+  # .env 파일을 properties 형식으로 읽어 ${...} 참조에 주입한다.
+  # optional: 파일이 없어도 기동 실패하지 않음(운영 등에서는 환경변수로 대체).
+  config:
+    import: optional:file:.env[.properties]
 
   profiles:
     active: dev
