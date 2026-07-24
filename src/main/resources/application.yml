@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: backend_catcheat
+
+  profiles:
+    active: dev
+
+  jpa:
+    open-in-view: false
+
+  flyway:
+    enabled: true

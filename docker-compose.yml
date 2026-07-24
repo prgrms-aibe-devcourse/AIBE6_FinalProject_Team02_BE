@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: catcheat-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: catcheat_dev
+      POSTGRES_USER: catcheat
+      POSTGRES_PASSWORD: catcheat
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
