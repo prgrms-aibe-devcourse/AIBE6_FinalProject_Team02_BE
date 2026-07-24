@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 컨트롤러는 요청/응답만 담당하고 실제 로직은 AuthService에 위임한다(AGENTS.md 계층 규칙).
  */
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
 public class AuthController {
 

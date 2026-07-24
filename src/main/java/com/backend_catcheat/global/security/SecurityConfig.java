@@ -3,7 +3,6 @@ package com.backend_catcheat.global.security;
 import com.backend_catcheat.domain.auth.oauth.CustomOAuth2UserService;
 import com.backend_catcheat.global.jwt.JwtAuthenticationFilter;
 import com.backend_catcheat.global.jwt.JwtTokenProvider;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,6 +14,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 /**
  * Spring Security 전체 설정.
@@ -49,7 +50,8 @@ public class SecurityConfig {
                                 "/",
                                 "/oauth2/**",
                                 "/login/**",
-                                "/api/auth/reissue"
+                                "/api/v1/auth/reissue",
+                                "/api/v1/auth/logout"
                         ).permitAll()
                         // 관리자 전용
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
