@@ -1,13 +1,12 @@
 package com.backend_catcheat.domain.auth.controller;
 
+import com.backend_catcheat.domain.auth.dto.UserResponseDTO;
 import com.backend_catcheat.domain.auth.service.AuthService;
 import com.backend_catcheat.global.common.ApiResponse;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.CookieValue;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
 
 /**
  * 인증 관련 엔드포인트.
@@ -42,5 +41,11 @@ public class AuthController {
     ) {
         authService.logout(refreshToken, response);
         return ApiResponse.ok();
+    }
+
+    /** 내 정보 조회. 로그인 상태 확인용. 인증 안 되면 시큐리티가 401 반환. */
+    @GetMapping("/me")
+    public ApiResponse<UserResponseDTO> me(@AuthenticationPrincipal Long userId) {
+        return ApiResponse.ok(authService.getMyInfo(userId));
     }
 }

@@ -1,5 +1,6 @@
 package com.backend_catcheat.domain.auth.service;
 
+import com.backend_catcheat.domain.auth.dto.UserResponseDTO;
 import com.backend_catcheat.domain.auth.entity.User;
 import com.backend_catcheat.domain.auth.repository.UserRepository;
 import com.backend_catcheat.domain.auth.token.RefreshTokenStore;
@@ -9,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
@@ -103,5 +105,11 @@ public class AuthService {
                 .sameSite("Lax")
                 .build();
         response.addHeader("Set-Cookie", cookie.toString());
+    }
+    /** 인증된 사용자의 내 정보 조회. */
+    @Transactional(readOnly = true)
+    public UserResponseDTO getMyInfo(Long userId) {
+        User user = userRepository.findById(userId).orElseThrow(this::unauthorized);
+        return UserResponseDTO.from(user);
     }
 }
