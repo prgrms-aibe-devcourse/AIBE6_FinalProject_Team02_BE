@@ -103,6 +103,10 @@ public class JwtTokenProvider {
     public long getRefreshTokenExpireMs() {
         return refreshTokenExpireMs;
     }
+    /** access token 만료(ms). 쿠키 maxAge 설정에 재사용. */
+    public long getAccessTokenExpireMs() {
+        return accessTokenExpireMs;
+    }
 
 
 
