@@ -54,7 +54,7 @@ public class User extends BaseEntity {
     @Column(length = 30)
     private String nickname;
 
-    /** 이메일. 소셜에서 받은 값. 미동의/미제공일 수 있어 nullable. length 320 = 이메일 최대 길이. */
+    /** 이메일. 소셜에서 받은 값. length 320 = 이메일 최대 길이. */
     @Column(length = 320)
     private String email;
 
