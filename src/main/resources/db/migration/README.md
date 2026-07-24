@@ -1,3 +1,3 @@
 ## 파일 이름 규칙
 
-- V1__260724_1233_user_schema
+- V1__260724_1233_user_schema.sql
