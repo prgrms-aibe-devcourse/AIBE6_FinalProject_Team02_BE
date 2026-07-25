@@ -41,3 +41,8 @@ out/
 AGENTS.md
 DESIGN.md
 
+### Secrets (로컬 시크릿 — 절대 커밋 금지) ###
+.env
+.env.local
+application-local.yml
+*.local.yml
