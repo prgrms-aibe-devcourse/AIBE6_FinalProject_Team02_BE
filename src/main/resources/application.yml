@@ -87,3 +87,13 @@ jwt:
 app:
   oauth2:
     authorized-redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:3000/oauth/callback}
+
+catcheat:
+  vision:
+    max-images: 5
+    max-long-edge-px: 1024
+    jpeg-quality: 0.8
+    # Groq base64 이미지 상한 자체 상항
+    max-encoded-bytes: 3500000
+    # Groq이 이미지 입력과 JSON 모드 조합을 거부하면 false로 내리고 비교
+    json-mode: true
