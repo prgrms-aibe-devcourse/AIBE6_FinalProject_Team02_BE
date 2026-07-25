@@ -48,6 +48,7 @@ src/test/resources/spike/*.jpg
 src/test/resources/spike/*.jpeg
 src/test/resources/spike/*.png
 spike-samples/
+docs/
 
 ### Secrets (로컬 시크릿 — 절대 커밋 금지) ###
 .env

@@ -22,16 +22,6 @@ import java.time.Instant;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-/**
- * Groq 연결 스모크 테스트 — 인증 / 모델 ID / 이미지 인코딩 세 가지가 실제로 통하는지만 확인한다.
- * <p>
- * 프로덕션 코드를 작성하기 전의 관문이므로 파싱·매핑은 검증하지 않는다.
- * 실제 API를 호출하므로 {@code external} 태그로 격리되어 기본 빌드에서 제외된다 (AGENTS.md §8).
- *
- * <pre>
- * GROQ_API_KEY=gsk_... ./gradlew test -PincludeExternal --tests "*GroqVisionSmokeTest*"
- * </pre>
- */
 @Tag("external")
 @SpringBootTest
 @ActiveProfiles("test")
