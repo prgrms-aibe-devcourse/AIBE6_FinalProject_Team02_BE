@@ -24,10 +24,7 @@ spring:
 
   ai:
     openai:
-      # Groq은 OpenAI 호환 엔드포인트를 제공한다. Spring AI가 뒤에 /v1/chat/completions 를 붙인다.
       base-url: https://api.groq.com/openai
-      # Spring AI는 빈 문자열 키를 빈 생성 시점에 거부한다. 도감 등 AI와 무관한 기능이
-      # 키 없이도 개발되도록 센티널 값을 두고, 스파이크 호출 시에만 명시적으로 실패시킨다.
       api-key: ${GROQ_API_KEY:missing-groq-api-key}
       chat:
         options:

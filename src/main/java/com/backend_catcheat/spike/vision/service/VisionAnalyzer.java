@@ -35,7 +35,6 @@ public class VisionAnalyzer {
 
     private static final String SYSTEM_PROMPT_PATH = "prompts/food-detection-system.st";
 
-    /** application.yml의 api-key 기본값. 실제 키가 주입되지 않았음을 뜻한다. */
     private static final String MISSING_API_KEY = "missing-groq-api-key";
 
     private final ChatModel chatModel;
@@ -48,7 +47,7 @@ public class VisionAnalyzer {
             ChatModel chatModel,
             ObjectMapper objectMapper,
             VisionSpikeProperties properties,
-            @Value("${spring.ai.openai.api-key:}") String apiKey
+            @Value("${spring.ai.openai.api-key}") String apiKey
     ) {
         this.chatModel = chatModel;
         this.objectMapper = objectMapper;
