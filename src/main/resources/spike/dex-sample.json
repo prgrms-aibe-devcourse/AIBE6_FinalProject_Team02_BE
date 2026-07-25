@@ -1,0 +1,39 @@
+[
+  { "id": 1,  "name": "김치찌개",   "category": "찌개·전골", "aliases": ["돼지김치찌개", "참치김치찌개", "김치찌게"] },
+  { "id": 2,  "name": "된장찌개",   "category": "찌개·전골", "aliases": ["된장국", "강된장"] },
+  { "id": 3,  "name": "순두부찌개", "category": "찌개·전골", "aliases": ["순두부", "해물순두부찌개"] },
+  { "id": 4,  "name": "부대찌개",   "category": "찌개·전골", "aliases": ["존슨탕"] },
+
+  { "id": 5,  "name": "칼국수",     "category": "면류",     "aliases": ["바지락칼국수", "닭칼국수"] },
+  { "id": 6,  "name": "잔치국수",   "category": "면류",     "aliases": ["국수", "멸치국수"] },
+  { "id": 7,  "name": "수제비",     "category": "면류",     "aliases": ["감자수제비"] },
+  { "id": 8,  "name": "냉면",       "category": "면류",     "aliases": ["물냉면", "비빔냉면", "평양냉면", "함흥냉면"] },
+  { "id": 9,  "name": "짜장면",     "category": "면류",     "aliases": ["자장면", "간짜장"] },
+  { "id": 10, "name": "짬뽕",       "category": "면류",     "aliases": ["삼선짬뽕"] },
+  { "id": 11, "name": "라면",       "category": "면류",     "aliases": ["봉지라면", "냄비라면"] },
+
+  { "id": 12, "name": "비빔밥",     "category": "밥·한그릇", "aliases": ["돌솥비빔밥", "전주비빔밥"] },
+  { "id": 13, "name": "김밥",       "category": "밥·한그릇", "aliases": ["참치김밥", "치즈김밥", "충무김밥"] },
+  { "id": 14, "name": "볶음밥",     "category": "밥·한그릇", "aliases": ["새우볶음밥", "김치볶음밥"] },
+  { "id": 15, "name": "덮밥",       "category": "밥·한그릇", "aliases": ["제육덮밥", "규동"] },
+
+  { "id": 16, "name": "삼겹살",     "category": "고기·구이", "aliases": ["생삼겹살", "오겹살"] },
+  { "id": 17, "name": "제육볶음",   "category": "고기·구이", "aliases": ["돼지불백", "제육"] },
+  { "id": 18, "name": "불고기",     "category": "고기·구이", "aliases": ["소불고기", "언양식불고기"] },
+  { "id": 19, "name": "치킨",       "category": "고기·구이", "aliases": ["후라이드치킨", "양념치킨", "프라이드치킨"] },
+
+  { "id": 20, "name": "떡볶이",     "category": "분식",     "aliases": ["로제떡볶이", "국물떡볶이", "떢볶이"] },
+  { "id": 21, "name": "순대",       "category": "분식",     "aliases": ["순대볶음", "백순대"] },
+  { "id": 22, "name": "호떡",       "category": "분식",     "aliases": ["씨앗호떡"] },
+  { "id": 23, "name": "붕어빵",     "category": "분식",     "aliases": ["잉어빵"] },
+
+  { "id": 24, "name": "돈까스",     "category": "튀김·전",   "aliases": ["돈가스", "왕돈까스", "등심돈까스"] },
+  { "id": 25, "name": "김치전",     "category": "튀김·전",   "aliases": ["김치부침개"] },
+  { "id": 26, "name": "파전",       "category": "튀김·전",   "aliases": ["해물파전", "동래파전"] },
+
+  { "id": 27, "name": "삼계탕",     "category": "국·탕",     "aliases": ["백숙", "닭백숙"] },
+  { "id": 28, "name": "설렁탕",     "category": "국·탕",     "aliases": ["곰탕"] },
+  { "id": 29, "name": "육개장",     "category": "국·탕",     "aliases": ["얼큰육개장"] },
+
+  { "id": 30, "name": "회",         "category": "해산물",    "aliases": ["모둠회", "연어회", "광어회"] }
+]
