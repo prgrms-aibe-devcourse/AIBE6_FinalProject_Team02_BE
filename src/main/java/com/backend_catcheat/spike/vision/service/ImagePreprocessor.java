@@ -120,7 +120,7 @@ public class ImagePreprocessor {
             }
         }
 
-        throw new VisionSpikeException("IMAGE_TOO_LARGE",
+        throw new VisionSpikeException("IMAGE_ENCODE_TOO_LARGE",
                 "사진 용량이 너무 커서 분석할 수 없어요 (%dB)".formatted(encoded.length));
     }
 

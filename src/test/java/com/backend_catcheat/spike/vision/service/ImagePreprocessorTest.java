@@ -106,6 +106,18 @@ class ImagePreprocessorTest {
     }
 
     @Test
+    @DisplayName("품질을 낮춰도 상한을 못 맞추면 인코딩 전용 코드로 거부한다")
+    void 인코딩_상한을_못_맞추면_거부한다() throws IOException {
+        // 업로드 상한(IMAGE_UPLOAD_TOO_LARGE)과 구분되는 경로임을 고정한다
+        ImagePreprocessor tightLimit =
+                new ImagePreprocessor(new VisionSpikeProperties(5, 1024, 0.8f, 100L, true));
+
+        assertThatThrownBy(() -> tightLimit.prepare(jpeg("large.jpg", 4000, 3000)))
+                .isInstanceOf(VisionSpikeException.class)
+                .hasFieldOrPropertyWithValue("code", "IMAGE_ENCODE_TOO_LARGE");
+    }
+
+    @Test
     @DisplayName("확장자만 이미지이고 내용이 깨졌으면 거부한다 — 클라이언트 검증을 믿지 않는다")
     void 깨진_이미지를_거부한다() {
         MockMultipartFile file = new MockMultipartFile("images", "fake.jpg", "image/jpeg", "not an image".getBytes());

@@ -39,6 +39,6 @@ public class VisionSpikeExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleMaxUploadSize(MaxUploadSizeExceededException e) {
         log.warn("[spike] 업로드 용량 초과", e);
         return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
-                .body(ApiResponse.fail("IMAGE_TOO_LARGE", "사진은 장당 10MB까지 올릴 수 있어요"));
+                .body(ApiResponse.fail("IMAGE_UPLOAD_TOO_LARGE", "사진은 장당 10MB까지 올릴 수 있어요"));
     }
 }

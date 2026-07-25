@@ -17,6 +17,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.List;
 
@@ -100,6 +101,17 @@ class VisionSpikeControllerTest {
         mockMvc.perform(multipart(ENDPOINT).file(jpegPart()))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.error.code").value("AI_CALL_FAILED"));
+    }
+
+    @Test
+    @DisplayName("업로드 상한 초과는 413과 전용 코드로 내보낸다 — 인코딩 상한과 구분")
+    void 업로드_상한_초과는_413이다() throws Exception {
+        when(visionSpikeService.analyze(anyList(), any()))
+                .thenThrow(new MaxUploadSizeExceededException(10 * 1024 * 1024));
+
+        mockMvc.perform(multipart(ENDPOINT).file(jpegPart()))
+                .andExpect(status().isContentTooLarge())
+                .andExpect(jsonPath("$.error.code").value("IMAGE_UPLOAD_TOO_LARGE"));
     }
 
     @Test
