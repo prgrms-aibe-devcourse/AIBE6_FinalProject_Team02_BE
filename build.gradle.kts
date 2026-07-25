@@ -56,5 +56,9 @@ dependencyManagement {
 }
 
 tasks.withType<Test> {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        if (!project.hasProperty("includeExternal")) {
+            excludeTags("external")
+        }
+    }
 }
