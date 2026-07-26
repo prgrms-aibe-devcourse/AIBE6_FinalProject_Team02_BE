@@ -2,7 +2,7 @@ package com.backend_catcheat.domain.onboarding.service;
 
 import com.backend_catcheat.domain.auth.entity.User;
 import com.backend_catcheat.domain.onboarding.dto.OnboardingStatusResponse;
-import com.backend_catcheat.domain.onboarding.repository.OnboardingRepository;
+import com.backend_catcheat.domain.auth.repository.UserRepository;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class OnboardingService {
-    private final OnboardingRepository onboardingRepository;
+    private final UserRepository userRepository;
 
     public OnboardingStatusResponse getStatus(Long userId) {
         User user = findUser(userId);
@@ -29,7 +29,7 @@ public class OnboardingService {
     }
 
     private User findUser(Long userId) {
-        return onboardingRepository.findById(userId)
+        return userRepository.findById(userId)
             .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
     }
 }
