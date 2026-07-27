@@ -83,6 +83,10 @@ public class User extends BaseEntity {
     @Column(name = "nickname_updated_at")
     private LocalDateTime nicknameUpdatedAt;
 
+    /** 장착한 대표 뱃지 id. 닉네임 옆에 표시된다. null이면 미장착. (badge 삭제 시 FK가 NULL 처리) */
+    @Column(name = "equipped_badge_id")
+    private Long equippedBadgeId;
+
     /**
      * 생성자를 private + @Builder로 둔다.
      * 외부에서는 User.builder().provider(...).build() 형태로만 생성하게 강제한다.
@@ -146,6 +150,11 @@ public class User extends BaseEntity {
         }
         this.nickname = nickname;
         this.nicknameUpdatedAt = now;
+    }
+
+    /** 대표 뱃지 장착/해제. badgeId가 null이면 해제. (보유 검증은 서비스에서 선행) */
+    public void equipBadge(Long badgeId) {
+        this.equippedBadgeId = badgeId;
     }
 }
 
