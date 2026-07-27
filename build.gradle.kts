@@ -14,6 +14,8 @@ java {
     }
 }
 
+extra["springAiVersion"] = "2.0.0"
+
 repositories {
     mavenCentral()
 }
@@ -33,6 +35,7 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
 
 
+    implementation("org.springframework.ai:spring-ai-starter-model-openai")
     compileOnly("org.projectlombok:lombok")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
     runtimeOnly("org.postgresql:postgresql")
@@ -46,6 +49,16 @@ dependencies {
     testAnnotationProcessor("org.projectlombok:lombok")
 }
 
+dependencyManagement {
+    imports {
+        mavenBom("org.springframework.ai:spring-ai-bom:${property("springAiVersion")}")
+    }
+}
+
 tasks.withType<Test> {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        if (!project.hasProperty("includeExternal")) {
+            excludeTags("external")
+        }
+    }
 }

@@ -17,6 +17,24 @@ spring:
 
   # DB(datasource)는 application-dev.yml / application-prod.yml에서 프로파일별로 정의한다.
 
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 55MB
+
+  ai:
+    openai:
+      # Spring AI가 뒤에 /chat/completions 를 붙이므로 base-url에 /v1까지 포함해야 한다
+      base-url: https://api.groq.com/openai/v1
+      api-key: ${GROQ_API_KEY:missing-groq-api-key}
+      chat:
+        options:
+          # Groq이 제공하는 유일한 비전 모델 (Llama 4 계열은 라인업에서 제외됨)
+          model: ${GROQ_VISION_MODEL:qwen/qwen3.6-27b}
+          temperature: 0.2
+      embedding:
+        enabled: false
+
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -68,3 +86,18 @@ jwt:
 app:
   oauth2:
     authorized-redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:3000/oauth/callback}
+
+catcheat:
+  vision:
+    # Groq 문서 기준 요청당 이미지 5장 — 기획안 "1~5장"과 일치
+    max-images: 5
+    # 한 상 사진으로 동시에 등록할 수 있는 음식 수
+    max-food-names: 5
+    max-long-edge-px: 1024
+    jpeg-quality: 0.8
+    # Groq 상한은 요청당 20MB. 비용은 전송량에 비례하므로 자체 상한을 더 낮게 둔다
+    max-encoded-bytes: 3500000
+    json-mode: true
+    # 추론 끄기. 음식 판별에 사고 과정이 불필요하고, 길어지면 JSON이 잘려 검증이 실패한다.
+    # 빈 값이면 모델 기본값(추론 on)을 쓴다 — 정확도 비교용으로 남겨 둔다.
+    reasoning-effort: none
