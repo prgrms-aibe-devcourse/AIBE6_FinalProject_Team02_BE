@@ -6,6 +6,7 @@ import com.backend_catcheat.domain.my.service.MyService;
 import com.backend_catcheat.global.common.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -44,6 +45,13 @@ public class MyController {
             @AuthenticationPrincipal Long userId,
             @RequestBody NicknameRequest request) {
         myService.changeNickname(userId, request.nickname());
+        return ApiResponse.ok();
+    }
+
+    /** 회원 탈퇴 (소프트 삭제) */
+    @DeleteMapping
+    public ApiResponse<Void> withdraw(@AuthenticationPrincipal Long userId) {
+        myService.withdraw(userId);
         return ApiResponse.ok();
     }
 }

@@ -6,6 +6,8 @@ import com.backend_catcheat.domain.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +41,11 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         User user = userRepository
                 .findByProviderAndProviderId(attributes.provider(), attributes.providerId())
                 .map(existing -> {
+                    // 탈퇴한 회원은 재로그인 차단. 소프트 삭제라 조회는 되지만 로그인은 막는다.
+                    if (existing.isWithdrawn()) {
+                        throw new OAuth2AuthenticationException(
+                                new OAuth2Error("withdrawn_user"), "withdrawn user");
+                    }
                     existing.updateEmail(attributes.email());
                     return existing;
                 })

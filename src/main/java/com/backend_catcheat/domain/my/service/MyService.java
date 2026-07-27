@@ -76,6 +76,16 @@ public class MyService {
         user.changeNickname(nickname, LocalDateTime.now());
     }
 
+    /**
+     * 회원 탈퇴 (소프트 삭제)
+     * 개인정보를 비식별화하고 탈퇴 시각을 남긴다.
+     */
+    @Transactional
+    public void withdraw(Long userId) {
+        User user = findUser(userId);
+        user.withdraw();
+    }
+
     private User findUser(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
