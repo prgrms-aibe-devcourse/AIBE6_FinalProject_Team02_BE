@@ -71,6 +71,10 @@ public class User extends BaseEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    /** 온보딩 튜토리얼 완료 여부 */
+    @Column(name = "onboarding_completed", nullable = false)
+    private boolean onboardingCompleted;
+
     /**
      * 생성자를 private + @Builder로 둔다.
      * 외부에서는 User.builder().provider(...).build() 형태로만 생성하게 강제한다.
@@ -107,6 +111,11 @@ public class User extends BaseEntity {
     /** 탈퇴한 회원인지 여부. */
     public boolean isWithdrawn() {
         return this.deletedAt != null;
+    }
+
+    /** 온보딩 튜토리얼 완료 처리 */
+    public void completeOnboarding() {
+        this.onboardingCompleted = true;
     }
 }
 
