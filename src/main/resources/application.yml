@@ -89,12 +89,14 @@ app:
 
 catcheat:
   vision:
+    # Groq 문서 기준 요청당 이미지 5장 — 기획안 "1~5장"과 일치
     max-images: 5
+    # 한 상 사진으로 동시에 등록할 수 있는 음식 수
+    max-food-names: 5
     max-long-edge-px: 1024
     jpeg-quality: 0.8
-    # Groq base64 이미지 상한 자체 상항
+    # Groq 상한은 요청당 20MB. 비용은 전송량에 비례하므로 자체 상한을 더 낮게 둔다
     max-encoded-bytes: 3500000
-    # Groq이 이미지 입력과 JSON 모드 조합을 거부하면 false로 내리고 비교
     json-mode: true
     # 추론 끄기. 음식 판별에 사고 과정이 불필요하고, 길어지면 JSON이 잘려 검증이 실패한다.
     # 빈 값이면 모델 기본값(추론 on)을 쓴다 — 정확도 비교용으로 남겨 둔다.
