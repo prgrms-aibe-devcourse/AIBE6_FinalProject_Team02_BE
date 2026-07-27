@@ -6,8 +6,9 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 
-@SpringBootApplication
 @ConfigurationPropertiesScan
+@EnableJpaAuditing
+@SpringBootApplication
 public class BackendCatcheatApplication {
 
     public static void main(String[] args) {
