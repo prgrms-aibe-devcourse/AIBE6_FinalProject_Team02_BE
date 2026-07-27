@@ -24,11 +24,13 @@ spring:
 
   ai:
     openai:
-      base-url: https://api.groq.com/openai
+      # Spring AI가 뒤에 /chat/completions 를 붙이므로 base-url에 /v1까지 포함해야 한다
+      base-url: https://api.groq.com/openai/v1
       api-key: ${GROQ_API_KEY:missing-groq-api-key}
       chat:
         options:
-          model: ${GROQ_VISION_MODEL:meta-llama/llama-4-scout-17b-16e-instruct}
+          # Groq이 제공하는 유일한 비전 모델 (Llama 4 계열은 라인업에서 제외됨)
+          model: ${GROQ_VISION_MODEL:qwen/qwen3.6-27b}
           temperature: 0.2
       embedding:
         enabled: false

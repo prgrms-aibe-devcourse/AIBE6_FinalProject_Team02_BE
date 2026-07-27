@@ -1,7 +1,7 @@
 package com.backend_catcheat.spike.vision.service;
 
 import com.backend_catcheat.spike.vision.config.VisionSpikeProperties;
-import com.backend_catcheat.spike.vision.dto.ai.AiVisionResult;
+import com.backend_catcheat.spike.vision.dto.ai.AiVerificationResult;
 import com.backend_catcheat.spike.vision.exception.VisionSpikeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,8 +33,9 @@ public class VisionAnalyzer {
 
     private static final Logger log = LoggerFactory.getLogger(VisionAnalyzer.class);
 
-    private static final String SYSTEM_PROMPT_PATH = "prompts/food-detection-system.st";
+    private static final String SYSTEM_PROMPT_PATH = "prompts/food-verification-system.st";
 
+    // application.yml의 spring.ai.openai.api-key 센티널 값(missing-groq-api-key)과 동일하게 유지
     private static final String MISSING_API_KEY = "missing-groq-api-key";
 
     private final ChatModel chatModel;
@@ -56,10 +57,10 @@ public class VisionAnalyzer {
         this.systemPrompt = loadSystemPrompt();
     }
 
-    public AnalysisOutcome analyze(List<PreparedImage> images, String hint) {
+    public AnalysisOutcome analyze(List<PreparedImage> images, List<String> foodNames) {
         requireApiKey();
 
-        Prompt prompt = buildPrompt(images, hint);
+        Prompt prompt = buildPrompt(images, foodNames);
 
         ChatResponse response;
         try {
@@ -74,12 +75,12 @@ public class VisionAnalyzer {
         return new AnalysisOutcome(rawText, response);
     }
 
-    public AiVisionResult parse(String rawText) {
+    public AiVerificationResult parse(String rawText) {
         String json = extractJsonObject(rawText);
         try {
-            AiVisionResult result = objectMapper.readValue(json, AiVisionResult.class);
-            // foods 누락은 "음식을 못 찾음"과 같게 취급한다 — 재분석 플로우로 넘기면 되므로 예외로 볼 필요가 없다
-            return result.foods() == null ? new AiVisionResult(List.of()) : result;
+            AiVerificationResult result = objectMapper.readValue(json, AiVerificationResult.class);
+            // verdicts 누락은 "아무것도 검증하지 못함"이므로 전부 불일치
+            return result.verdicts() == null ? new AiVerificationResult(List.of()) : result;
         } catch (JacksonException e) {
             log.warn("[spike] AI 응답 파싱 실패. 원문: {}", rawText);
             throw new VisionSpikeException("AI_RESPONSE_PARSE_FAILED", "음식 분석 결과를 읽지 못했어요", e);
@@ -93,7 +94,7 @@ public class VisionAnalyzer {
         }
     }
 
-    private Prompt buildPrompt(List<PreparedImage> images, String hint) {
+    private Prompt buildPrompt(List<PreparedImage> images, List<String> foodNames) {
         List<Media> media = images.stream()
                 .map(image -> Media.builder()
                         .mimeType(MimeTypeUtils.IMAGE_JPEG)
@@ -101,9 +102,8 @@ public class VisionAnalyzer {
                         .build())
                 .toList();
 
-        String userText = StringUtils.hasText(hint)
-                ? "이 사진 속 음식을 판별해라. 유저가 준 힌트: \"%s\". 힌트를 우선 고려하되 사진과 맞지 않으면 무시해라.".formatted(hint)
-                : "이 사진 속 음식을 판별해라.";
+        String userText = "이 사진에 다음 음식이 있는지 각각 판정해라: %s"
+                .formatted(String.join(", ", foodNames));
 
         UserMessage userMessage = UserMessage.builder()
                 .text(userText)
@@ -114,11 +114,16 @@ public class VisionAnalyzer {
     }
 
     private OpenAiChatOptions chatOptions() {
-        OpenAiChatOptions.Builder builder = OpenAiChatOptions.builder();
+        OpenAiChatOptions.Builder builder = ((OpenAiChatOptions) chatModel.getOptions()).mutate();
         if (properties.jsonMode()) {
             builder.responseFormat(OpenAiChatModel.ResponseFormat.builder()
                     .type(OpenAiChatModel.ResponseFormat.Type.JSON_OBJECT)
                     .build());
+        }
+        // 추론 모델의 사고 과정은 음식 판별에 필요 없는데 응답 시간·토큰을 지배하고,
+        // 길어지면 JSON 생성이 잘려 Groq의 JSON 검증이 실패한다. none으로 끈다.
+        if (StringUtils.hasText(properties.reasoningEffort())) {
+            builder.reasoningEffort(properties.reasoningEffort());
         }
         return builder.build();
     }
