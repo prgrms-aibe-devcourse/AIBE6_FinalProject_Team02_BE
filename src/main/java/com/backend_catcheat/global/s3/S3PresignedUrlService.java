@@ -7,14 +7,18 @@ import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.text.Normalizer;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -35,6 +39,28 @@ public class S3PresignedUrlService {
 
     private final S3Presigner s3Presigner;
     private final S3Properties s3Properties;
+
+    public String createDownloadUrl(String objectLocation) {
+        if (objectLocation == null || objectLocation.isBlank()) {
+            return null;
+        }
+
+        if (objectLocation.startsWith("http://") || objectLocation.startsWith("https://")) {
+            return objectLocation;
+        }
+
+        String key = Normalizer.normalize(extractKey(objectLocation), Normalizer.Form.NFD);
+        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                .bucket(s3Properties.bucket())
+                .key(key)
+                .build();
+        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                .signatureDuration(SIGNATURE_DURATION)
+                .getObjectRequest(getObjectRequest)
+                .build();
+        PresignedGetObjectRequest presignedRequest = s3Presigner.presignGetObject(presignRequest);
+        return presignedRequest.url().toString();
+    }
 
     public PresignedUploadResponseDTO createUploadUrls(PresignedUploadRequestDTO request) {
 
@@ -117,6 +143,18 @@ public class S3PresignedUrlService {
 
     private String buildPublicUrl(String key) {
         return s3Properties.publicBaseUrl().replaceAll("/+$", "") + "/" + key;
+    }
+
+    private String extractKey(String objectLocation) {
+        String s3Prefix = "s3://" + s3Properties.bucket() + "/";
+        if (objectLocation.startsWith(s3Prefix)) {
+            return objectLocation.substring(s3Prefix.length());
+        }
+        if (objectLocation.startsWith("s3://")) {
+            int keyStart = objectLocation.indexOf('/', "s3://".length());
+            return keyStart >= 0 ? objectLocation.substring(keyStart + 1) : objectLocation;
+        }
+        return objectLocation.replaceFirst("^/+", "");
     }
 
 }

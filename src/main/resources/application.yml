@@ -109,3 +109,6 @@ cloud:
       bucket: ${AWS_S3_BUCKET}
       region: ${AWS_REGION}
       public-base-url: ${AWS_PUBLIC_BASE_URL}
+      access-key-id: ${AWS_ACCESS_KEY_ID:}
+      secret-access-key: ${AWS_SECRET_ACCESS_KEY:}
+      session-token: ${AWS_SESSION_TOKEN:}
