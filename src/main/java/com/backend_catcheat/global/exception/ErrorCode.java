@@ -18,7 +18,8 @@ public enum ErrorCode {
     // 닉네임
     NICKNAME_INVALID(HttpStatus.BAD_REQUEST, "닉네임 형식을 확인해 주세요"),
     NICKNAME_DUPLICATED(HttpStatus.CONFLICT, "이미 사용 중인 닉네임이에요"),
-    NICKNAME_ALREADY_SET(HttpStatus.CONFLICT, "이미 닉네임이 설정되어 있어요");
+    NICKNAME_ALREADY_SET(HttpStatus.CONFLICT, "이미 닉네임이 설정되어 있어요"),
+    NICKNAME_CHANGE_TOO_SOON(HttpStatus.BAD_REQUEST, "닉네임은 한 달에 한 번만 바꿀 수 있어요");
 
     private final HttpStatus status;
     private final String message;

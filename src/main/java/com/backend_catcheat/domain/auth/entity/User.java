@@ -78,6 +78,12 @@ public class User extends BaseEntity {
     private boolean onboardingCompleted;
 
     /**
+     * 닉네임 최종 변경 시각
+     */
+    @Column(name = "nickname_updated_at")
+    private LocalDateTime nicknameUpdatedAt;
+
+    /**
      * 생성자를 private + @Builder로 둔다.
      * 외부에서는 User.builder().provider(...).build() 형태로만 생성하게 강제한다.
      */
@@ -128,6 +134,18 @@ public class User extends BaseEntity {
             throw new CustomException(ErrorCode.NICKNAME_ALREADY_SET);
         }
         this.nickname = nickname;
+    }
+
+    /**
+     * 닉네임 변경
+     * 마지막 변경 후 1개월이 지나지 않았으면 예외
+     */
+    public void changeNickname(String nickname, LocalDateTime now) {
+        if (this.nicknameUpdatedAt != null && now.isBefore(this.nicknameUpdatedAt.plusMonths(1))) {
+            throw new CustomException(ErrorCode.NICKNAME_CHANGE_TOO_SOON);
+        }
+        this.nickname = nickname;
+        this.nicknameUpdatedAt = now;
     }
 }
 
