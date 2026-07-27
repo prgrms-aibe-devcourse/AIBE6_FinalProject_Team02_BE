@@ -1,5 +1,7 @@
 package com.backend_catcheat.domain.auth.entity;
 
+import com.backend_catcheat.global.exception.CustomException;
+import com.backend_catcheat.global.exception.ErrorCode;
 import com.backend_catcheat.global.jpa.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -116,6 +118,16 @@ public class User extends BaseEntity {
     /** 온보딩 튜토리얼 완료 처리 */
     public void completeOnboarding() {
         this.onboardingCompleted = true;
+    }
+
+    /**
+     * 최초 닉네임 세팅
+     */
+    public void setInitialNickname(String nickname) {
+        if (this.nickname != null) {
+            throw new CustomException(ErrorCode.NICKNAME_ALREADY_SET);
+        }
+        this.nickname = nickname;
     }
 }
 
