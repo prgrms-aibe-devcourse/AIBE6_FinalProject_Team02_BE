@@ -29,8 +29,9 @@ public class VisionSpikeController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<VisionAnalysisResponse> analyze(
             @RequestPart(value = "images", required = false) List<MultipartFile> images,
-            @RequestParam(value = "hint", required = false) String hint
+            @RequestParam(value = "analysisPhotoIndex", required = false) Integer analysisPhotoIndex,
+            @RequestParam(value = "foodNames", required = false) List<String> foodNames
     ) {
-        return ApiResponse.ok(visionSpikeService.analyze(images, hint));
+        return ApiResponse.ok(visionSpikeService.analyze(images, analysisPhotoIndex, foodNames));
     }
 }

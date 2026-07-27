@@ -26,7 +26,7 @@ class ImagePreprocessorTest {
 
     @BeforeEach
     void setUp() {
-        preprocessor = new ImagePreprocessor(new VisionSpikeProperties(5, 1024, 0.8f, 3_500_000L, true));
+        preprocessor = new ImagePreprocessor(new VisionSpikeProperties(5, 1024, 0.8f, 3_500_000L, 5, true, "none"));
     }
 
     @Test
@@ -110,7 +110,7 @@ class ImagePreprocessorTest {
     void 인코딩_상한을_못_맞추면_거부한다() throws IOException {
         // 업로드 상한(IMAGE_UPLOAD_TOO_LARGE)과 구분되는 경로임을 고정한다
         ImagePreprocessor tightLimit =
-                new ImagePreprocessor(new VisionSpikeProperties(5, 1024, 0.8f, 100L, true));
+                new ImagePreprocessor(new VisionSpikeProperties(5, 1024, 0.8f, 100L, 5, true, "none"));
 
         assertThatThrownBy(() -> tightLimit.prepare(jpeg("large.jpg", 4000, 3000)))
                 .isInstanceOf(VisionSpikeException.class)

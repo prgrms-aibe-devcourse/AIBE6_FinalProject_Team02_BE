@@ -3,8 +3,8 @@ package com.backend_catcheat.spike.vision.controller;
 import com.backend_catcheat.spike.vision.config.SpikeSecurityConfig;
 import com.backend_catcheat.spike.vision.dto.SpikeMetrics;
 import com.backend_catcheat.spike.vision.dto.VisionAnalysisResponse;
-import com.backend_catcheat.spike.vision.dto.VisionAnalysisResponse.DetectedFood;
-import com.backend_catcheat.spike.vision.dto.VisionAnalysisResponse.FoodCandidate;
+import com.backend_catcheat.spike.vision.dto.VisionAnalysisResponse.FoodVerdict;
+
 import com.backend_catcheat.spike.vision.exception.VisionSpikeException;
 import com.backend_catcheat.spike.vision.service.VisionSpikeService;
 import org.junit.jupiter.api.DisplayName;
@@ -48,18 +48,19 @@ class VisionSpikeControllerTest {
     @Test
     @DisplayName("성공 응답은 success/data 포맷을 따른다")
     void 성공_응답_포맷() throws Exception {
-        when(visionSpikeService.analyze(anyList(), any())).thenReturn(new VisionAnalysisResponse(
-                List.of(new DetectedFood(List.of(
-                        new FoodCandidate("김치찌개", 0.93, 1L, "김치찌개", "찌개·전골", "EXACT")))),
-                new SpikeMetrics(120, 1800, 3, 1, 1930, 1, 250_000, 90_000, 1200, 100, 1300, "llama-4-scout"),
-                "{\"foods\":[]}"
+        when(visionSpikeService.analyze(anyList(), any(), any())).thenReturn(new VisionAnalysisResponse(
+                List.of(new FoodVerdict("김치찌개", true, 0.93, "", 1L, "김치찌개", "찌개·전골", "EXACT", true)),
+                new SpikeMetrics(120, 1800, 3, 1, 1930, 3, 1, 250_000, 90_000, 1200, 100, 1300, "qwen/qwen3.6-27b"),
+                "{\"verdicts\":[]}"
         ));
 
         mockMvc.perform(multipart(ENDPOINT).file(jpegPart()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.foods[0].candidates[0].slotName").value("김치찌개"))
-                .andExpect(jsonPath("$.data.foods[0].candidates[0].matchType").value("EXACT"))
+                .andExpect(jsonPath("$.data.verdicts[0].requestedName").value("김치찌개"))
+                .andExpect(jsonPath("$.data.verdicts[0].matched").value(true))
+                .andExpect(jsonPath("$.data.verdicts[0].unlockable").value(true))
+                .andExpect(jsonPath("$.data.verdicts[0].matchType").value("EXACT"))
                 .andExpect(jsonPath("$.data.metrics.totalMs").value(1930))
                 // 공용 래퍼는 null 필드를 생략하지 않으므로 "부재"가 아니라 "null"을 단언한다
                 .andExpect(jsonPath("$.error").isEmpty());
@@ -68,7 +69,7 @@ class VisionSpikeControllerTest {
     @Test
     @DisplayName("실패 응답은 success/error 포맷을 따르고 code를 포함한다")
     void 실패_응답_포맷() throws Exception {
-        when(visionSpikeService.analyze(anyList(), any()))
+        when(visionSpikeService.analyze(anyList(), any(), any()))
                 .thenThrow(new VisionSpikeException("IMAGE_COUNT_EXCEEDED", "사진은 최대 5장까지 올릴 수 있어요"));
 
         mockMvc.perform(multipart(ENDPOINT).file(jpegPart()))
@@ -82,10 +83,10 @@ class VisionSpikeControllerTest {
     @Test
     @DisplayName("images 파트가 아예 없어도 공통 포맷으로 응답한다 — 스택트레이스 노출 방지")
     void 파트_누락도_공통_포맷이다() throws Exception {
-        when(visionSpikeService.analyze(any(), any()))
+        when(visionSpikeService.analyze(any(), any(), any()))
                 .thenThrow(new VisionSpikeException("IMAGE_REQUIRED", "사진을 최소 1장 올려 주세요"));
 
-        mockMvc.perform(multipart(ENDPOINT).param("hint", "김치찌개"))
+        mockMvc.perform(multipart(ENDPOINT).param("foodNames", "김치찌개"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("IMAGE_REQUIRED"))
@@ -95,7 +96,7 @@ class VisionSpikeControllerTest {
     @Test
     @DisplayName("AI 장애는 500으로 내보낸다 — 입력 문제와 구분")
     void AI_장애는_500이다() throws Exception {
-        when(visionSpikeService.analyze(anyList(), any()))
+        when(visionSpikeService.analyze(anyList(), any(), any()))
                 .thenThrow(new VisionSpikeException("AI_CALL_FAILED", "음식 분석에 실패했어요. 잠시 후 다시 시도해 주세요"));
 
         mockMvc.perform(multipart(ENDPOINT).file(jpegPart()))
@@ -106,7 +107,7 @@ class VisionSpikeControllerTest {
     @Test
     @DisplayName("업로드 상한 초과는 413과 전용 코드로 내보낸다 — 인코딩 상한과 구분")
     void 업로드_상한_초과는_413이다() throws Exception {
-        when(visionSpikeService.analyze(anyList(), any()))
+        when(visionSpikeService.analyze(anyList(), any(), any()))
                 .thenThrow(new MaxUploadSizeExceededException(10 * 1024 * 1024));
 
         mockMvc.perform(multipart(ENDPOINT).file(jpegPart()))
@@ -117,9 +118,9 @@ class VisionSpikeControllerTest {
     @Test
     @DisplayName("인증 없이 호출할 수 있다 — 스파이크 경로는 dev에서 열려 있다")
     void 인증_없이_호출된다() throws Exception {
-        when(visionSpikeService.analyze(anyList(), any())).thenReturn(new VisionAnalysisResponse(
+        when(visionSpikeService.analyze(anyList(), any(), any())).thenReturn(new VisionAnalysisResponse(
                 List.of(),
-                new SpikeMetrics(1, 1, 1, 1, 4, 1, 1, 1, 0, 0, 0, "llama-4-scout"),
+                new SpikeMetrics(1, 1, 1, 1, 4, 1, 1, 1, 1, 0, 0, 0, "qwen/qwen3.6-27b"),
                 "{}"
         ));
 

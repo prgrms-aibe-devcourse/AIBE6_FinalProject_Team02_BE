@@ -3,9 +3,10 @@ package com.backend_catcheat.spike.vision.service;
 import com.backend_catcheat.spike.vision.config.VisionSpikeProperties;
 import com.backend_catcheat.spike.vision.dto.SpikeMetrics;
 import com.backend_catcheat.spike.vision.dto.VisionAnalysisResponse;
-import com.backend_catcheat.spike.vision.dto.VisionAnalysisResponse.DetectedFood;
-import com.backend_catcheat.spike.vision.dto.VisionAnalysisResponse.FoodCandidate;
-import com.backend_catcheat.spike.vision.dto.ai.AiVisionResult;
+import com.backend_catcheat.spike.vision.dto.VisionAnalysisResponse.FoodVerdict;
+
+import com.backend_catcheat.spike.vision.dto.ai.AiVerificationResult;
+import com.backend_catcheat.spike.vision.dto.ai.AiVerificationResult.AiVerdict;
 import com.backend_catcheat.spike.vision.exception.VisionSpikeException;
 import com.backend_catcheat.spike.vision.service.DexMatcher.MatchResult;
 import org.slf4j.Logger;
@@ -14,11 +15,12 @@ import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.Comparator;
+import java.util.Map;
 import java.util.List;
-import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 public class VisionSpikeService {
@@ -42,32 +44,98 @@ public class VisionSpikeService {
         this.properties = properties;
     }
 
-    public VisionAnalysisResponse analyze(List<MultipartFile> images, String hint) {
+    public VisionAnalysisResponse analyze(List<MultipartFile> images, Integer analysisPhotoIndex, List<String> foodNames) {
         validateImageCount(images);
+        List<String> names = normalizeFoodNames(foodNames);
+        int index = resolveAnalysisPhotoIndex(images, analysisPhotoIndex);
         long startedAt = System.nanoTime();
 
+        // AI에는 분석 사진 1장만 보낸다 (AGENTS.md §5.2). 나머지는 카드 사진이라 전처리 대상이 아니다.
         long preprocessStart = System.nanoTime();
-        List<PreparedImage> prepared = images.stream().map(preprocessor::prepare).toList();
+        PreparedImage analysisPhoto = preprocessor.prepare(images.get(index));
         long preprocessMs = elapsedMs(preprocessStart);
 
+        List<PreparedImage> prepared = List.of(analysisPhoto);
+
         long aiStart = System.nanoTime();
-        VisionAnalyzer.AnalysisOutcome outcome = analyzer.analyze(prepared, hint);
+        VisionAnalyzer.AnalysisOutcome outcome = analyzer.analyze(prepared, names);
         long aiCallMs = elapsedMs(aiStart);
 
         long parseStart = System.nanoTime();
-        AiVisionResult aiResult = analyzer.parse(outcome.rawText());
+        AiVerificationResult aiResult = analyzer.parse(outcome.rawText());
         long parseMs = elapsedMs(parseStart);
 
         long matchStart = System.nanoTime();
-        List<DetectedFood> foods = toDetectedFoods(aiResult);
+        List<FoodVerdict> verdicts = toVerdicts(names, aiResult);
         long matchMs = elapsedMs(matchStart);
 
         SpikeMetrics metrics = buildMetrics(
-                prepared, outcome.response(), preprocessMs, aiCallMs, parseMs, matchMs, elapsedMs(startedAt));
+                images.size(), prepared, outcome.response(),
+                preprocessMs, aiCallMs, parseMs, matchMs, elapsedMs(startedAt));
 
-        logOutcome(foods, metrics);
+        logOutcome(verdicts, metrics);
 
-        return new VisionAnalysisResponse(foods, metrics, outcome.rawText());
+        return new VisionAnalysisResponse(verdicts, metrics, outcome.rawText());
+    }
+
+    private List<String> normalizeFoodNames(List<String> foodNames) {
+        if (foodNames == null || foodNames.isEmpty()) {
+            throw new VisionSpikeException("FOOD_NAME_REQUIRED", "음식 이름을 입력해 주세요");
+        }
+        List<String> names = foodNames.stream()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .distinct()
+                .toList();
+        if (names.isEmpty()) {
+            throw new VisionSpikeException("FOOD_NAME_REQUIRED", "음식 이름을 입력해 주세요");
+        }
+        if (names.size() > properties.maxFoodNames()) {
+            throw new VisionSpikeException("FOOD_NAME_COUNT_EXCEEDED",
+                    "음식은 한 번에 최대 %d개까지 등록할 수 있어요".formatted(properties.maxFoodNames()));
+        }
+        return names;
+    }
+
+    private List<FoodVerdict> toVerdicts(List<String> requestedNames, AiVerificationResult aiResult) {
+        Map<String, AiVerdict> byName = aiResult.verdicts().stream()
+                .filter(v -> v != null && StringUtils.hasText(v.name()))
+                .collect(Collectors.toMap(
+                        v -> normalizeName(v.name()), v -> v, (first, second) -> first));
+
+        return requestedNames.stream()
+                .map(name -> toVerdict(name, byName.get(normalizeName(name))))
+                .toList();
+    }
+
+    private FoodVerdict toVerdict(String requestedName, AiVerdict aiVerdict) {
+        boolean matched = aiVerdict != null && aiVerdict.matched();
+        double confidence = aiVerdict != null ? aiVerdict.confidence() : 0.0;
+        String reason = aiVerdict == null
+                ? "사진에서 이 음식을 확인하지 못했어요"
+                : (matched ? "" : defaultIfBlank(aiVerdict.reason(), "사진과 음식 이름이 달라 보여요"));
+
+        MatchResult match = dexMatcher.match(requestedName);
+        return new FoodVerdict(
+                requestedName,
+                matched,
+                confidence,
+                reason,
+                match.isMapped() ? match.slot().id() : null,
+                match.isMapped() ? match.slot().name() : null,
+                match.isMapped() ? match.slot().category() : null,
+                match.matchType().name(),
+                // 검증을 통과했고 도감에도 있어야 해금할 수 있다
+                matched && match.isMapped()
+        );
+    }
+
+    private static String normalizeName(String value) {
+        return value.replaceAll("[\\s·\\-_]", "").toLowerCase();
+    }
+
+    private static String defaultIfBlank(String value, String fallback) {
+        return StringUtils.hasText(value) ? value : fallback;
     }
 
     private void validateImageCount(List<MultipartFile> images) {
@@ -80,31 +148,19 @@ public class VisionSpikeService {
         }
     }
 
-    private List<DetectedFood> toDetectedFoods(AiVisionResult aiResult) {
-        return aiResult.foods().stream()
-                .filter(food -> food.candidates() != null && !food.candidates().isEmpty())
-                .map(food -> new DetectedFood(
-                        food.candidates().stream()
-                                .filter(Objects::nonNull)
-                                .sorted(Comparator.comparingDouble(AiVisionResult.AiCandidate::confidence).reversed())
-                                .map(this::toCandidate)
-                                .toList()))
-                .toList();
-    }
-
-    private FoodCandidate toCandidate(AiVisionResult.AiCandidate candidate) {
-        MatchResult match = dexMatcher.match(candidate.name());
-        return new FoodCandidate(
-                candidate.name(),
-                candidate.confidence(),
-                match.isMapped() ? match.slot().id() : null,
-                match.isMapped() ? match.slot().name() : null,
-                match.isMapped() ? match.slot().category() : null,
-                match.matchType().name()
-        );
+    private int resolveAnalysisPhotoIndex(List<MultipartFile> images, Integer requested) {
+        if (requested == null) {
+            return 0;
+        }
+        if (requested < 0 || requested >= images.size()) {
+            throw new VisionSpikeException("ANALYSIS_PHOTO_INDEX_INVALID",
+                    "분석할 사진을 다시 선택해 주세요");
+        }
+        return requested;
     }
 
     private SpikeMetrics buildMetrics(
+            int uploadedCount,
             List<PreparedImage> prepared,
             ChatResponse response,
             long preprocessMs,
@@ -122,6 +178,7 @@ public class VisionSpikeService {
                 parseMs,
                 matchMs,
                 totalMs,
+                uploadedCount,
                 prepared.size(),
                 prepared.stream().mapToLong(PreparedImage::originalBytes).sum(),
                 prepared.stream().mapToLong(PreparedImage::encodedBytes).sum(),
@@ -132,15 +189,13 @@ public class VisionSpikeService {
         );
     }
 
-    private void logOutcome(List<DetectedFood> foods, SpikeMetrics metrics) {
-        long unmapped = foods.stream()
-                .flatMap(food -> food.candidates().stream())
-                .filter(candidate -> DexMatcher.MatchType.UNMAPPED.name().equals(candidate.matchType()))
-                .count();
+    private void logOutcome(List<FoodVerdict> verdicts, SpikeMetrics metrics) {
+        long matched = verdicts.stream().filter(FoodVerdict::matched).count();
+        long unlockable = verdicts.stream().filter(FoodVerdict::unlockable).count();
 
-        // 리포트 집계는 이 한 줄을 긁어서 만든다
-        log.info("[spike] 분석 완료 model={} foods={} unmapped={} | 전처리 {}ms + AI {}ms + 파싱 {}ms + 매핑 {}ms = 총 {}ms | 토큰 {} | {}B -> {}B",
-                metrics.model(), foods.size(), unmapped,
+        log.info("[spike] 검증 완료 model={} 업로드{}장/분석{}장 요청{}건 일치{}건 해금가능{}건 | 전처리 {}ms + AI {}ms + 파싱 {}ms + 매핑 {}ms = 총 {}ms | 토큰 {} | {}B -> {}B",
+                metrics.model(), metrics.uploadedImageCount(), metrics.analyzedImageCount(),
+                verdicts.size(), matched, unlockable,
                 metrics.preprocessMs(), metrics.aiCallMs(), metrics.parseMs(), metrics.matchMs(), metrics.totalMs(),
                 metrics.totalTokens(), metrics.originalBytes(), metrics.encodedBytes());
 
