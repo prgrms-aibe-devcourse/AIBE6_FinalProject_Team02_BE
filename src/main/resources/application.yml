@@ -96,3 +96,6 @@ catcheat:
     max-encoded-bytes: 3500000
     # Groq이 이미지 입력과 JSON 모드 조합을 거부하면 false로 내리고 비교
     json-mode: true
+    # 추론 끄기. 음식 판별에 사고 과정이 불필요하고, 길어지면 JSON이 잘려 검증이 실패한다.
+    # 빈 값이면 모델 기본값(추론 on)을 쓴다 — 정확도 비교용으로 남겨 둔다.
+    reasoning-effort: none

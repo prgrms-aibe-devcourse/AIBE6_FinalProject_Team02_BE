@@ -8,6 +8,8 @@ public record VisionSpikeProperties(
         int maxLongEdgePx,
         float jpegQuality,
         long maxEncodedBytes,
-        boolean jsonMode
+        int maxFoodNames,
+        boolean jsonMode,
+        String reasoningEffort
 ) {
 }
