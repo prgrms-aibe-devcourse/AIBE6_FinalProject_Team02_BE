@@ -7,7 +7,6 @@ public record PresignedUploadResponseDTO (
 ){
     public record UploadTarget(
             String key,
-            String uploadUrl,
-            String publicUrl
+            String uploadUrl
     ) {}
 }
