@@ -25,19 +25,24 @@ public class FoodRegistrationRequest extends BaseEntity {
     @Column(nullable = false, length = 20)
     private RegistrationRequestStatus status;
 
+    @Column(name = "reject_reason", length = 200)
+    private String rejectReason;
+
     @Builder
-    private FoodRegistrationRequest(Long registrationId, String description, String failureReason, RegistrationRequestStatus status) {
+    private FoodRegistrationRequest(Long registrationId, String description, String failureReason) {
         this.registrationId = registrationId;
         this.description = description;
         this.failureReason = failureReason;
-        this.status = status;
+        this.status = RegistrationRequestStatus.PENDING;
     }
     public void complete() {
         this.status = RegistrationRequestStatus.COMPLETED;
     }
-    public void reject(String failureReason) {
+
+
+    public void reject(String reason) {
         this.status = RegistrationRequestStatus.REJECTED;
-        this.failureReason = failureReason;
+        this.rejectReason = reason;   // failureReason 말고 rejectReason에
     }
 
 }

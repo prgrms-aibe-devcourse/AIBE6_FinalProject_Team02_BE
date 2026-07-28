@@ -11,23 +11,23 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/admin/reports")
+@RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
 public class AdminController {
     private final AdminService adminService;
 
-    @GetMapping
+    @GetMapping("/reports")
     public ApiResponse<List<FoodReportResponseDTO>> getPendingReports() {
         return ApiResponse.ok(adminService.getPendingReports());
     }
 
-    @GetMapping("/{reportId}/accept")
+    @PatchMapping("/reports/{reportId}/accept")
     public ApiResponse<Void> acceptReport(@PathVariable Long reportId) {
         adminService.acceptReport(reportId);
         return ApiResponse.ok();
     }
 
-    @PatchMapping("/{reportId}/reject")
+    @PatchMapping("/reports/{reportId}/reject")
     public ApiResponse<Void> rejectReport(
             @PathVariable Long reportId,
             @RequestBody RejectRequestDTO request

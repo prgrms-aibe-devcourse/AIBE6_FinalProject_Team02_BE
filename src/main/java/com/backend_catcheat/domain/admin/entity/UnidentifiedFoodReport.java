@@ -3,6 +3,7 @@ package com.backend_catcheat.domain.admin.entity;
 import com.backend_catcheat.global.jpa.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -27,6 +28,13 @@ public class UnidentifiedFoodReport extends BaseEntity {
     @Column(name = "reject_reason", length = 200)
     private String rejectReason;
 
+    @Builder
+    private UnidentifiedFoodReport(Long registrationId, String description) {
+        this.registrationId = registrationId;
+        this.description = description;
+        this.status = ReportStatus.PENDING;   // 생성 시 항상 대기
+    }
+
     //채택처리
     public void accept() {
         this.status = ReportStatus.ACCEPTED;
@@ -36,5 +44,6 @@ public class UnidentifiedFoodReport extends BaseEntity {
         this.status = ReportStatus.REJECTED;
         this.rejectReason = reason;
     }
+
 
 }
