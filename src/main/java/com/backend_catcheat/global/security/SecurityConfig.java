@@ -6,6 +6,7 @@ import com.backend_catcheat.global.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -53,6 +54,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/reissue",
                                 "/api/v1/auth/logout"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/dex/basic").permitAll()
                         // 관리자 전용
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         // 그 외 모든 요청은 인증 필요

@@ -1,5 +1,7 @@
 package com.backend_catcheat.domain.auth.entity;
 
+import com.backend_catcheat.global.exception.CustomException;
+import com.backend_catcheat.global.exception.ErrorCode;
 import com.backend_catcheat.global.jpa.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -60,6 +62,20 @@ public class User extends BaseEntity {
     private boolean onboardingCompleted;
 
     /**
+     * 닉네임 최종 변경 시각
+     */
+    @Column(name = "nickname_updated_at")
+    private LocalDateTime nicknameUpdatedAt;
+
+    /** 장착한 대표 뱃지 id. 닉네임 옆에 표시된다. null이면 미장착. (badge 삭제 시 FK가 NULL 처리) */
+    @Column(name = "equipped_badge_id")
+    private Long equippedBadgeId;
+
+    /** 프로필 사진 S3 object key. null이면 사진 없음 */
+    @Column(name = "profile_image_key", length = 512)
+    private String profileImageKey;
+
+    /**
      * 생성자를 private + @Builder로 둔다.
      * 외부에서는 User.builder().provider(...).build() 형태로만 생성하게 강제한다.
      */
@@ -100,6 +116,43 @@ public class User extends BaseEntity {
     /** 온보딩 튜토리얼 완료 처리 */
     public void completeOnboarding() {
         this.onboardingCompleted = true;
+    }
+
+    /**
+     * 최초 닉네임 세팅
+     */
+    public void setInitialNickname(String nickname) {
+        if (this.nickname != null) {
+            throw new CustomException(ErrorCode.NICKNAME_ALREADY_SET);
+        }
+        this.nickname = nickname;
+    }
+
+    /**
+     * 닉네임 변경
+     * 마지막 변경 후 1개월이 지나지 않았으면 예외
+     */
+    public void changeNickname(String nickname, LocalDateTime now) {
+        if (this.nicknameUpdatedAt != null && now.isBefore(this.nicknameUpdatedAt.plusMonths(1))) {
+            throw new CustomException(ErrorCode.NICKNAME_CHANGE_TOO_SOON);
+        }
+        this.nickname = nickname;
+        this.nicknameUpdatedAt = now;
+    }
+
+    /** 대표 뱃지 장착/해제. badgeId가 null이면 해제. (보유 검증은 서비스에서 선행) */
+    public void equipBadge(Long badgeId) {
+        this.equippedBadgeId = badgeId;
+    }
+
+    /** 프로필 사진 설정(업로드된 S3 key) */
+    public void changeProfileImage(String key) {
+        this.profileImageKey = key;
+    }
+
+    /** 프로필 사진 제거 → 닉네임 첫 글자 표시로 돌아감 */
+    public void removeProfileImage() {
+        this.profileImageKey = null;
     }
 }
 

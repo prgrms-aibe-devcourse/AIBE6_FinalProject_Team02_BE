@@ -22,4 +22,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * 없을 때 null 대신 Optional.empty()로 안전하게 처리한다.
      */
     Optional<User> findByProviderAndProviderId(Provider provider, String providerId);
+
+    /**
+     * 닉네임 중복 여부
+     * 초기 세팅·변경 시 유니크 보장을 위해 사용
+     */
+    boolean existsByNickname(String nickname);
 }

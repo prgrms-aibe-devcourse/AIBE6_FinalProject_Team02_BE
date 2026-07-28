@@ -7,6 +7,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
 import org.springframework.stereotype.Component;
 
@@ -27,8 +28,15 @@ public class OAuth2FailureHandler extends SimpleUrlAuthenticationFailureHandler 
             HttpServletResponse response,
             AuthenticationException exception
     ) throws IOException {
+        // 기본은 사유를 숨기고(login_failed), 탈퇴 회원만 별도 코드로 안내한다.
+        String errorCode = "login_failed";
+        if (exception instanceof OAuth2AuthenticationException oae
+                && "withdrawn_user".equals(oae.getError().getErrorCode())) {
+            errorCode = "withdrawn";
+        }
+
         String target = redirectUri + "?error=" +
-                URLEncoder.encode("login_failed", StandardCharsets.UTF_8);
+                URLEncoder.encode(errorCode, StandardCharsets.UTF_8);
         getRedirectStrategy().sendRedirect(request, response, target);
     }
 }
