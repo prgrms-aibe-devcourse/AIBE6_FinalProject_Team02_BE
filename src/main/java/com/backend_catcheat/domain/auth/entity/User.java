@@ -87,6 +87,10 @@ public class User extends BaseEntity {
     @Column(name = "equipped_badge_id")
     private Long equippedBadgeId;
 
+    /** 프로필 사진 S3 object key. null이면 사진 없음 */
+    @Column(name = "profile_image_key", length = 512)
+    private String profileImageKey;
+
     /**
      * 생성자를 private + @Builder로 둔다.
      * 외부에서는 User.builder().provider(...).build() 형태로만 생성하게 강제한다.
@@ -155,6 +159,16 @@ public class User extends BaseEntity {
     /** 대표 뱃지 장착/해제. badgeId가 null이면 해제. (보유 검증은 서비스에서 선행) */
     public void equipBadge(Long badgeId) {
         this.equippedBadgeId = badgeId;
+    }
+
+    /** 프로필 사진 설정(업로드된 S3 key) */
+    public void changeProfileImage(String key) {
+        this.profileImageKey = key;
+    }
+
+    /** 프로필 사진 제거 → 닉네임 첫 글자 표시로 돌아감 */
+    public void removeProfileImage() {
+        this.profileImageKey = null;
     }
 }
 
