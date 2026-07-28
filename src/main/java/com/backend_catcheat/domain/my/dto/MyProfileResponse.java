@@ -8,5 +8,6 @@ import java.time.LocalDateTime;
 public record MyProfileResponse(
         String nickname,
         boolean nicknameChangeable,
-        LocalDateTime nicknameChangeableAt
+        LocalDateTime nicknameChangeableAt,
+        String profileImageUrl
 ) {}

@@ -2,6 +2,7 @@ package com.backend_catcheat.domain.my.controller;
 
 import com.backend_catcheat.domain.my.dto.MyProfileResponse;
 import com.backend_catcheat.domain.my.dto.NicknameRequest;
+import com.backend_catcheat.domain.my.dto.ProfileImageRequest;
 import com.backend_catcheat.domain.my.service.MyService;
 import com.backend_catcheat.global.common.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +46,22 @@ public class MyController {
             @AuthenticationPrincipal Long userId,
             @RequestBody NicknameRequest request) {
         myService.changeNickname(userId, request.nickname());
+        return ApiResponse.ok();
+    }
+
+    /** 프로필 사진 설정 (presigned로 업로드된 S3 key 저장) */
+    @PatchMapping("/profile-image")
+    public ApiResponse<Void> changeProfileImage(
+            @AuthenticationPrincipal Long userId,
+            @RequestBody ProfileImageRequest request) {
+        myService.changeProfileImage(userId, request.key());
+        return ApiResponse.ok();
+    }
+
+    /** 프로필 사진 제거 → 닉네임 첫 글자 표시로 복귀 */
+    @DeleteMapping("/profile-image")
+    public ApiResponse<Void> removeProfileImage(@AuthenticationPrincipal Long userId) {
+        myService.removeProfileImage(userId);
         return ApiResponse.ok();
     }
 

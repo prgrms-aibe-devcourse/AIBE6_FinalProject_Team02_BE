@@ -5,6 +5,7 @@ import com.backend_catcheat.domain.auth.repository.UserRepository;
 import com.backend_catcheat.domain.my.dto.MyProfileResponse;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
+import com.backend_catcheat.global.s3.S3PresignedUrlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,19 +22,49 @@ import java.util.regex.Pattern;
 @Transactional(readOnly = true)
 public class MyService {
     private final UserRepository userRepository;
+    private final S3PresignedUrlService s3PresignedUrlService;
 
     // 닉네임 규칙: 2~8자, 한글/영문/숫자/밑줄만
     private static final Pattern NICKNAME_PATTERN =
             Pattern.compile("^[가-힣a-zA-Z0-9_]{2,8}$");
 
-    /** 마이페이지 프로필 조회. 닉네임 변경 가능 여부/가능 시각을 함께 계산해 준다. */
+    /** 마이페이지 프로필 조회
+     * 닉네임 변경 가능 여부/가능 시각 + 프로필 이미지 URL 반환 */
     public MyProfileResponse getProfile(Long userId) {
         User user = findUser(userId);
         LocalDateTime updatedAt = user.getNicknameUpdatedAt();
         // 변경 이력이 없으면 즉시 가능, 있으면 마지막 변경 +1개월부터 가능
         LocalDateTime changeableAt = updatedAt == null ? null : updatedAt.plusMonths(1);
         boolean changeable = changeableAt == null || !LocalDateTime.now().isBefore(changeableAt);
-        return new MyProfileResponse(user.getNickname(), changeable, changeableAt);
+        // 저장은 S3 key, 표시용은 presigned/공개 URL로 변환 (사진 없으면 null)
+        String profileImageUrl = s3PresignedUrlService.createDownloadUrl(user.getProfileImageKey());
+        return new MyProfileResponse(user.getNickname(), changeable, changeableAt, profileImageUrl);
+    }
+
+    /** 프로필 사진 설정 */
+    @Transactional
+    public void changeProfileImage(Long userId, String key) {
+        if (key == null || key.isBlank()) {
+            throw new CustomException(ErrorCode.UPLOAD_FILE_REQUIRED);
+        }
+        User user = findUser(userId);
+        String oldKey = user.getProfileImageKey();
+        user.changeProfileImage(key);
+        // 새 이미지로 바뀌면 이전 S3 객체 삭제 (고아 객체 방지, best-effort)
+        if (oldKey != null && !oldKey.equals(key)) {
+            s3PresignedUrlService.deleteObject(oldKey);
+        }
+    }
+
+    /** 프로필 사진 제거 → 닉네임 첫 글자 표시로 복귀 */
+    @Transactional
+    public void removeProfileImage(Long userId) {
+        User user = findUser(userId);
+        String oldKey = user.getProfileImageKey();
+        user.removeProfileImage();
+        if (oldKey != null) {
+            s3PresignedUrlService.deleteObject(oldKey);
+        }
     }
 
     /**
