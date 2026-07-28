@@ -1,6 +1,7 @@
 package com.backend_catcheat.domain.dex.basicdex.service;
 
 import com.backend_catcheat.domain.dex.basicdex.dto.BasicDexResponse;
+import com.backend_catcheat.domain.dex.basicdex.entity.BasicDexEntity;
 import com.backend_catcheat.domain.dex.basicdex.repository.BasicDexRepository;
 import com.backend_catcheat.global.s3.S3PresignedUrlService;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +27,7 @@ public class BasicDexService {
                 .toList();
     }
 
-    private String resolveIllustrationLocation(com.backend_catcheat.domain.dex.basicdex.entity.BasicDexEntity entity) {
+    private String resolveIllustrationLocation(BasicDexEntity entity) {
         if (entity.getIllustrationUrl() != null && !entity.getIllustrationUrl().isBlank()) {
             return entity.getIllustrationUrl();
         }

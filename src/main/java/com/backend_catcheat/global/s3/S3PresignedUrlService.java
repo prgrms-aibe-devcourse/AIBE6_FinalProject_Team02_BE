@@ -128,8 +128,7 @@ public class S3PresignedUrlService {
 
         return new PresignedUploadResponseDTO.UploadTarget(
                 key,
-                presignedRequest.url().toString(),
-                buildPublicUrl(key)
+                presignedRequest.url().toString()
         );
     }
 
