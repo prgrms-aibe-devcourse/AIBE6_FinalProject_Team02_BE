@@ -128,8 +128,7 @@ public class S3PresignedUrlService {
 
         return new PresignedUploadResponseDTO.UploadTarget(
                 key,
-                presignedRequest.url().toString(),
-                buildPublicUrl(key)
+                presignedRequest.url().toString()
         );
     }
 
@@ -162,10 +161,6 @@ public class S3PresignedUrlService {
             case "image/heif" -> ".heif";
             default -> throw new CustomException(ErrorCode.INVALID_UPLOAD_FILE);
         };
-    }
-
-    private String buildPublicUrl(String key) {
-        return s3Properties.publicBaseUrl().replaceAll("/+$", "") + "/" + key;
     }
 
     private String extractKey(String objectLocation) {
