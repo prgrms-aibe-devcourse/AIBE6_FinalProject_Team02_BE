@@ -23,20 +23,20 @@ public class FoodRegistrationRequest extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private ResistrationRequestStatus status;
+    private RegistrationRequestStatus status;
 
     @Builder
-    private FoodRegistrationRequest(Long registrationId, String description, String failureReason, ResistrationRequestStatus status) {
+    private FoodRegistrationRequest(Long registrationId, String description, String failureReason, RegistrationRequestStatus status) {
         this.registrationId = registrationId;
         this.description = description;
         this.failureReason = failureReason;
         this.status = status;
     }
     public void complete() {
-        this.status = ResistrationRequestStatus.COMPLETED;
+        this.status = RegistrationRequestStatus.COMPLETED;
     }
     public void reject(String failureReason) {
-        this.status = ResistrationRequestStatus.REJECTED;
+        this.status = RegistrationRequestStatus.REJECTED;
         this.failureReason = failureReason;
     }
 

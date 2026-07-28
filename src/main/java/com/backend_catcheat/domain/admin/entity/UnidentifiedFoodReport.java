@@ -24,13 +24,17 @@ public class UnidentifiedFoodReport extends BaseEntity {
     @Column(nullable = false, length = 20)
     private ReportStatus status;
 
+    @Column(name = "reject_reason", length = 200)
+    private String rejectReason;
+
     //채택처리
     public void accept() {
         this.status = ReportStatus.ACCEPTED;
     }
     //반려처리
-    public void reject() {
+    public void reject(String reason) {
         this.status = ReportStatus.REJECTED;
+        this.rejectReason = reason;
     }
 
 }

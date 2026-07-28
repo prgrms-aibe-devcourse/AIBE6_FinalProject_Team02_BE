@@ -1,6 +1,8 @@
 package com.backend_catcheat.domain.admin.controller;
 
+import com.backend_catcheat.domain.admin.dto.FoodRegistrationRequestResponseDTO;
 import com.backend_catcheat.domain.admin.dto.FoodReportResponseDTO;
+import com.backend_catcheat.domain.admin.dto.RejectRequestDTO;
 import com.backend_catcheat.domain.admin.service.AdminService;
 import com.backend_catcheat.global.common.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -24,10 +26,34 @@ public class AdminController {
         adminService.acceptReport(reportId);
         return ApiResponse.ok();
     }
-    
+
     @PatchMapping("/{reportId}/reject")
-    public ApiResponse<Void> rejectReport(@PathVariable Long reportId) {
-        adminService.rejectReport(reportId);
+    public ApiResponse<Void> rejectReport(
+            @PathVariable Long reportId,
+            @RequestBody RejectRequestDTO request
+    ) {
+        adminService.rejectReport(reportId, request.reason());
+        return ApiResponse.ok();
+    }
+    @GetMapping("/registration-requests")
+    public ApiResponse<List<FoodRegistrationRequestResponseDTO>> getPendingRequests() {
+        return ApiResponse.ok(adminService.getPendingRequests());
+    }
+
+
+    @PatchMapping("/registration-requests/{requestId}/complete")
+    public ApiResponse<Void> completeRequest(@PathVariable Long requestId) {
+        adminService.completeRequest(requestId);
+        return ApiResponse.ok();
+    }
+
+
+    @PatchMapping("/registration-requests/{requestId}/reject")
+    public ApiResponse<Void> rejectRequest(
+            @PathVariable Long requestId,
+            @RequestBody RejectRequestDTO request
+    ) {
+        adminService.rejectRequest(requestId, request.reason());
         return ApiResponse.ok();
     }
 }
