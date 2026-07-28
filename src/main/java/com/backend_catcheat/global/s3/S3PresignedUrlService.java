@@ -6,7 +6,10 @@ import com.backend_catcheat.domain.upload.dto.PresignedUploadResponseDTO;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
@@ -23,6 +26,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class S3PresignedUrlService {
@@ -38,6 +42,7 @@ public class S3PresignedUrlService {
     );
 
     private final S3Presigner s3Presigner;
+    private final S3Client s3Client;
     private final S3Properties s3Properties;
 
     public String createDownloadUrl(String objectLocation) {
@@ -60,6 +65,24 @@ public class S3PresignedUrlService {
                 .build();
         PresignedGetObjectRequest presignedRequest = s3Presigner.presignGetObject(presignRequest);
         return presignedRequest.url().toString();
+    }
+
+    /**
+     * S3 객체 삭제
+     */
+    public void deleteObject(String objectLocation) {
+        if (objectLocation == null || objectLocation.isBlank()) {
+            return;
+        }
+        try {
+            String key = extractKey(objectLocation);
+            s3Client.deleteObject(DeleteObjectRequest.builder()
+                    .bucket(s3Properties.bucket())
+                    .key(key)
+                    .build());
+        } catch (Exception e) {
+            log.warn("S3 객체 삭제 실패: {}", objectLocation, e);
+        }
     }
 
     public PresignedUploadResponseDTO createUploadUrls(PresignedUploadRequestDTO request) {
