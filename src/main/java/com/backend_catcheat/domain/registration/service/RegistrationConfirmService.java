@@ -1,7 +1,7 @@
 package com.backend_catcheat.domain.registration.service;
 
-import com.backend_catcheat.domain.admin.entity.ReviewQueueItem;
-import com.backend_catcheat.domain.admin.repository.ReviewQueueItemRepository;
+import com.backend_catcheat.domain.admin.entity.FoodRegistrationRequest;
+import com.backend_catcheat.domain.admin.repository.FoodRegistrationRequestRepository;
 import com.backend_catcheat.domain.dex.basicdex.entity.BasicDexEntity;
 import com.backend_catcheat.domain.dex.basicdex.repository.BasicDexRepository;
 import com.backend_catcheat.domain.dex.collection.entity.CardPhoto;
@@ -66,7 +66,7 @@ public class RegistrationConfirmService {
     private final UserCollectionRepository userCollectionRepository;
     private final CollectionCardRepository cardRepository;
     private final CardPhotoRepository cardPhotoRepository;
-    private final ReviewQueueItemRepository reviewQueueRepository;
+    private final FoodRegistrationRequestRepository foodRegistrationRequestRepository;
     private final RegistrationPhotoLoader photoLoader;
     private final VisionProperties properties;
 
@@ -111,10 +111,13 @@ public class RegistrationConfirmService {
                         registration.getId(), slot.getId(), thumbnail.getId(),
                         memo, locationName(location), lat(location), lng(location), collectedAt));
 
-                reviewQueueRepository.save(ReviewQueueItem.pending(
-                        registration.getId(), saved.getId(),
+                foodRegistrationRequestRepository.save(FoodRegistrationRequest.builder()
+                        .registrationId(registration.getId())
+                        .description(slot.getName())     // 관리자 목록에 보일 음식(칸) 이름
+                        .collectionCardId(saved.getId())
                         // 증빙은 AI가 판정했던 바로 그 사진이다
-                        evidence != null ? evidence.getId() : thumbnail.getId()));
+                        .evidencePhotoId(evidence != null ? evidence.getId() : thumbnail.getId())
+                        .build());
 
                 pending.add(new PendingSlot(
                         slot.getId(), slot.getName(), slot.getCategory().getDisplayName(), saved.getId()));

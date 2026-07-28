@@ -28,11 +28,22 @@ public class FoodRegistrationRequest extends BaseEntity {
     @Column(name = "reject_reason", length = 200)
     private String rejectReason;
 
+    /** 검토 대기 상태로 만들어진 수집 카드. 완료(complete) 시 이 카드를 칸에 붙인다. */
+    @Column(name = "collection_card_id")
+    private Long collectionCardId;
+
+    /** AI가 판정했던 증빙 사진. 관리자가 목록에서 확인용으로 본다. */
+    @Column(name = "evidence_photo_id")
+    private Long evidencePhotoId;
+
     @Builder
-    private FoodRegistrationRequest(Long registrationId, String description, String failureReason) {
+    private FoodRegistrationRequest(Long registrationId, String description, String failureReason,
+                                    Long collectionCardId, Long evidencePhotoId) {
         this.registrationId = registrationId;
         this.description = description;
         this.failureReason = failureReason;
+        this.collectionCardId = collectionCardId;
+        this.evidencePhotoId = evidencePhotoId;
         this.status = RegistrationRequestStatus.PENDING;
     }
     public void complete() {

@@ -14,7 +14,10 @@ import org.junit.jupiter.params.provider.ValueSource;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+
+import static org.mockito.Mockito.mock;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -43,7 +46,8 @@ class S3PresignedUrlServiceTest {
                 .build();
 
         service = new S3PresignedUrlService(
-                presigner, new S3Properties(BUCKET, "ap-northeast-2", "dummy-access-key", "dummy-secret-key", null));
+                presigner, mock(S3Client.class),
+                new S3Properties(BUCKET, "ap-northeast-2", "dummy-access-key", "dummy-secret-key", null));
     }
 
     private PresignedUploadResponseDTO.UploadTarget issueOne(String fileName, String contentType) {
