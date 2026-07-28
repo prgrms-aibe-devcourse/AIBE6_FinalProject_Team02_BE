@@ -7,6 +7,7 @@ import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import com.backend_catcheat.global.s3.S3PresignedUrlService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -84,6 +85,7 @@ public class MyService {
         }
 
         user.setInitialNickname(nickname);
+        saveAndFlushNickname(user); // 동시성으로 DB UNIQUE 위반 시 409로 변환
     }
 
     /**
@@ -105,6 +107,7 @@ public class MyService {
         }
 
         user.changeNickname(nickname, LocalDateTime.now());
+        saveAndFlushNickname(user); // 동시성으로 DB UNIQUE 위반 시 409로 변환
     }
 
     /**
@@ -120,6 +123,18 @@ public class MyService {
     private User findUser(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+    }
+
+    /**
+     * 닉네임 변경을 즉시 flush해 DB UNIQUE 제약 위반 잡음
+     * existsByNickname 선검사를 통과한 동시성 경합도 커밋 전에 409로 변환
+     */
+    private void saveAndFlushNickname(User user) {
+        try {
+            userRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException e) {
+            throw new CustomException(ErrorCode.NICKNAME_DUPLICATED);
+        }
     }
 
     /** 앞뒤 공백 제거 후 형식 검사. 어긋나면 NICKNAME_INVALID. */
