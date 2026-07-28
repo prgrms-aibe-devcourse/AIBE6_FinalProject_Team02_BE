@@ -90,6 +90,7 @@ public class AuthService {
                 .secure(false)      // 운영(HTTPS)에서는 true
                 .path("/")
                 .maxAge(Duration.ofMillis(maxAgeMs))
+                //lax: 크로스 사이트 요청 시 쿠키를 보내지 않음, strict: 크로스 사이트 요청 시 쿠키를 보내지 않음, none: 크로스 사이트 요청 시 쿠키를 보냄
                 .sameSite("Lax")
                 .build();
         response.addHeader("Set-Cookie", cookie.toString());

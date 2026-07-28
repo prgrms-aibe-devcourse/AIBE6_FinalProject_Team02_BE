@@ -14,12 +14,6 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
-/**
- * 서비스 자체 access/refresh JWT를 발급하고 검증한다.
- * 소셜 프로바이더가 준 토큰과는 별개로, 이후 우리 API 인가는 이 토큰으로만 한다.
- *
- * 값들은 application.yml의 jwt.* 설정에서 주입받는다.
- */
 @Slf4j // Slf4j는 로그를 남기기 위한 라이브러리. @Slf4j를 붙이면 log.info(), log.error() 등 사용 가능
 @Component
 public class JwtTokenProvider {
@@ -63,8 +57,8 @@ public class JwtTokenProvider {
                 .claim(CLAIM_TYPE, TYPE_REFRESH)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + refreshTokenExpireMs))
-                .signWith(key)
-                .compact();
+                .signWith(key) //key로 서명
+                .compact(); //최종 문자열로 완성
     }
     /**
      * 토큰의 서명·만료를 검증한다.
@@ -113,10 +107,10 @@ public class JwtTokenProvider {
     /** 서명 검증 후 payload(claims)를 꺼내는 공통 로직. 서명이 안 맞거나 만료면 예외. */
     private Claims parse(String token) {
         return Jwts.parser()
-                .verifyWith(key)
+                .verifyWith(key) //키로 서명검증
                 .build()
-                .parseSignedClaims(token)
-                .getPayload();
+                .parseSignedClaims(token)//토큰 풀기
+                .getPayload(); //내용 꺼내기
     }
 
 }
