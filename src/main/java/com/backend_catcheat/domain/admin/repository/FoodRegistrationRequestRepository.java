@@ -6,6 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-public interface FoodRegistationRequestRepository extends JpaRepository<FoodRegistrationRequest, Long> {
-    List<FoodRegistrationRequest> findByStatusOrderByCreateAtDesc(RegistrationRequestStatus status);
+public interface FoodRegistrationRequestRepository extends JpaRepository<FoodRegistrationRequest, Long> {
+    List<FoodRegistrationRequest> findByStatusOrderByCreatedAtDesc(RegistrationRequestStatus status);
 }

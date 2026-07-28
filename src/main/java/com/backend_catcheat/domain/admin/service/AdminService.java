@@ -6,7 +6,7 @@ import com.backend_catcheat.domain.admin.entity.FoodRegistrationRequest;
 import com.backend_catcheat.domain.admin.entity.RegistrationRequestStatus;
 import com.backend_catcheat.domain.admin.entity.ReportStatus;
 import com.backend_catcheat.domain.admin.entity.UnidentifiedFoodReport;
-import com.backend_catcheat.domain.admin.repository.FoodRegistationRequestRepository;
+import com.backend_catcheat.domain.admin.repository.FoodRegistrationRequestRepository;
 import com.backend_catcheat.domain.admin.repository.UnidentifiedFoodReportRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AdminService {
     private final UnidentifiedFoodReportRepository reportRepository;
-    private final FoodRegistationRequestRepository requestRepository;
+    private final FoodRegistrationRequestRepository requestRepository;
 
     @Transactional
     public List<FoodReportResponseDTO> getPendingReports(){
@@ -53,7 +53,7 @@ public class AdminService {
     //=====음식 등록 요청 승인 큐=====
     @Transactional
     public List<FoodRegistrationRequestResponseDTO> getPendingRequests(){
-        return requestRepository.findByStatusOrderByCreateAtDesc(RegistrationRequestStatus.PENDING)
+        return requestRepository.findByStatusOrderByCreatedAtDesc(RegistrationRequestStatus.PENDING)
                 .stream()
                 .map(FoodRegistrationRequestResponseDTO::from)
                 .toList();
