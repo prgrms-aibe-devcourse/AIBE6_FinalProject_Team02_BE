@@ -6,11 +6,6 @@ import java.util.Map;
 
 /**
  * 프로바이더마다 사용자 정보 응답 구조가 달라서 파싱을 한 곳으로 모은다.
- * - Google: 최상위에 sub/name/email 이 바로 있다 (flat).
- * - Kakao : 최상위 id + kakao_account.email + kakao_account.profile.nickname (중첩).
- * - Naver : response 객체 안에 id/name/email 이 들어있다 (중첩).
- *
- * record: 값만 담는 불변 객체. of()로 만들어 provider/providerId/nickname/email을 꺼내 쓴다.
  */
 public record OAuthAttributes(
         Provider provider,
@@ -76,7 +71,7 @@ public record OAuthAttributes(
         );
     }
 
-    /** 값이 숫자(예: 카카오 id는 Long)로 올 수 있어 문자열로 안전 변환한다. */
+    /** 값이 숫자로 올 수 있어 문자열로  변환 */
     private static String asString(Object value) {
         return value == null ? null : String.valueOf(value);
     }

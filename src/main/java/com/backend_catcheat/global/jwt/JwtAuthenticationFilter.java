@@ -15,13 +15,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
-/**
- * 모든 요청에 대해 딱 한 번 실행되는 필터(OncePerRequestFilter).
- * httpOnly 쿠키에 담긴 access token을 꺼내 검증하고, 유효하면
- * "이 요청은 인증된 사용자"라고 SecurityContext에 등록한다.
- *
- * 쿠키 방식이므로 Authorization 헤더가 아니라 쿠키에서 토큰을 읽는다.
- */
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     public static final String ACCESS_TOKEN_COOKIE = "access_token";

@@ -8,7 +8,7 @@ import com.backend_catcheat.domain.dex.collection.entity.CollectionCard;
 import com.backend_catcheat.domain.dex.collection.entity.UserCollection;
 import com.backend_catcheat.domain.dex.collection.repository.CardPhotoRepository;
 import com.backend_catcheat.domain.dex.collection.repository.CollectionCardRepository;
-import com.backend_catcheat.domain.admin.repository.ReviewQueueItemRepository;
+import com.backend_catcheat.domain.admin.repository.FoodRegistrationRequestRepository;
 import com.backend_catcheat.domain.dex.collection.repository.UserCollectionRepository;
 import com.backend_catcheat.domain.registration.config.VisionProperties;
 import com.backend_catcheat.domain.registration.dto.RegistrationConfirmRequest;
@@ -54,7 +54,7 @@ class RegistrationConfirmServiceTest {
     private UserCollectionRepository userCollectionRepository;
     private CollectionCardRepository cardRepository;
     private CardPhotoRepository cardPhotoRepository;
-    private ReviewQueueItemRepository reviewQueueRepository;
+    private FoodRegistrationRequestRepository foodRegistrationRequestRepository;
     private RegistrationPhotoLoader photoLoader;
 
     private RegistrationConfirmService service;
@@ -69,12 +69,12 @@ class RegistrationConfirmServiceTest {
         userCollectionRepository = mock(UserCollectionRepository.class);
         cardRepository = mock(CollectionCardRepository.class);
         cardPhotoRepository = mock(CardPhotoRepository.class);
-        reviewQueueRepository = mock(ReviewQueueItemRepository.class);
+        foodRegistrationRequestRepository = mock(FoodRegistrationRequestRepository.class);
         photoLoader = mock(RegistrationPhotoLoader.class);
 
         service = new RegistrationConfirmService(
                 registrationRepository, attemptRepository, photoRepository, slotRepository,
-                userCollectionRepository, cardRepository, cardPhotoRepository, reviewQueueRepository, photoLoader,
+                userCollectionRepository, cardRepository, cardPhotoRepository, foodRegistrationRequestRepository, photoLoader,
                 new VisionProperties(5, 1024, 0.8f, 3_500_000L, 5, true, "none"));
 
         registration = Registration.start(USER_ID, ANALYSIS_KEY);
@@ -299,8 +299,8 @@ class RegistrationConfirmServiceTest {
         org.mockito.Mockito.verify(userCollectionRepository, org.mockito.Mockito.never())
                 .save(any(UserCollection.class));
         // 증빙이 검토 큐에 쌓인다
-        org.mockito.Mockito.verify(reviewQueueRepository)
-                .save(any(com.backend_catcheat.domain.admin.entity.ReviewQueueItem.class));
+        org.mockito.Mockito.verify(foodRegistrationRequestRepository)
+                .save(any(com.backend_catcheat.domain.admin.entity.FoodRegistrationRequest.class));
     }
 
     @Test

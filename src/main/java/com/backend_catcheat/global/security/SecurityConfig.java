@@ -55,9 +55,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/logout"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/dex/basic").permitAll()
-                        // 관리자 전용 — 경로 규칙(§6)은 /api/v1/admin/** 이다.
-                        // 버전 없는 패턴만 두면 실제 컨트롤러가 매칭되지 않아
-                        // anyRequest().authenticated()로 떨어지고, 일반 유저도 관리자 API를 부를 수 있게 된다.
+                        // 관리자 전용
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         // 그 외 모든 요청은 인증 필요
                         .anyRequest().authenticated()

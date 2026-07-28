@@ -63,9 +63,10 @@ public enum ErrorCode {
     DUPLICATE_PHOTO(HttpStatus.CONFLICT, "이미 등록된 사진이에요"),
     MEMO_TOO_LONG(HttpStatus.BAD_REQUEST, "메모는 100자까지 쓸 수 있어요"),
 
-    // 관리자 검토
-    REVIEW_ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "검토 항목을 찾을 수 없어요"),
-    REVIEW_ALREADY_HANDLED(HttpStatus.CONFLICT, "이미 처리한 검토 항목이에요"),
+    // 관리자 콘솔 (제보 큐 / 음식 등록 요청 큐)
+    REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "제보를 찾을 수 없어요"),
+    REGISTRATION_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "등록 요청을 찾을 수 없어요"),
+    ADMIN_ITEM_ALREADY_HANDLED(HttpStatus.CONFLICT, "이미 처리한 항목이에요"),
 
     // 뱃지
     BADGE_NOT_OWNED(HttpStatus.BAD_REQUEST, "보유하지 않은 뱃지예요");
