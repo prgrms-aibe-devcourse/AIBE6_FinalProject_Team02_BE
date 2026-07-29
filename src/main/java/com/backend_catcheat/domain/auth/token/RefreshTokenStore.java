@@ -8,20 +8,11 @@ import org.springframework.stereotype.Repository;
 import java.time.Duration;
 import java.util.Optional;
 
-/**
- * refresh token을 Redis에 저장/조회/삭제한다.
- *
- * 왜 서버(Redis)에 저장하는가:
- * - 재발급 요청이 오면 "이게 서버가 발급한 유효한 refresh token이 맞는지" 대조해야 한다.
- * - 로그아웃/탈퇴 시 해당 유저의 refresh token을 즉시 무효화(삭제)할 수 있어야 한다.
- * key 형식은 "RT:{userId}", value는 refresh token 문자열.
- * TTL(만료)을 refresh 만료 시간과 똑같이 걸어 자동으로 사라지게 한다.
- */
 @Repository
 @RequiredArgsConstructor
 public class RefreshTokenStore {
 
-    private static final String KEY_PREFIX = "RT:";
+    private static final String KEY_PREFIX = "RT:";//저장할때 키앞에 붙이는 접두사
 
     private final StringRedisTemplate redisTemplate;   // Spring Boot data-redis가 자동 등록
     private final JwtTokenProvider jwtTokenProvider;   // TTL 값을 가져오기 위함

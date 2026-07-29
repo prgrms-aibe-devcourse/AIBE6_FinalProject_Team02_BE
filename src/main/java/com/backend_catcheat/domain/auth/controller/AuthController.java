@@ -42,7 +42,7 @@ public class AuthController {
         authService.logout(refreshToken, response);
         return ApiResponse.ok();
     }
-
+    //@AuthenticationPrincipal : Authentication 객체에서 현재 인증된 사용자의 정보를 직접 가져올 수 있게 해주는 어노테이션
     /** 내 정보 조회. 로그인 상태 확인용. 인증 안 되면 시큐리티가 401 반환. */
     @GetMapping("/me")
     public ApiResponse<UserResponseDTO> me(@AuthenticationPrincipal Long userId) {

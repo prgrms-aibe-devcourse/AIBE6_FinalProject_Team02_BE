@@ -163,10 +163,6 @@ public class S3PresignedUrlService {
         };
     }
 
-    private String buildPublicUrl(String key) {
-        return s3Properties.publicBaseUrl().replaceAll("/+$", "") + "/" + key;
-    }
-
     private String extractKey(String objectLocation) {
         String s3Prefix = "s3://" + s3Properties.bucket() + "/";
         if (objectLocation.startsWith(s3Prefix)) {
