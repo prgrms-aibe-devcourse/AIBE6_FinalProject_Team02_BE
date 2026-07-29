@@ -69,7 +69,7 @@ class ReportServiceTest {
         when(reportRepository.findByStatusOrderByCreatedAtDesc(ReportStatus.PENDING))
                 .thenReturn(List.of(report));
 
-        List<FoodReportResponseDTO> result = reportService.getPendingReports();
+        List<FoodReportResponseDTO> result = reportService.getReports(ReportStatus.PENDING);
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).description()).isEqualTo("테스트 제보");

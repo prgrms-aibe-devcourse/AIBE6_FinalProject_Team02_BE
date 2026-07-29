@@ -3,6 +3,7 @@ package com.backend_catcheat.domain.admin.controller;
 import com.backend_catcheat.domain.admin.dto.FoodRegistrationRequestResponseDTO;
 import com.backend_catcheat.domain.admin.dto.FoodReportResponseDTO;
 import com.backend_catcheat.domain.admin.dto.RejectRequestDTO;
+import com.backend_catcheat.domain.admin.entity.ReportStatus;
 import com.backend_catcheat.domain.admin.service.RegistrationRequestService;
 import com.backend_catcheat.domain.admin.service.ReportService;
 import com.backend_catcheat.global.common.ApiResponse;
@@ -26,8 +27,9 @@ public class AdminController {
     // ===== 제보 큐 =====
 
     @GetMapping("/reports")
-    public ApiResponse<List<FoodReportResponseDTO>> getPendingReports() {
-        return ApiResponse.ok(reportService.getPendingReports());
+    public ApiResponse<List<FoodReportResponseDTO>> getReports(
+            @RequestParam(defaultValue = "PENDING") ReportStatus status) {
+        return ApiResponse.ok(reportService.getReports(status));
     }
 
     @PatchMapping("/reports/{reportId}/accept")
@@ -66,4 +68,6 @@ public class AdminController {
         registrationRequestService.rejectRequest(requestId, request.reason());
         return ApiResponse.ok();
     }
+
+
 }

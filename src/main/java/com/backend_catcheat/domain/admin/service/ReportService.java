@@ -44,8 +44,8 @@ public class ReportService {
 
     /** 대기 중(PENDING) 제보 목록을 최신순으로. */
     @Transactional(readOnly = true)
-    public List<FoodReportResponseDTO> getPendingReports() {
-        return reportRepository.findByStatusOrderByCreatedAtDesc(ReportStatus.PENDING)
+    public List<FoodReportResponseDTO> getReports(ReportStatus status) {
+        return reportRepository.findByStatusOrderByCreatedAtDesc(status)
                 .stream()
                 .map(this::toResponse)
                 .toList();
