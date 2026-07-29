@@ -68,8 +68,13 @@ public enum ErrorCode {
     REGISTRATION_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "등록 요청을 찾을 수 없어요"),
     ADMIN_ITEM_ALREADY_HANDLED(HttpStatus.CONFLICT, "이미 처리한 항목이에요"),
 
+    //제보
+    REPORT_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "제보할 음식 이름을 입력해주세요"),
+
     // 뱃지
     BADGE_NOT_OWNED(HttpStatus.BAD_REQUEST, "보유하지 않은 뱃지예요");
+
+
 
     private final HttpStatus status;
     private final String message;

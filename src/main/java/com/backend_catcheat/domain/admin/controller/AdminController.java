@@ -56,4 +56,5 @@ public class AdminController {
         adminService.rejectRequest(requestId, request.reason());
         return ApiResponse.ok();
     }
+
 }
