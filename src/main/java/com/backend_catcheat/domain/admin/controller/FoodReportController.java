@@ -2,7 +2,7 @@ package com.backend_catcheat.domain.admin.controller;
 
 import com.backend_catcheat.domain.admin.dto.FoodReportCreateRequestDTO;
 import com.backend_catcheat.domain.admin.dto.FoodReportResponseDTO;
-import com.backend_catcheat.domain.admin.service.FoodReportService;
+import com.backend_catcheat.domain.admin.service.ReportService;
 import com.backend_catcheat.global.common.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -22,12 +22,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class FoodReportController {
 
-    private final FoodReportService foodReportService;
+    private final ReportService reportService;
 
     @PostMapping
     public ApiResponse<FoodReportResponseDTO> report(
             @AuthenticationPrincipal Long userId,
             @RequestBody FoodReportCreateRequestDTO request) {
-        return ApiResponse.ok(foodReportService.createReport(userId, request.name()));
+        return ApiResponse.ok(reportService.createReport(userId, request.name()));
     }
 }
