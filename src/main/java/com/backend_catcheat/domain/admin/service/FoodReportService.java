@@ -17,13 +17,17 @@ public class FoodReportService {
     private final UnidentifiedFoodReportRepository reportRepository;
 
     @Transactional
-    public FoodReportResponseDTO createReport(String name){
+    public FoodReportResponseDTO createReport(Long reporterId, String name){
         String trimmed = name == null ? "" : name.trim();
         if(trimmed.isEmpty() || trimmed.length() > NAME_MAX_LENGTH) {
             throw new CustomException(ErrorCode.REPORT_NAME_REQUIRED);
         }
         UnidentifiedFoodReport saved = reportRepository.save(
-                UnidentifiedFoodReport.builder().description(trimmed).build());
+                UnidentifiedFoodReport.builder()
+                        .description(trimmed)
+                        .reporterId(reporterId)
+                        .build()
+        );
 
         return FoodReportResponseDTO.from(saved);
     }

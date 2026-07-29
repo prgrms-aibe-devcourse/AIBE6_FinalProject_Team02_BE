@@ -7,6 +7,7 @@ import com.backend_catcheat.domain.admin.entity.ReportStatus;
 import com.backend_catcheat.domain.admin.entity.UnidentifiedFoodReport;
 import com.backend_catcheat.domain.admin.repository.FoodRegistrationRequestRepository;
 import com.backend_catcheat.domain.admin.repository.UnidentifiedFoodReportRepository;
+import com.backend_catcheat.domain.auth.repository.UserRepository;
 import com.backend_catcheat.domain.dex.collection.entity.CollectionCard;
 import com.backend_catcheat.domain.dex.collection.entity.UserCollection;
 import com.backend_catcheat.domain.dex.collection.repository.CollectionCardRepository;
@@ -31,9 +32,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 /**
  * AdminService 단위 테스트.
@@ -59,7 +58,8 @@ class AdminServiceTest {
     PhotoRepository photoRepository;
     @Mock
     S3PresignedUrlService presignedUrlService;
-
+    @Mock
+    UserRepository userRepository;
     @InjectMocks
     AdminService adminService;
 

@@ -27,11 +27,14 @@ public class UnidentifiedFoodReport extends BaseEntity {
 
     @Column(name = "reject_reason", length = 200)
     private String rejectReason;
+    @Column(name = "reporter_id")
+    private Long reporterId;   // 제보한 사용자 id
 
     @Builder
-    private UnidentifiedFoodReport(Long registrationId, String description) {
+    private UnidentifiedFoodReport(Long registrationId, String description, Long reporterId) {
         this.registrationId = registrationId;
         this.description = description;
+        this.reporterId = reporterId;
         this.status = ReportStatus.PENDING;   // 생성 시 항상 대기
     }
 

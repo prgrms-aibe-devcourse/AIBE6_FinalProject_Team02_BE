@@ -10,7 +10,9 @@ public record FoodReportResponseDTO(
         Long registrationId,
         String description,
         ReportStatus status,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        Long reporterId,
+        String reporterName
 
 ) {
     public static FoodReportResponseDTO from(UnidentifiedFoodReport report) {
@@ -19,7 +21,9 @@ public record FoodReportResponseDTO(
                 report.getRegistrationId(),
                 report.getDescription(),
                 report.getStatus(),
-                report.getCreatedAt()
-        );
+                report.getCreatedAt(),
+                report.getReporterId(),
+                null);
+
     }
 }

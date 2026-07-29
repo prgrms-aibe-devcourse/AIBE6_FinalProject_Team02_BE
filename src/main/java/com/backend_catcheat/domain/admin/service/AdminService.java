@@ -8,6 +8,7 @@ import com.backend_catcheat.domain.admin.entity.ReportStatus;
 import com.backend_catcheat.domain.admin.entity.UnidentifiedFoodReport;
 import com.backend_catcheat.domain.admin.repository.FoodRegistrationRequestRepository;
 import com.backend_catcheat.domain.admin.repository.UnidentifiedFoodReportRepository;
+import com.backend_catcheat.domain.auth.repository.UserRepository;
 import com.backend_catcheat.domain.dex.collection.entity.CollectionCard;
 import com.backend_catcheat.domain.dex.collection.entity.UserCollection;
 import com.backend_catcheat.domain.dex.collection.repository.CollectionCardRepository;
@@ -44,14 +45,14 @@ public class AdminService {
     private final RegistrationRepository registrationRepository;
     private final PhotoRepository photoRepository;
     private final S3PresignedUrlService presignedUrlService;
-
+    private final UserRepository userRepository;
     // ===== 1) 미확인 음식 제보 큐 =====
 
     @Transactional(readOnly = true)
     public List<FoodReportResponseDTO> getPendingReports() {
         return reportRepository.findByStatusOrderByCreatedAtDesc(ReportStatus.PENDING)
                 .stream()
-                .map(FoodReportResponseDTO::from)
+                .map(this::toReportResponse)
                 .toList();
     }
 
@@ -66,6 +67,15 @@ public class AdminService {
     public void rejectReport(Long reportId, String reason) {
         loadPendingReport(reportId).reject(reason);
     }
+    private FoodReportResponseDTO toReportResponse(UnidentifiedFoodReport r) {
+        String reporterName = r.getReporterId() == null ? null
+                : userRepository.findById(r.getReporterId())
+                  .map(u -> u.getNickname() != null ? u.getNickname() : u.getEmail())
+                  .orElse(null);
+        return new FoodReportResponseDTO(
+                r.getId(), r.getRegistrationId(), r.getDescription(),
+                r.getStatus(), r.getCreatedAt(), r.getReporterId(), reporterName);
+    }
 
     // ===== 2) 음식 등록 요청 큐 =====
 
@@ -76,6 +86,7 @@ public class AdminService {
                 .map(this::toResponse)
                 .toList();
     }
+
 
     /**
      * 등록 완료 — 검토 대기 카드를 칸에 붙여 해금한다.
