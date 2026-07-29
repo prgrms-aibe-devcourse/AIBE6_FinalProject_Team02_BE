@@ -4,6 +4,7 @@ import com.backend_catcheat.domain.dex.collection.entity.UserCollection;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -12,4 +13,7 @@ public interface UserCollectionRepository extends JpaRepository<UserCollection, 
     Optional<UserCollection> findByUserIdAndSlotId(Long userId, Long slotId);
 
     long countByUserId(Long userId);
+
+    List<UserCollection> findByUserId(Long userId);
+
 }
