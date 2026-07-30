@@ -12,6 +12,8 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
 /**
  * 소셜 로그인이 성공하면 Spring Security가 이 서비스의 loadUser()를 호출한다.
  * 여기서 (provider + providerId)로 기존 회원을 찾고,
@@ -41,10 +43,15 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         User user = userRepository
                 .findByProviderAndProviderId(attributes.provider(), attributes.providerId())
                 .map(existing -> {
-                    // 탈퇴한 회원은 재로그인 차단. 소프트 삭제라 조회는 되지만 로그인은 막는다.
                     if (existing.isWithdrawn()) {
-                        throw new OAuth2AuthenticationException(
-                                new OAuth2Error("withdrawn_user"), "withdrawn user");
+                        // 유예 기간 안이면 재로그인으로 계정을 되살린다.
+                        if (existing.isReactivatable(LocalDateTime.now())) {
+                            existing.reactivate();
+                        } else {
+                            // 유예 기간이 지난 탈퇴 회원은 재로그인 차단
+                            throw new OAuth2AuthenticationException(
+                                    new OAuth2Error("withdrawn_user"), "withdrawn user");
+                        }
                     }
                     existing.updateEmail(attributes.email());
                     return existing;
