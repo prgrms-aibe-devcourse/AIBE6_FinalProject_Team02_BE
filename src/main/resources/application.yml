@@ -102,6 +102,15 @@ catcheat:
     # 빈 값이면 모델 기본값(추론 on)을 쓴다 — 정확도 비교용으로 남겨 둔다.
     reasoning-effort: none
 
+  place:
+    # 카카오 로컬 API는 카카오 로그인과 같은 앱의 REST 키를 쓴다.
+    # 별도 키로 갈아끼울 수 있게 전용 변수를 먼저 본다.
+    api-key: ${KAKAO_REST_API_KEY:${KAKAO_CLIENT_ID}}
+    # 카카오 키워드 검색의 size 상한이 15다
+    size: 15
+    min-query-length: 2
+    timeout-ms: 3000
+
 
 cloud:
   aws:
