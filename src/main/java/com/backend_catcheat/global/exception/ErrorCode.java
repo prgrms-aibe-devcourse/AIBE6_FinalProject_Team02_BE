@@ -63,6 +63,16 @@ public enum ErrorCode {
     DUPLICATE_PHOTO(HttpStatus.CONFLICT, "이미 등록된 사진이에요"),
     MEMO_TOO_LONG(HttpStatus.BAD_REQUEST, "메모는 100자까지 쓸 수 있어요"),
 
+    // 메모 템플릿
+    MEMO_TEMPLATE_NOT_FOUND(HttpStatus.NOT_FOUND, "메모 템플릿을 찾을 수 없어요"),
+    MEMO_TEMPLATE_CONTENT_REQUIRED(HttpStatus.BAD_REQUEST, "저장할 메모 내용을 적어 주세요"),
+    MEMO_TEMPLATE_TOO_LONG(HttpStatus.BAD_REQUEST, "메모 템플릿은 100자까지 저장할 수 있어요"),
+    MEMO_TEMPLATE_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "메모 템플릿은 3개까지 저장할 수 있어요. 하나를 지우고 다시 저장해 주세요"),
+
+    // 장소 검색 (카카오 로컬)
+    // 카카오 장애는 우리 서버 버그가 아니다. 500으로 두면 모니터링에서 진짜 장애와 섞인다
+    PLACE_SEARCH_FAILED(HttpStatus.BAD_GATEWAY, "장소를 찾지 못했어요. 직접 입력해 주세요"),
+
     // 관리자 콘솔 (제보 큐 / 음식 등록 요청 큐)
     REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "제보를 찾을 수 없어요"),
     REGISTRATION_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "등록 요청을 찾을 수 없어요"),
