@@ -27,6 +27,10 @@ import java.time.LocalDateTime;
         }
 )
 public class User extends BaseEntity {
+
+    /** 탈퇴 후 계정 복구가 가능한 유예 기간(일) */
+    public static final int WITHDRAWAL_GRACE_DAYS = 30;
+
     /** 소셜 제공자(GOOGLE/KAKAO/NAVER). EnumType.STRING = DB에 "KAKAO"처럼 문자열로 저장. */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -99,18 +103,27 @@ public class User extends BaseEntity {
     }
 
     /**
-     * 회원 탈퇴 처리 — 개인정보를 지우고(비식별화) 탈퇴 시각을 기록한다.
-     * 실제 행(row) 삭제는 유예 기간 후 별도 배치에서 수행한다.
+     * 회원 탈퇴 처리 — 탈퇴 시각만 기록(Soft Delete)
      */
     public void withdraw() {
         this.deletedAt = LocalDateTime.now();
-        this.nickname = null;
-        this.email = null;
     }
 
     /** 탈퇴한 회원인지 여부. */
     public boolean isWithdrawn() {
         return this.deletedAt != null;
+    }
+
+    /**
+     * 탈퇴 후 유예 기간 안이라 재로그인으로 복구할 수 있는지 여부
+     */
+    public boolean isReactivatable(LocalDateTime now) {
+        return isWithdrawn() && now.isBefore(this.deletedAt.plusDays(WITHDRAWAL_GRACE_DAYS));
+    }
+
+    /** 유예 기간 내 재로그인 → 탈퇴를 취소하고 계정을 되살림 */
+    public void reactivate() {
+        this.deletedAt = null;
     }
 
     /** 온보딩 튜토리얼 완료 처리 */
