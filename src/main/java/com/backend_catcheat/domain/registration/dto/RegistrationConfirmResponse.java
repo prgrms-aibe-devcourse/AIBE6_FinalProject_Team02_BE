@@ -20,7 +20,6 @@ public record RegistrationConfirmResponse(
     ) {
     }
 
-    /** 관리자가 수락해야 열린다. 카드는 이미 만들어져 있고 "검토 대기" 배지가 붙는다 */
     public record PendingSlot(
             Long slotId,
             String slotName,
