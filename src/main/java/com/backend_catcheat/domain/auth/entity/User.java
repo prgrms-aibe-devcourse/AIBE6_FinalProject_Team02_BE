@@ -79,6 +79,14 @@ public class User extends BaseEntity {
     @Column(name = "profile_image_key", length = 512)
     private String profileImageKey;
 
+    /** 이번 달 남은 챌린지 개설권. 매월 3개로 리필된다. */
+    @Column(name = "challenge_ticket_count", nullable = false)
+    private int challengeTicketCount;
+
+    /** 개설권을 마지막으로 리필한 연월(yyyymm). 현재 월과 다르면 3개로 리필한다. */
+    @Column(name = "challenge_ticket_month", nullable = false)
+    private int challengeTicketMonth;
+
     /**
      * 생성자를 private + @Builder로 둔다.
      * 외부에서는 User.builder().provider(...).build() 형태로만 생성하게 강제한다.
@@ -167,6 +175,33 @@ public class User extends BaseEntity {
     public void removeProfileImage() {
         this.profileImageKey = null;
     }
+
+    /** 매월 지급되는 챌린지 개설권 수 */
+    public static final int MONTHLY_CHALLENGE_TICKETS = 3;
+
+    /** 이번 달 남은 개설권. 조회 시 월이 바뀌었으면 리필한다. (yearMonth 예: 202607) */
+    public int remainingChallengeTickets(int yearMonth) {
+        refillChallengeTicketsIfNewMonth(yearMonth);
+        return challengeTicketCount;
+    }
+
+    /** 개설권 1장 소진. 남은 게 없으면 예외. */
+    public void useChallengeTicket(int yearMonth) {
+        refillChallengeTicketsIfNewMonth(yearMonth);
+        if (challengeTicketCount <= 0) {
+            throw new CustomException(ErrorCode.CHALLENGE_TICKET_EXHAUSTED);
+        }
+        challengeTicketCount--;
+    }
+
+    /** 월이 바뀌었으면 개설권을 3개로 리필. */
+    private void refillChallengeTicketsIfNewMonth(int yearMonth) {
+        if (this.challengeTicketMonth != yearMonth) {
+            this.challengeTicketMonth = yearMonth;
+            this.challengeTicketCount = MONTHLY_CHALLENGE_TICKETS;
+        }
+    }
+
 }
 
 
