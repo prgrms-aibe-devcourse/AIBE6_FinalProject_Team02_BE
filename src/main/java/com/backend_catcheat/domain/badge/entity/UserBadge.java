@@ -36,4 +36,13 @@ public class UserBadge {
 
     @Column(name = "acquired_at", nullable = false)
     private LocalDateTime acquiredAt;
+
+    /** 뱃지 지급 */
+    public static UserBadge grant(Long userId, Badge badge, LocalDateTime acquiredAt) {
+        UserBadge ub = new UserBadge();
+        ub.userId = userId;
+        ub.badge = badge;
+        ub.acquiredAt = acquiredAt;
+        return ub;
+    }
 }
