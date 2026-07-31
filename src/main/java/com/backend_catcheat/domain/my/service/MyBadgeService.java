@@ -30,7 +30,9 @@ public class MyBadgeService {
                 .map(ub -> new MyBadgeResponse(
                         ub.getBadge().getId(),
                         ub.getBadge().getName(),
+                        ub.getBadge().getCode(),
                         ub.getBadge().getImageUrl(),
+                        ub.getBadge().getDescription(),
                         ub.getAcquiredAt(),
                         ub.getBadge().getId().equals(equippedId)))
                 .toList();
