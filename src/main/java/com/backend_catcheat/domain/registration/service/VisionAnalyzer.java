@@ -7,6 +7,8 @@ import com.backend_catcheat.global.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.metadata.ChatResponseMetadata;
+import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -27,24 +29,18 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-/**
- * 사진이 유저가 지정한 음식과 맞는지 AI에게 판정시킨다.
- *
- * AI에 보내는 사진은 분석 사진 1장뿐이다
- */
 @Slf4j
 @Component
 public class VisionAnalyzer {
 
     private static final String SYSTEM_PROMPT_PATH = "prompts/food-verification-system.st";
-
-    // application.yml의 spring.ai.openai.api-key 센티널 값과 동일하게 유지
-    private static final String MISSING_API_KEY = "missing-groq-api-key";
+    private static final String RESPONSE_SCHEMA_PATH = "schemas/food-verification.json";
 
     private final ChatModel chatModel;
     private final ObjectMapper objectMapper;
     private final VisionProperties properties;
     private final String systemPrompt;
+    private final String responseSchema;
     private final String apiKey;
 
     public VisionAnalyzer(
@@ -57,10 +53,11 @@ public class VisionAnalyzer {
         this.objectMapper = objectMapper;
         this.properties = properties;
         this.apiKey = apiKey;
-        this.systemPrompt = loadSystemPrompt();
+        this.systemPrompt = readClasspath(SYSTEM_PROMPT_PATH);
+        this.responseSchema = readClasspath(RESPONSE_SCHEMA_PATH);
     }
 
-    public AnalysisOutcome analyze(PreparedImage image, List<String> foodNames) {
+    public AiVerificationResult verify(PreparedImage image, List<String> foodNames) {
         requireApiKey();
 
         ChatResponse response;
@@ -71,13 +68,26 @@ public class VisionAnalyzer {
             throw new CustomException(ErrorCode.AI_CALL_FAILED);
         }
 
+        logTokenUsage(response);
+
         String rawText = response.getResult().getOutput().getText();
         log.debug("[등록] AI 원문 응답: {}", rawText);
 
-        return new AnalysisOutcome(rawText, response);
+        return parse(rawText);
     }
 
-    public AiVerificationResult parse(String rawText) {
+    // 종량제라 등록 1건당 실제 소비량을 남긴다. 단가는 바뀌므로 환산하지 않는다
+    private void logTokenUsage(ChatResponse response) {
+        ChatResponseMetadata metadata = response.getMetadata();
+        Usage usage = metadata != null ? metadata.getUsage() : null;
+        if (usage == null) {
+            return;
+        }
+        log.info("[등록] AI 토큰 prompt={} completion={} total={}",
+                usage.getPromptTokens(), usage.getCompletionTokens(), usage.getTotalTokens());
+    }
+
+    AiVerificationResult parse(String rawText) {
         String json = extractJsonObject(rawText);
         try {
             AiVerificationResult result = objectMapper.readValue(json, AiVerificationResult.class);
@@ -90,7 +100,7 @@ public class VisionAnalyzer {
     }
 
     private void requireApiKey() {
-        if (!StringUtils.hasText(apiKey) || MISSING_API_KEY.equals(apiKey)) {
+        if (!StringUtils.hasText(apiKey)) {
             throw new CustomException(ErrorCode.AI_KEY_MISSING);
         }
     }
@@ -111,13 +121,11 @@ public class VisionAnalyzer {
 
     private OpenAiChatOptions chatOptions() {
         OpenAiChatOptions.Builder builder = ((OpenAiChatOptions) chatModel.getOptions()).mutate();
-        if (properties.jsonMode()) {
-            builder.responseFormat(OpenAiChatModel.ResponseFormat.builder()
-                    .type(OpenAiChatModel.ResponseFormat.Type.JSON_OBJECT)
-                    .build());
-        }
-        // 추론 모델의 사고 과정은 음식 판별에 필요 없는데 응답 시간·토큰을 지배하고,
-        // 길어지면 JSON 생성이 잘려 Groq의 JSON 검증이 실패한다. none으로 끈다.
+        // jsonSchema()가 type을 JSON_SCHEMA로 바꾸고 strict=true까지 붙인다
+        builder.responseFormat(OpenAiChatModel.ResponseFormat.builder()
+                .jsonSchema(responseSchema)
+                .build());
+        // gpt-4o-mini는 이 파라미터를 받지 않아 실으면 400이 난다
         if (StringUtils.hasText(properties.reasoningEffort())) {
             builder.reasoningEffort(properties.reasoningEffort());
         }
@@ -137,14 +145,11 @@ public class VisionAnalyzer {
         return rawText.substring(start, end + 1);
     }
 
-    private static String loadSystemPrompt() {
+    private static String readClasspath(String path) {
         try {
-            return new ClassPathResource(SYSTEM_PROMPT_PATH).getContentAsString(StandardCharsets.UTF_8);
+            return new ClassPathResource(path).getContentAsString(StandardCharsets.UTF_8);
         } catch (IOException e) {
-            throw new UncheckedIOException("시스템 프롬프트를 읽을 수 없습니다: " + SYSTEM_PROMPT_PATH, e);
+            throw new UncheckedIOException("클래스패스 리소스를 읽을 수 없습니다: " + path, e);
         }
-    }
-
-    public record AnalysisOutcome(String rawText, ChatResponse response) {
     }
 }

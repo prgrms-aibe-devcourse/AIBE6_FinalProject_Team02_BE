@@ -53,7 +53,7 @@ public class FoodVerificationService {
         PreparedImage prepared = preprocessor.prepare(original, analysisPhotoKey);
 
         List<String> names = slots.stream().map(BasicDexEntity::getName).toList();
-        AiVerificationResult aiResult = analyzer.parse(analyzer.analyze(prepared, names).rawText());
+        AiVerificationResult aiResult = analyzer.verify(prepared, names);
 
         List<SlotVerdict> verdicts = toVerdicts(slots, aiResult);
         recordAttempts(registration, verdicts);
@@ -81,7 +81,6 @@ public class FoodVerificationService {
         Registration registration = registrationRepository.findById(registrationId)
                 .orElseThrow(() -> new CustomException(ErrorCode.REGISTRATION_NOT_FOUND));
 
-        // 요청 바디의 id를 신뢰하지 않는다 — 남의 등록 건에 재시도를 붙일 수 없어야 한다
         if (!registration.isOwnedBy(userId)) {
             throw new CustomException(ErrorCode.REGISTRATION_FORBIDDEN);
         }
@@ -107,7 +106,7 @@ public class FoodVerificationService {
         return keys;
     }
 
-    /** 요청 순서를 유지한다 — 화면의 칩 순서와 결과 순서가 어긋나면 유저가 어느 게 실패했는지 못 읽는다. */
+    // 요청 순서를 유지한다. 화면의 칩 순서와 어긋나면 어느 게 실패했는지 읽을 수 없다
     private List<BasicDexEntity> loadSlots(List<Long> slotIds) {
         if (slotIds == null || slotIds.isEmpty()) {
             throw new CustomException(ErrorCode.FOOD_NAME_REQUIRED);
@@ -154,7 +153,7 @@ public class FoodVerificationService {
 
         return slots.stream().map(slot -> {
             AiVerdict verdict = byName.get(normalize(slot.getName()));
-            // AI가 그 이름을 아예 빠뜨렸으면 통과시키지 않는다 — 확인되지 않은 것은 해금하지 않는다
+            // AI가 그 이름을 아예 빠뜨렸으면 통과시키지 않는다
             boolean matched = verdict != null && verdict.matched();
             String reason = matched ? "" : reasonOf(verdict);
 

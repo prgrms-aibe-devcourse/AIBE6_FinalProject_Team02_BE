@@ -24,13 +24,12 @@ spring:
 
   ai:
     openai:
-      # Spring AI가 뒤에 /chat/completions 를 붙이므로 base-url에 /v1까지 포함해야 한다
-      base-url: https://api.groq.com/openai/v1
-      api-key: ${GROQ_API_KEY:missing-groq-api-key}
+      # base-url은 지정하지 않는다 — Spring AI 기본값(https://api.openai.com)을 그대로 쓴다
+      api-key: ${OPENAI_API_KEY:}
       chat:
         options:
-          # Groq이 제공하는 유일한 비전 모델 (Llama 4 계열은 라인업에서 제외됨)
-          model: ${GROQ_VISION_MODEL:qwen/qwen3.6-27b}
+          # 비전 + Structured Outputs(json_schema strict)를 모두 지원하는 최저가 모델
+          model: ${OPENAI_VISION_MODEL:gpt-4o-mini}
           temperature: 0.2
       embedding:
         enabled: false
@@ -89,18 +88,17 @@ app:
 
 catcheat:
   vision:
-    # Groq 문서 기준 요청당 이미지 5장 — 기획안 "1~5장"과 일치
+    # 기획안 "1~5장"과 일치
     max-images: 5
     # 한 상 사진으로 동시에 등록할 수 있는 음식 수
     max-food-names: 5
     max-long-edge-px: 1024
     jpeg-quality: 0.8
-    # Groq 상한은 요청당 20MB. 비용은 전송량에 비례하므로 자체 상한을 더 낮게 둔다
+    # 비용이 전송량·이미지 타일 수에 비례하므로 자체 상한을 낮게 둔다
     max-encoded-bytes: 3500000
-    json-mode: true
-    # 추론 끄기. 음식 판별에 사고 과정이 불필요하고, 길어지면 JSON이 잘려 검증이 실패한다.
-    # 빈 값이면 모델 기본값(추론 on)을 쓴다 — 정확도 비교용으로 남겨 둔다.
-    reasoning-effort: none
+    # reasoning_effort는 o-시리즈/gpt-5 계열 전용이라 gpt-4o-mini에 보내면 400이 난다.
+    # 빈 값이면 요청에 아예 싣지 않는다 — 추론 모델로 갈아탈 때를 위해 설정 자체는 남겨 둔다.
+    reasoning-effort: ""
 
   place:
     # 카카오 로컬 API는 카카오 로그인과 같은 앱의 REST 키를 쓴다.
