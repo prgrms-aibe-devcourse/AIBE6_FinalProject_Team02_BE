@@ -23,10 +23,12 @@ import com.backend_catcheat.domain.registration.entity.VerificationAttempt;
 import com.backend_catcheat.domain.registration.repository.PhotoRepository;
 import com.backend_catcheat.domain.registration.repository.RegistrationRepository;
 import com.backend_catcheat.domain.registration.repository.VerificationAttemptRepository;
+import com.backend_catcheat.global.event.SlotsUnlockedEvent;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -69,6 +71,7 @@ public class RegistrationConfirmService {
     private final FoodRegistrationRequestRepository foodRegistrationRequestRepository;
     private final RegistrationPhotoLoader photoLoader;
     private final VisionProperties properties;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public RegistrationConfirmResponse confirm(
@@ -131,6 +134,11 @@ public class RegistrationConfirmService {
         }
 
         registration.complete();
+
+        // 해금이 있으면 수집 뱃지 평가를 트리거한다 (커밋 후 별도 트랜잭션에서 지급)
+        if (!unlocked.isEmpty()) {
+            eventPublisher.publishEvent(new SlotsUnlockedEvent(userId));
+        }
 
         long collectedCount = userCollectionRepository.countByUserId(userId);
         long totalSlots = slotRepository.count();

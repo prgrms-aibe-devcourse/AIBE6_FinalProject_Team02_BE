@@ -10,10 +10,12 @@ import com.backend_catcheat.domain.dex.collection.repository.CollectionCardRepos
 import com.backend_catcheat.domain.dex.collection.repository.UserCollectionRepository;
 import com.backend_catcheat.domain.registration.repository.PhotoRepository;
 import com.backend_catcheat.domain.registration.repository.RegistrationRepository;
+import com.backend_catcheat.global.event.SlotsUnlockedEvent;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import com.backend_catcheat.global.s3.S3PresignedUrlService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +35,7 @@ public class RegistrationRequestService {
     private final RegistrationRepository registrationRepository;
     private final PhotoRepository photoRepository;
     private final S3PresignedUrlService presignedUrlService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /** 대기 중(PENDING) 등록 요청 목록을 최신순으로. */
     @Transactional(readOnly = true)
@@ -80,6 +83,9 @@ public class RegistrationRequestService {
                         UserCollection.unlock(userId, card.getSlotId(), card.getCollectedAt())));
 
         card.attachTo(collection.getId());   // 이 순간 칸에 붙는다 = 해금
+
+        // 해금됐으니 수집 뱃지 평가 트리거 (커밋 후 별도 트랜잭션에서 지급)
+        eventPublisher.publishEvent(new SlotsUnlockedEvent(userId));
     }
 
     private FoodRegistrationRequest loadPending(Long requestId) {
