@@ -22,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class BadgeGrantService {
-
     private final BadgeRepository badgeRepository;
     private final UserBadgeRepository userBadgeRepository;
     private final UserCollectionRepository userCollectionRepository;
@@ -36,7 +35,7 @@ public class BadgeGrantService {
     }
 
     /**
-     * 기본 도감 수집이 늘어난 뒤 호출 — 수집률/카테고리 완성 뱃지를 평가해 미보유분만 지급
+     * 기본 도감 수집이 늘어난 뒤 호출
      */
     @Transactional
     public void evaluateCollectionBadges(Long userId) {
