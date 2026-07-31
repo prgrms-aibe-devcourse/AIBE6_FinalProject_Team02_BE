@@ -79,15 +79,23 @@ public enum ErrorCode {
     ADMIN_ITEM_ALREADY_HANDLED(HttpStatus.CONFLICT, "이미 처리한 항목이에요"),
 
 
-    CHALLENGE_TICKET_EXHAUSTED(HttpStatus.CONFLICT, "이번 달 챌린지 개설권을 모두 사용했어요"),
 
     //제보
     REPORT_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "제보할 음식 이름을 입력해주세요"),
 
+
+    //챌린지
+    //티켓
+    CHALLENGE_TICKET_EXHAUSTED(HttpStatus.CONFLICT, "이번 달 챌린지 개설권을 모두 사용했어요"),
+    //개설 검증 코드
     CHALLENGE_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "챌린지 이름을 입력해 주세요"),
     CHALLENGE_TYPE_REQUIRED(HttpStatus.BAD_REQUEST, "챌린지 유형과 기한 방식을 선택해 주세요"),
     CHALLENGE_SLOT_MIN_REQUIRED(HttpStatus.BAD_REQUEST, "목표 음식을 최소 5개 등록해 주세요"),
     CHALLENGE_PERIOD_INVALID(HttpStatus.BAD_REQUEST, "기간 한정은 종료 시각이 시작 이후여야 해요"),
+    //참여 관련
+    CHALLENGE_NOT_FOUND(HttpStatus.NOT_FOUND, "챌린지를 찾을 수 없어요"),
+    CHALLENGE_ENDED(HttpStatus.CONFLICT, "이미 종료된 챌린지예요"),
+    CHALLENGE_ALREADY_JOINED(HttpStatus.CONFLICT, "이미 참여한 챌린지예요"),
 
     // 뱃지
     BADGE_NOT_OWNED(HttpStatus.BAD_REQUEST, "보유하지 않은 뱃지예요");
