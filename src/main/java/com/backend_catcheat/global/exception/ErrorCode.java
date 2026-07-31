@@ -78,6 +78,9 @@ public enum ErrorCode {
     REGISTRATION_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "등록 요청을 찾을 수 없어요"),
     ADMIN_ITEM_ALREADY_HANDLED(HttpStatus.CONFLICT, "이미 처리한 항목이에요"),
 
+
+    CHALLENGE_TICKET_EXHAUSTED(HttpStatus.CONFLICT, "이번 달 챌린지 개설권을 모두 사용했어요"),
+
     //제보
     REPORT_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "제보할 음식 이름을 입력해주세요"),
 
