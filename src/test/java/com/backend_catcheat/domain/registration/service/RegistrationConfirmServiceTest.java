@@ -28,6 +28,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import org.springframework.context.ApplicationEventPublisher;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -56,6 +58,7 @@ class RegistrationConfirmServiceTest {
     private CardPhotoRepository cardPhotoRepository;
     private FoodRegistrationRequestRepository foodRegistrationRequestRepository;
     private RegistrationPhotoLoader photoLoader;
+    private ApplicationEventPublisher eventPublisher;
 
     private RegistrationConfirmService service;
     private Registration registration;
@@ -71,11 +74,12 @@ class RegistrationConfirmServiceTest {
         cardPhotoRepository = mock(CardPhotoRepository.class);
         foodRegistrationRequestRepository = mock(FoodRegistrationRequestRepository.class);
         photoLoader = mock(RegistrationPhotoLoader.class);
+        eventPublisher = mock(ApplicationEventPublisher.class);
 
         service = new RegistrationConfirmService(
                 registrationRepository, attemptRepository, photoRepository, slotRepository,
                 userCollectionRepository, cardRepository, cardPhotoRepository, foodRegistrationRequestRepository, photoLoader,
-                new VisionProperties(5, 1024, 0.8f, 3_500_000L, 5, ""));
+                new VisionProperties(5, 1024, 0.8f, 3_500_000L, 5, ""), eventPublisher);
 
         registration = Registration.start(USER_ID, ANALYSIS_KEY);
         // 저장 전 엔티티는 id가 null이라 조회 스텁이 안 걸린다. 실제 흐름(영속화된 상태)을 재현한다

@@ -3,7 +3,9 @@ package com.backend_catcheat.domain.auth.oauth;
 import com.backend_catcheat.domain.auth.entity.Role;
 import com.backend_catcheat.domain.auth.entity.User;
 import com.backend_catcheat.domain.auth.repository.UserRepository;
+import com.backend_catcheat.global.event.UserRegisteredEvent;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -28,6 +30,7 @@ import java.time.LocalDateTime;
 public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -56,15 +59,19 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
                     existing.updateEmail(attributes.email());
                     return existing;
                 })
-                .orElseGet(() -> userRepository.save(
-                        User.builder()
-                                .provider(attributes.provider())
-                                .providerId(attributes.providerId())
-                                // nickname은 유저가 온보딩에서 직접 지정 → 가입 시엔 비워둔다.
-                                .email(attributes.email())
-                                .role(Role.USER)   // 신규 가입은 항상 일반 사용자 권한
-                                .build()
-                ));
+                .orElseGet(() -> {
+                    User created = userRepository.save(
+                            User.builder()
+                                    .provider(attributes.provider())
+                                    .providerId(attributes.providerId())
+                                    // nickname은 유저가 온보딩에서 직접 지정 → 가입 시엔 비워둔다.
+                                    .email(attributes.email())
+                                    .role(Role.USER)   // 신규 가입은 항상 일반 사용자 권한
+                                    .build());
+                    // 커밋 후 가입 기본 뱃지 지급(AFTER_COMMIT). 지급 실패가 로그인을 막지 않도록 격리
+                    eventPublisher.publishEvent(new UserRegisteredEvent(created.getId()));
+                    return created;
+                });
 
         // 4) 로그인 주체(principal)로 반환. userId/role을 담아 이후 JWT 발급에 사용한다.
         return new CustomOAuth2User(user.getId(), user.getRole(), oAuth2User.getAttributes());
