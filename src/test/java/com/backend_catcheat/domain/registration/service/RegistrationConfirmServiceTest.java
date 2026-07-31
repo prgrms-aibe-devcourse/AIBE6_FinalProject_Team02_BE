@@ -75,7 +75,7 @@ class RegistrationConfirmServiceTest {
         service = new RegistrationConfirmService(
                 registrationRepository, attemptRepository, photoRepository, slotRepository,
                 userCollectionRepository, cardRepository, cardPhotoRepository, foodRegistrationRequestRepository, photoLoader,
-                new VisionProperties(5, 1024, 0.8f, 3_500_000L, 5, true, "none"));
+                new VisionProperties(5, 1024, 0.8f, 3_500_000L, 5, ""));
 
         registration = Registration.start(USER_ID, ANALYSIS_KEY);
         // 저장 전 엔티티는 id가 null이라 조회 스텁이 안 걸린다. 실제 흐름(영속화된 상태)을 재현한다

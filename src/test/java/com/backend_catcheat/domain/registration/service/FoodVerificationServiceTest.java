@@ -6,6 +6,7 @@ import com.backend_catcheat.domain.dex.basicdex.type.Category;
 import com.backend_catcheat.domain.registration.config.VisionProperties;
 import com.backend_catcheat.domain.registration.dto.VerificationRequest;
 import com.backend_catcheat.domain.registration.dto.VerificationResponse;
+import com.backend_catcheat.domain.registration.dto.ai.AiVerificationResult;
 import com.backend_catcheat.domain.registration.entity.Registration;
 import com.backend_catcheat.domain.registration.repository.RegistrationRepository;
 import com.backend_catcheat.domain.registration.repository.VerificationAttemptRepository;
@@ -14,6 +15,7 @@ import com.backend_catcheat.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.Optional;
@@ -54,7 +56,7 @@ class FoodVerificationServiceTest {
         service = new FoodVerificationService(
                 registrationRepository, attemptRepository, slotRepository,
                 photoLoader, preprocessor, analyzer,
-                new VisionProperties(5, 1024, 0.8f, 3_500_000L, 5, true, "none"));
+                new VisionProperties(5, 1024, 0.8f, 3_500_000L, 5, ""));
 
         when(registrationRepository.save(any(Registration.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -71,13 +73,10 @@ class FoodVerificationServiceTest {
         return entity;
     }
 
+    // 파싱 자체는 별도 테스트에 맡기고, 여기서는 AI가 돌려준 판정만 재현한다
     private void aiReturns(String json) {
-        VisionAnalyzer.AnalysisOutcome outcome = new VisionAnalyzer.AnalysisOutcome(json, null);
-        when(analyzer.analyze(any(), anyList())).thenReturn(outcome);
-        // parse는 실제 구현을 그대로 쓰되, 여기서는 스텁으로 대체해 파싱 자체는 별도 테스트에 맡긴다
-        when(analyzer.parse(json)).thenAnswer(invocation ->
-                new tools.jackson.databind.ObjectMapper().readValue(
-                        json, com.backend_catcheat.domain.registration.dto.ai.AiVerificationResult.class));
+        when(analyzer.verify(any(), anyList())).thenAnswer(invocation ->
+                new ObjectMapper().readValue(json, AiVerificationResult.class));
     }
 
     private VerificationRequest request(Long registrationId, Long... slotIds) {
@@ -172,8 +171,8 @@ class FoodVerificationServiceTest {
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.RETRY_LIMIT_EXCEEDED);
 
-        // 상한을 넘으면 AI를 부르지 않는다 — 호출 비용이 그냥 나가면 안 된다
-        verify(analyzer, never()).analyze(any(), anyList());
+        // 상한을 넘으면 AI를 부르지 않는다. 호출 비용이 그냥 나가면 안 된다
+        verify(analyzer, never()).verify(any(), anyList());
     }
 
     @Test
