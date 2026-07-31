@@ -35,7 +35,7 @@ public class ChallengeUnlock {
         this.imageKey = imageKey;
         this.unlockedAt = LocalDateTime.now();
     }
-
+    //
     public static ChallengeUnlock of(Long participantId, Long slotId, String imageKey) {
         return new ChallengeUnlock(participantId, slotId, imageKey);
     }

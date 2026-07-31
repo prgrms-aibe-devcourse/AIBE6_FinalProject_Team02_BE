@@ -21,6 +21,9 @@ public class ChallengeDex extends BaseEntity {
     @Column(nullable = false, length = 100)
     private String name;
 
+    @Column(length = 500)
+    private String description;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "challenge_type", nullable = false, length = 20)
     private ChallengeType challengeType;
@@ -47,6 +50,7 @@ public class ChallengeDex extends BaseEntity {
     @Builder
     public ChallengeDex(
             Long ownerId, String name,
+            String description,
             ChallengeType challengeType,
             PeriodType periodType,
             LocalDateTime startsAt,
@@ -57,6 +61,7 @@ public class ChallengeDex extends BaseEntity {
     ) {
         this.ownerId = ownerId;
         this.name = name;
+        this.description = description;
         this.challengeType = challengeType;
         this.periodType = periodType;
         this.startsAt = startsAt;
