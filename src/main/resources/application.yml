@@ -92,9 +92,10 @@ catcheat:
     max-images: 5
     # 한 상 사진으로 동시에 등록할 수 있는 음식 수
     max-food-names: 5
-    max-long-edge-px: 1024
+    # 512를 넘기면 타일이 1개에서 4개로 뛰어 토큰이 3배가 된다. 768로 올려도 절감은 0이다
+    max-long-edge-px: 512
     jpeg-quality: 0.8
-    # 비용이 전송량·이미지 타일 수에 비례하므로 자체 상한을 낮게 둔다
+    # 요청 크기 상한용. 토큰 비용은 전송량이 아니라 타일 수로 결정된다
     max-encoded-bytes: 3500000
     # reasoning_effort는 o-시리즈/gpt-5 계열 전용이라 gpt-4o-mini에 보내면 400이 난다.
     # 빈 값이면 요청에 아예 싣지 않는다 — 추론 모델로 갈아탈 때를 위해 설정 자체는 남겨 둔다.
