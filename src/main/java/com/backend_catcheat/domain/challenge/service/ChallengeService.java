@@ -11,6 +11,7 @@ import com.backend_catcheat.domain.challenge.entity.ChallengeDexSlot;
 import com.backend_catcheat.domain.challenge.entity.PeriodType;
 import com.backend_catcheat.domain.challenge.repository.ChallengeDexRepository;
 import com.backend_catcheat.domain.challenge.repository.ChallengeDexSlotRepository;
+import com.backend_catcheat.domain.challenge.repository.ChallengeUnlockRepository;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,8 @@ public class ChallengeService {
     private final UserRepository userRepository;
     private final ChallengeDexRepository challengeDexRepository;
     private final ChallengeDexSlotRepository slotRepository;
+
+    private final ChallengeUnlockRepository unlockRepository;
 
     //개설권 조회
     @Transactional

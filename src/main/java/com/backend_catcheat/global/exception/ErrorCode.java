@@ -96,9 +96,15 @@ public enum ErrorCode {
     CHALLENGE_NOT_FOUND(HttpStatus.NOT_FOUND, "챌린지를 찾을 수 없어요"),
     CHALLENGE_ENDED(HttpStatus.CONFLICT, "이미 종료된 챌린지예요"),
     CHALLENGE_ALREADY_JOINED(HttpStatus.CONFLICT, "이미 참여한 챌린지예요"),
+    //해금 관련
+    CHALLENGE_NOT_JOINED(HttpStatus.CONFLICT, "먼저 챌린지에 참여해 주세요"),
+    CHALLENGE_SLOT_NOT_FOUND(HttpStatus.NOT_FOUND, "챌린지 목표를 찾을 수 없어요"),
+    CHALLENGE_SLOT_ALREADY_UNLOCKED(HttpStatus.CONFLICT, "이미 인증한 목표예요"),
+    
 
     // 뱃지
     BADGE_NOT_OWNED(HttpStatus.BAD_REQUEST, "보유하지 않은 뱃지예요");
+
 
 
 

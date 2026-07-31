@@ -4,6 +4,8 @@ import com.backend_catcheat.domain.challenge.dto.ChallengeCreateRequestDTO;
 import com.backend_catcheat.domain.challenge.dto.ChallengeCreateResponseDTO;
 import com.backend_catcheat.domain.challenge.dto.CreationTicketResponseDTO;
 import com.backend_catcheat.domain.challenge.dto.JoinResponseDTO;
+import com.backend_catcheat.domain.challenge.entity.UnlockRequestDTO;
+import com.backend_catcheat.domain.challenge.entity.UnlockResponseDTO;
 import com.backend_catcheat.domain.challenge.service.ChallengeParticipationService;
 import com.backend_catcheat.domain.challenge.service.ChallengeService;
 import com.backend_catcheat.global.common.ApiResponse;
@@ -40,4 +42,14 @@ public class ChallengeController {
             @PathVariable Long challengeId) {
         return ApiResponse.ok(new JoinResponseDTO(challengeParticipationService.join(userId, challengeId)));
     }
-}
+
+    //해금
+    @PostMapping("/{challengeId}//unlocks")
+    public ApiResponse<UnlockResponseDTO> unlock(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long challengeId,
+            @RequestParam UnlockRequestDTO request
+            ) {
+        return ApiResponse.ok(challengeParticipationService.unlock(
+                userId, challengeId, request.slotId(), request.imageKey()));
+    }}
