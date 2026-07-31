@@ -84,8 +84,14 @@ public enum ErrorCode {
     //제보
     REPORT_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "제보할 음식 이름을 입력해주세요"),
 
+    CHALLENGE_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "챌린지 이름을 입력해 주세요"),
+    CHALLENGE_TYPE_REQUIRED(HttpStatus.BAD_REQUEST, "챌린지 유형과 기한 방식을 선택해 주세요"),
+    CHALLENGE_SLOT_MIN_REQUIRED(HttpStatus.BAD_REQUEST, "목표 음식을 최소 5개 등록해 주세요"),
+    CHALLENGE_PERIOD_INVALID(HttpStatus.BAD_REQUEST, "기간 한정은 종료 시각이 시작 이후여야 해요"),
+
     // 뱃지
     BADGE_NOT_OWNED(HttpStatus.BAD_REQUEST, "보유하지 않은 뱃지예요");
+
 
 
 
