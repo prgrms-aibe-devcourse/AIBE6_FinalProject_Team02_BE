@@ -1,0 +1,72 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# CatchEat 백엔드(Spring Boot) 코드래빗 설정
+# 목표: 사소한 스타일 지적은 줄이고, 실제 버그·동시성·N+1 등 트러블슈팅 요소에 집중
+
+language: ko-KR
+
+tone_instructions: >
+  실무 시니어 백엔드 리뷰어처럼, 실제로 문제가 될 수 있는 핵심 이슈만 지적한다.
+  스타일·포맷·네이밍·주석 취향 같은 사소한 지적은 하지 않는다.
+  버그, 잠재적 버그, 동시성 문제, 성능(N+1 등), 트랜잭션 정합성처럼 고치면 실질적으로
+  나아지는 것에 집중하고, 확신이 낮으면 단정하지 말고 질문 형태로 남긴다.
+
+reviews:
+  profile: chill                 # 덜 깐깐하게 (nitpick 억제)
+  request_changes_workflow: false
+  high_level_summary: true
+  review_status: true
+  poem: false                    # 잡음 제거
+  collapse_walkthrough: true
+  sequence_diagrams: false
+  changed_files_summary: true
+  assess_linked_issues: true
+
+  path_filters:
+    - "!**/build/**"
+    - "!**/.gradle/**"
+    - "!**/gradlew"
+    - "!**/gradlew.bat"
+    - "!**/gradle/wrapper/**"
+    - "!**/*.jar"
+
+  path_instructions:
+    - path: "**/*.java"
+      instructions: >
+        핵심 비즈니스 로직과 실제 결함 위주로만 리뷰한다. 아래에 집중한다:
+        (1) 명백한 버그 / 잠재적 NPE / 경계조건(null, 빈 컬렉션, off-by-one);
+        (2) 동시성 이슈 - TOCTOU, race condition, 트랜잭션 경계, 락 없는 공유 상태, 유니크 제약 위반 처리;
+        (3) JPA 성능 - N+1 쿼리, 반복문 내 쿼리, 누락된 fetch join, 불필요한 EAGER 로딩;
+        (4) 트랜잭션/영속성 - @Transactional 누락·오용, flush 타이밍, 지연로딩(LazyInitialization) 예외, dirty checking 오해;
+        (5) 예외 처리 누락, 리소스 누수, 외부 호출(S3 등) 실패 처리.
+        스타일/포맷/네이밍/주석 취향 지적은 하지 않는다. 사소한 개선 제안은 생략한다.
+    - path: "**/src/main/resources/db/migration/*.sql"
+      instructions: >
+        마이그레이션 안전성만 본다: 이미 적용된 마이그레이션을 수정했는지(checksum 깨짐),
+        되돌릴 수 없는 파괴적 변경, 누락된 인덱스/FK, NOT NULL 추가 시 기존 행 영향,
+        대용량 테이블 락 위험, 버전 번호 충돌. 컨벤션/포맷 지적은 하지 않는다.
+    - path: "**/*Controller.java"
+      instructions: >
+        인증/인가 누락(@AuthenticationPrincipal 검증, 본인 리소스 확인), 입력 검증 누락,
+        예외의 응답 매핑만 중점적으로 본다.
+
+  auto_review:
+    enabled: true
+    auto_incremental_review: true  # PR에 새 커밋 push할 때마다 변경분 자동 재리뷰
+    drafts: false
+    base_branches:
+      - develop
+      - main
+
+  tools:
+    languagetool:
+      enabled: false             # 산문 문법 검사 잡음 제거
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  # 리뷰 시 웹 문서(공식 레퍼런스 등)를 검색해 근거로 활용
+  web_search:
+    enabled: true
+  learnings:
+    scope: local
