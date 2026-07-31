@@ -1,5 +1,6 @@
 package com.backend_catcheat.domain.challenge.service;
 
+import com.backend_catcheat.domain.challenge.dto.UnlockResponseDTO;
 import com.backend_catcheat.domain.challenge.entity.*;
 import com.backend_catcheat.domain.challenge.repository.ChallengeDexRepository;
 import com.backend_catcheat.domain.challenge.repository.ChallengeDexSlotRepository;
