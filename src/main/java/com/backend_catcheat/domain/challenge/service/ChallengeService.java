@@ -5,13 +5,15 @@ import com.backend_catcheat.domain.auth.repository.UserRepository;
 import com.backend_catcheat.domain.challenge.dto.ChallengeCreateRequestDTO;
 import com.backend_catcheat.domain.challenge.dto.ChallengeCreateRequestDTO.SlotInput;
 import com.backend_catcheat.domain.challenge.dto.ChallengeCreateResponseDTO;
+import com.backend_catcheat.domain.challenge.dto.ChallengeSummaryDTO;
 import com.backend_catcheat.domain.challenge.dto.CreationTicketResponseDTO;
 import com.backend_catcheat.domain.challenge.entity.ChallengeDex;
 import com.backend_catcheat.domain.challenge.entity.ChallengeDexSlot;
+import com.backend_catcheat.domain.challenge.entity.ChallengeListStatus;
 import com.backend_catcheat.domain.challenge.entity.PeriodType;
 import com.backend_catcheat.domain.challenge.repository.ChallengeDexRepository;
 import com.backend_catcheat.domain.challenge.repository.ChallengeDexSlotRepository;
-import com.backend_catcheat.domain.challenge.repository.ChallengeUnlockRepository;
+import com.backend_catcheat.domain.challenge.repository.ChallengeParticipantRepository;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -32,8 +34,7 @@ public class ChallengeService {
     private final ChallengeDexRepository challengeDexRepository;
     private final ChallengeDexSlotRepository slotRepository;
 
-    private final ChallengeUnlockRepository unlockRepository;
-
+    private final ChallengeParticipantRepository participantRepository;
     //개설권 조회
     @Transactional
     public CreationTicketResponseDTO getRemainingTickets(Long userId){
@@ -106,7 +107,29 @@ public class ChallengeService {
             }
         }
     }
+    //챌린지 탐색
+    @Transactional(readOnly = true)
+    public List<ChallengeSummaryDTO> getChallenges(ChallengeListStatus status){
+        LocalDateTime now = LocalDateTime.now();
+        List<ChallengeDex>  list = (status == ChallengeListStatus.FINISHED)
+                ? challengeDexRepository.findFinished(now)
+                : challengeDexRepository.findOngoing(now);
+        return list.stream().map(this::toSummary).toList();
+    }
 
+    private ChallengeSummaryDTO toSummary(ChallengeDex c){
+        long paticipants = participantRepository.countByChallengeDexId(c.getId());
+        return new ChallengeSummaryDTO(
+                c.getId(),
+                c.getName(),
+                c.getDescription(),
+                c.getChallengeType(),
+                c.getPeriodType(),
+                c.getStartsAt(),
+                c.getEndsAt(),
+                paticipants
+        );
+    }
 
 
     //yyyymm 정수 (예: 2026년 7월 → 202607)
