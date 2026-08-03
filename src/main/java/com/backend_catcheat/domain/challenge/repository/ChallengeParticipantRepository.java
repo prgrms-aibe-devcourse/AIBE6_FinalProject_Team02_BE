@@ -2,11 +2,26 @@ package com.backend_catcheat.domain.challenge.repository;
 
 import com.backend_catcheat.domain.challenge.entity.ChallengeParticipant;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface ChallengeParticipantRepository extends JpaRepository<ChallengeParticipant, Long> {
     Optional<ChallengeParticipant> findByChallengeDexIdAndUserId(Long challengeDexId, Long userId);
     boolean existsByChallengeDexIdAndUserId(Long challengeDexId, Long userId);
     long countByChallengeDexId(Long challengeDexId);   // 참여자수(랭킹)
+
+    // 목록 화면 N+1 방지 — 여러 챌린지의 참여자 수를 한 번에 집계
+    @Query("select p.challengeDexId as dexId, count(p) as cnt " +
+            "from ChallengeParticipant p " +
+            "where p.challengeDexId in :dexIds " +
+            "group by p.challengeDexId")
+    List<ParticipantCount> countByChallengeDexIdIn(@Param("dexIds") List<Long> dexIds);
+
+    interface ParticipantCount {
+        Long getDexId();
+        long getCnt();
+    }
 }

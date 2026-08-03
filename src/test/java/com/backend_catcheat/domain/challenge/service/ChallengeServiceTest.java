@@ -10,7 +10,7 @@ import com.backend_catcheat.domain.challenge.dto.ChallengeCreateResponseDTO;
 import com.backend_catcheat.domain.challenge.dto.CreationTicketResponseDTO;
 import com.backend_catcheat.domain.challenge.entity.ChallengeType;
 import com.backend_catcheat.domain.challenge.entity.PeriodType;
-import com.backend_catcheat.domain.challenge.dto.ChallengeListStatus;
+import com.backend_catcheat.domain.challenge.entity.ChallengeListStatus;
 import com.backend_catcheat.domain.challenge.dto.ChallengeSummaryDTO;
 import com.backend_catcheat.domain.challenge.entity.ChallengeDex;
 import com.backend_catcheat.domain.challenge.repository.ChallengeDexRepository;
@@ -150,7 +150,11 @@ class ChallengeServiceTest {
     @DisplayName("진행중 탐색은 진행중 목록을 요약 DTO로 돌려준다")
     void getChallenges_ongoing() {
         when(challengeDexRepository.findOngoing(any())).thenReturn(List.of(sampleDex()));
-        when(participantRepository.countByChallengeDexId(any())).thenReturn(3L);
+        when(participantRepository.countByChallengeDexIdIn(any())).thenReturn(List.of(
+                new ChallengeParticipantRepository.ParticipantCount() {
+                    public Long getDexId() { return null; }   // sampleDex는 미영속이라 id=null
+                    public long getCnt() { return 3L; }
+                }));
 
         List<ChallengeSummaryDTO> result = challengeService.getChallenges(ChallengeListStatus.ONGOING);
 
@@ -163,7 +167,7 @@ class ChallengeServiceTest {
     @DisplayName("완료 탐색은 finished 쿼리를 사용한다")
     void getChallenges_finished() {
         when(challengeDexRepository.findFinished(any())).thenReturn(List.of(sampleDex()));
-        when(participantRepository.countByChallengeDexId(any())).thenReturn(0L);
+        when(participantRepository.countByChallengeDexIdIn(any())).thenReturn(List.of());   // 참여자 0명
 
         List<ChallengeSummaryDTO> result = challengeService.getChallenges(ChallengeListStatus.FINISHED);
 

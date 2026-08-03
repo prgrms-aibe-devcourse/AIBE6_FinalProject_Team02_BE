@@ -19,6 +19,7 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -115,11 +116,21 @@ public class ChallengeService {
         List<ChallengeDex>  list = (status == ChallengeListStatus.FINISHED)
                 ? challengeDexRepository.findFinished(now)
                 : challengeDexRepository.findOngoing(now);
-        return list.stream().map(this::toSummary).toList();
+
+        //참여자 수를 챌린지별 count 쿼리 대신 한 번에 집계(N+1 방지)
+        List<Long> ids = list.stream().map(ChallengeDex::getId).toList();
+        Map<Long, Long> countByDex = ids.isEmpty() ? Map.of()
+                : participantRepository.countByChallengeDexIdIn(ids).stream()
+                        .collect(Collectors.toMap(
+                                ChallengeParticipantRepository.ParticipantCount::getDexId,
+                                ChallengeParticipantRepository.ParticipantCount::getCnt));
+
+        return list.stream()
+                .map(c -> toSummary(c, countByDex.getOrDefault(c.getId(), 0L)))
+                .toList();
     }
 
-    private ChallengeSummaryDTO toSummary(ChallengeDex c){
-        long paticipants = participantRepository.countByChallengeDexId(c.getId());
+    private ChallengeSummaryDTO toSummary(ChallengeDex c, long participants){
         return new ChallengeSummaryDTO(
                 c.getId(),
                 c.getName(),
@@ -128,7 +139,7 @@ public class ChallengeService {
                 c.getPeriodType(),
                 c.getStartsAt(),
                 c.getEndsAt(),
-                paticipants
+                participants
         );
     }
     @Transactional(readOnly = true)

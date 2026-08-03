@@ -151,6 +151,17 @@ class ChallengeParticipationServiceTest {
     }
 
     @Test
+    @DisplayName("인증 사진(imageKey)이 비어 있으면 CHALLENGE_UNLOCK_IMAGE_REQUIRED")
+    void unlock_blankImageKey() {
+        assertThatThrownBy(() -> service.unlock(USER_ID, DEX_ID, SLOT_ID, "  "))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CHALLENGE_UNLOCK_IMAGE_REQUIRED));
+        assertThatThrownBy(() -> service.unlock(USER_ID, DEX_ID, SLOT_ID, null))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CHALLENGE_UNLOCK_IMAGE_REQUIRED));
+    }
+
+    @Test
     @DisplayName("참여하지 않았으면 CHALLENGE_NOT_JOINED")
     void unlock_notJoined() {
         when(participantRepository.findByChallengeDexIdAndUserId(DEX_ID, USER_ID))

@@ -9,6 +9,7 @@ import com.backend_catcheat.domain.challenge.repository.ChallengeUnlockRepositor
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +47,10 @@ public class ChallengeParticipationService {
 
     @Transactional
     public UnlockResponseDTO unlock(Long userId, Long challengeDexId, Long slotId, String imageKey){
+        //인증 사진 없이 해금 방지
+        if (imageKey == null || imageKey.isBlank()) {
+            throw new CustomException(ErrorCode.CHALLENGE_UNLOCK_IMAGE_REQUIRED);
+        }
         ChallengeParticipant participant = participantRepository
                 .findByChallengeDexIdAndUserId(challengeDexId, userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CHALLENGE_NOT_JOINED));
@@ -59,7 +64,13 @@ public class ChallengeParticipationService {
         if(unlockRepository.existsByChallengeParticipantIdAndSlotId(participant.getId(), slotId)) {
             throw new CustomException(ErrorCode.CHALLENGE_SLOT_ALREADY_UNLOCKED);
         }
-        unlockRepository.save(ChallengeUnlock.of(participant.getId(), slotId, imageKey));
+        try {
+            unlockRepository.save(ChallengeUnlock.of(participant.getId(), slotId, imageKey));
+            unlockRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            //존재 확인과 저장 사이 동시 요청으로 유니크 제약 위반 시 → 중복 인증으로 처리
+            throw new CustomException(ErrorCode.CHALLENGE_SLOT_ALREADY_UNLOCKED);
+        }
 
         long unlocked = unlockRepository.countByChallengeParticipantId(participant.getId());
         long total = slotRepository.countByChallengeDexId(challengeDexId);

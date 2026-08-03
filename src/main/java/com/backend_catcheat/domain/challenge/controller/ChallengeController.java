@@ -42,11 +42,11 @@ public class ChallengeController {
     }
 
     //해금
-    @PostMapping("/{challengeId}//unlocks")
+    @PostMapping("/{challengeId}/unlocks")
     public ApiResponse<UnlockResponseDTO> unlock(
             @AuthenticationPrincipal Long userId,
             @PathVariable Long challengeId,
-            @RequestParam UnlockRequestDTO request
+            @RequestBody UnlockRequestDTO request
             ) {
         return ApiResponse.ok(challengeParticipationService.unlock(
                 userId, challengeId, request.slotId(), request.imageKey()));
