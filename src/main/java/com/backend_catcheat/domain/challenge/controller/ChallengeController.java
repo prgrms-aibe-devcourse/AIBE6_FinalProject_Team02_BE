@@ -59,6 +59,14 @@ public class ChallengeController {
             ){
         return ApiResponse.ok(challengeService.getChallenges(status));
     }
+    
+    //상세보기
+    @GetMapping("/{challengeId}")
+    public ApiResponse<ChallengeDetailResponseDTO> detail(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long challengeId) {
+        return ApiResponse.ok(challengeService.getDetail(userId, challengeId));
+    }
 
 
 }

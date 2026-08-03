@@ -2,18 +2,13 @@ package com.backend_catcheat.domain.challenge.service;
 
 import com.backend_catcheat.domain.auth.entity.User;
 import com.backend_catcheat.domain.auth.repository.UserRepository;
-import com.backend_catcheat.domain.challenge.dto.ChallengeCreateRequestDTO;
+import com.backend_catcheat.domain.challenge.dto.*;
 import com.backend_catcheat.domain.challenge.dto.ChallengeCreateRequestDTO.SlotInput;
-import com.backend_catcheat.domain.challenge.dto.ChallengeCreateResponseDTO;
-import com.backend_catcheat.domain.challenge.dto.ChallengeSummaryDTO;
-import com.backend_catcheat.domain.challenge.dto.CreationTicketResponseDTO;
-import com.backend_catcheat.domain.challenge.entity.ChallengeDex;
-import com.backend_catcheat.domain.challenge.entity.ChallengeDexSlot;
-import com.backend_catcheat.domain.challenge.entity.ChallengeListStatus;
-import com.backend_catcheat.domain.challenge.entity.PeriodType;
+import com.backend_catcheat.domain.challenge.entity.*;
 import com.backend_catcheat.domain.challenge.repository.ChallengeDexRepository;
 import com.backend_catcheat.domain.challenge.repository.ChallengeDexSlotRepository;
 import com.backend_catcheat.domain.challenge.repository.ChallengeParticipantRepository;
+import com.backend_catcheat.domain.challenge.repository.ChallengeUnlockRepository;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +19,9 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -33,7 +31,7 @@ public class ChallengeService {
     private final UserRepository userRepository;
     private final ChallengeDexRepository challengeDexRepository;
     private final ChallengeDexSlotRepository slotRepository;
-
+    private final ChallengeUnlockRepository unlockRepository;
     private final ChallengeParticipantRepository participantRepository;
     //개설권 조회
     @Transactional
@@ -130,6 +128,37 @@ public class ChallengeService {
                 paticipants
         );
     }
+    @Transactional(readOnly = true)
+    public ChallengeDetailResponseDTO getDetail(Long userId, Long challengeDexId){
+        ChallengeDex dex = challengeDexRepository.findByIdAndDeletedAtIsNull(challengeDexId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CHALLENGE_NOT_FOUND));
+        Optional<ChallengeParticipant> participant = participantRepository.findByChallengeDexIdAndUserId(challengeDexId, userId);
+
+        //인증한 슬롯 id들
+        Set<Long> unlockedSlotIds =participant
+                .map(p -> unlockRepository.findByChallengeParticipantId(p.getId()).stream()
+                        .map(ChallengeUnlock::getSlotId)
+                        .collect(Collectors.toSet()))
+                        .orElse(Set.of());
+
+        List<ChallengeDetailResponseDTO.SlotDetail> slots =
+                slotRepository.findByChallengeDexIdOrderBySlotOrderAsc(challengeDexId).stream()
+                        .map(s -> new ChallengeDetailResponseDTO.SlotDetail(
+                                s.getId(), s.getFoodName(), s.getPlaceName(), s.getSlotOrder(),
+                                unlockedSlotIds.contains(s.getId())))
+                        .toList();
+
+        return new ChallengeDetailResponseDTO(
+                dex.getId(), dex.getName(), dex.getDescription(),
+                dex.getChallengeType(), dex.getPeriodType(),
+                dex.getStartsAt(), dex.getEndsAt(), dex.getRewardBadgeId(),
+                participantRepository.countByChallengeDexId(challengeDexId),
+                participant.isPresent(),
+                participant.map(ChallengeParticipant::isCompleted).orElse(false),
+                slots);
+
+    }
+
 
 
     //yyyymm 정수 (예: 2026년 7월 → 202607)
