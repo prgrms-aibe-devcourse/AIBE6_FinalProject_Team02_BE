@@ -97,6 +97,11 @@ public enum ErrorCode {
     CHALLENGE_ENDED(HttpStatus.CONFLICT, "이미 종료된 챌린지예요"),
     CHALLENGE_ALREADY_JOINED(HttpStatus.CONFLICT, "이미 참여한 챌린지예요"),
 
+    // 제작 도감
+    MADE_DEX_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "도감 이름을 입력해 주세요"),
+    MADE_DEX_NAME_TOO_LONG(HttpStatus.BAD_REQUEST, "도감 이름은 100자까지 쓸 수 있어요"),
+    MADE_DEX_DESCRIPTION_TOO_LONG(HttpStatus.BAD_REQUEST, "도감 소개는 500자까지 쓸 수 있어요"),
+
     // 뱃지
     BADGE_NOT_OWNED(HttpStatus.BAD_REQUEST, "보유하지 않은 뱃지예요");
 
