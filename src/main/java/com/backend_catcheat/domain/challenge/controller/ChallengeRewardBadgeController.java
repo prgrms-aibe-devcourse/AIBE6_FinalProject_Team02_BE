@@ -1,6 +1,7 @@
 package com.backend_catcheat.domain.challenge.controller;
 
 import com.backend_catcheat.domain.challenge.dto.PresetBadgeDTO;
+import com.backend_catcheat.domain.challenge.dto.RewardBadgeDTO;
 import com.backend_catcheat.domain.challenge.dto.RewardBadgeCreateRequestDTO;
 import com.backend_catcheat.domain.challenge.dto.RewardBadgeCreateResponseDTO;
 import com.backend_catcheat.domain.challenge.service.ChallengeRewardBadgeService;
@@ -24,6 +25,12 @@ public class ChallengeRewardBadgeController {
     @GetMapping("/presets")
     public ApiResponse<List<PresetBadgeDTO>> presets() {
         return ApiResponse.ok(challengeRewardBadgeService.getPresets());
+    }
+
+    //보상 뱃지 표시 정보(상세 미리보기·완료 팝업)
+    @GetMapping("/{badgeId}")
+    public ApiResponse<RewardBadgeDTO> rewardBadge(@PathVariable Long badgeId) {
+        return ApiResponse.ok(challengeRewardBadgeService.getRewardBadge(badgeId));
     }
 
     //보상 뱃지 생성 → 반환된 badgeId를 개설 요청 rewardBadgeId로 사용
