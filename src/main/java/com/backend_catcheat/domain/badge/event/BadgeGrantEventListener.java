@@ -1,6 +1,7 @@
 package com.backend_catcheat.domain.badge.event;
 
 import com.backend_catcheat.domain.badge.service.BadgeGrantService;
+import com.backend_catcheat.global.event.ChallengeCompletedEvent;
 import com.backend_catcheat.global.event.SlotsUnlockedEvent;
 import com.backend_catcheat.global.event.UserRegisteredEvent;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +39,17 @@ public class BadgeGrantEventListener {
             badgeGrantService.evaluateCollectionBadges(event.userId());
         } catch (Exception e) {
             log.warn("[뱃지] 수집 뱃지 평가 실패 userId={}", event.userId(), e);
+        }
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void onChallengeCompleted(ChallengeCompletedEvent event) {
+        try {
+            badgeGrantService.grantChallengeReward(event.userId(), event.rewardBadgeId());
+        } catch (Exception e) {
+            log.warn("[뱃지] 챌린지 완료 보상 지급 실패 userId={} badgeId={}",
+                    event.userId(), event.rewardBadgeId(), e);
         }
     }
 }

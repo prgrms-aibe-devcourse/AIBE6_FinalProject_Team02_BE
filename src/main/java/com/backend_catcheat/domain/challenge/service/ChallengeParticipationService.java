@@ -6,9 +6,11 @@ import com.backend_catcheat.domain.challenge.repository.ChallengeDexRepository;
 import com.backend_catcheat.domain.challenge.repository.ChallengeDexSlotRepository;
 import com.backend_catcheat.domain.challenge.repository.ChallengeParticipantRepository;
 import com.backend_catcheat.domain.challenge.repository.ChallengeUnlockRepository;
+import com.backend_catcheat.global.event.ChallengeCompletedEvent;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +24,7 @@ public class ChallengeParticipationService {
     private final ChallengeParticipantRepository  participantRepository;
     private final ChallengeDexSlotRepository slotRepository;
     private final ChallengeUnlockRepository unlockRepository;
+    private final ApplicationEventPublisher eventPublisher;
     @Transactional
     public Long join(Long userId, Long challengeDexId){
 
@@ -78,8 +81,12 @@ public class ChallengeParticipationService {
         if(unlocked >= total && !participant.isCompleted()){
             participant.complete();
 
-            //여기에 뱃지 지급 코드 넣으시면 됩니다.
-
+            //개설자가 지정한 보상 뱃지가 있으면 완료자에게 지급
+            challengeDexRepository.findByIdAndDeletedAtIsNull(challengeDexId)
+                    .map(ChallengeDex::getRewardBadgeId)
+                    .ifPresent(rewardBadgeId -> eventPublisher.publishEvent(
+                            new ChallengeCompletedEvent(userId, rewardBadgeId)
+                    ));
         }
         return new UnlockResponseDTO(unlocked, total, participant.isCompleted());
 
