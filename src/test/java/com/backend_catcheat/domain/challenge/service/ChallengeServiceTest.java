@@ -80,7 +80,7 @@ class ChallengeServiceTest {
     private ChallengeCreateRequestDTO req(PeriodType period, LocalDateTime endsAt, int slotCount) {
         List<SlotInput> slots = new ArrayList<>();
         for (int i = 0; i < slotCount; i++) {
-            slots.add(new SlotInput("음식" + i, null, null, null));
+            slots.add(new SlotInput("음식" + i, null, null, null, null));
         }
         return new ChallengeCreateRequestDTO(
                 "테스트 챌린지", "설명",

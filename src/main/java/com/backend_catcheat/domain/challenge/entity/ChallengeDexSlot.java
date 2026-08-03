@@ -31,14 +31,18 @@ public class ChallengeDexSlot {
     @Column(name = "slot_order", nullable = false)
     private int slotOrder;
 
+    @Column(name = "image_key", length = 512)
+    private String imageKey;                     // 개설자가 등록한 목표 음식 사진(S3 key). 미해금이면 흑백 표시
+
     @Builder
     private ChallengeDexSlot(Long challengeDexId, String foodName, String placeName,
-                             Double lat, Double lng, int slotOrder) {
+                             Double lat, Double lng, int slotOrder, String imageKey) {
         this.challengeDexId = challengeDexId;
         this.foodName = foodName;
         this.placeName = placeName;
         this.lat = lat;
         this.lng = lng;
         this.slotOrder = slotOrder;
+        this.imageKey = imageKey;
     }
 }

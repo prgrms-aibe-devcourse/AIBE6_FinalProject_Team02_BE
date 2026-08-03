@@ -21,5 +21,5 @@ public record ChallengeDetailResponseDTO(
         boolean completed,    // 내가 완료했는지
         List<SlotDetail> slots
 ) {
-    public record SlotDetail(Long id, String foodName, String placeName, int slotOrder, boolean unlocked) {}
+    public record SlotDetail(Long id, String foodName, String placeName, int slotOrder, boolean unlocked, String imageUrl) {}
 }

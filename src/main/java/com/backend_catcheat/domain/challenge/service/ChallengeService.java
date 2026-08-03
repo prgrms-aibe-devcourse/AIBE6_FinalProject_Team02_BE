@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import com.backend_catcheat.global.s3.S3PresignedUrlService;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +34,7 @@ public class ChallengeService {
     private final ChallengeDexSlotRepository slotRepository;
     private final ChallengeUnlockRepository unlockRepository;
     private final ChallengeParticipantRepository participantRepository;
+    private final S3PresignedUrlService s3PresignedUrlService;
     //개설권 조회
     @Transactional
     public CreationTicketResponseDTO getRemainingTickets(Long userId){
@@ -77,6 +79,7 @@ public class ChallengeService {
                     .lat(s.lat())
                     .lng(s.lng())
                     .slotOrder(i)              // 입력 순서대로 표시 순서 부여
+                    .imageKey(s.imageKey())    // 개설자가 등록한 목표 음식 사진(S3 key)
                     .build());
         }
         slotRepository.saveAll(slots);
@@ -145,7 +148,10 @@ public class ChallengeService {
                 slotRepository.findByChallengeDexIdOrderBySlotOrderAsc(challengeDexId).stream()
                         .map(s -> new ChallengeDetailResponseDTO.SlotDetail(
                                 s.getId(), s.getFoodName(), s.getPlaceName(), s.getSlotOrder(),
-                                unlockedSlotIds.contains(s.getId())))
+                                unlockedSlotIds.contains(s.getId()),
+                                // 개설자가 등록한 목표 사진 → 조회용 프리사인 URL (없으면 null)
+                                s.getImageKey() == null ? null
+                                        : s3PresignedUrlService.createDownloadUrl(s.getImageKey())))
                         .toList();
 
         return new ChallengeDetailResponseDTO(
