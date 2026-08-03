@@ -2,15 +2,13 @@ package com.backend_catcheat.domain.challenge.service;
 
 import com.backend_catcheat.domain.auth.entity.User;
 import com.backend_catcheat.domain.auth.repository.UserRepository;
-import com.backend_catcheat.domain.challenge.dto.ChallengeCreateRequestDTO;
+import com.backend_catcheat.domain.challenge.dto.*;
 import com.backend_catcheat.domain.challenge.dto.ChallengeCreateRequestDTO.SlotInput;
-import com.backend_catcheat.domain.challenge.dto.ChallengeCreateResponseDTO;
-import com.backend_catcheat.domain.challenge.dto.CreationTicketResponseDTO;
-import com.backend_catcheat.domain.challenge.entity.ChallengeDex;
-import com.backend_catcheat.domain.challenge.entity.ChallengeDexSlot;
-import com.backend_catcheat.domain.challenge.entity.PeriodType;
+import com.backend_catcheat.domain.challenge.entity.*;
 import com.backend_catcheat.domain.challenge.repository.ChallengeDexRepository;
 import com.backend_catcheat.domain.challenge.repository.ChallengeDexSlotRepository;
+import com.backend_catcheat.domain.challenge.repository.ChallengeParticipantRepository;
+import com.backend_catcheat.domain.challenge.repository.ChallengeUnlockRepository;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +19,11 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+import com.backend_catcheat.global.s3.S3PresignedUrlService;
 
 @Service
 @RequiredArgsConstructor
@@ -30,7 +33,9 @@ public class ChallengeService {
     private final UserRepository userRepository;
     private final ChallengeDexRepository challengeDexRepository;
     private final ChallengeDexSlotRepository slotRepository;
-
+    private final ChallengeUnlockRepository unlockRepository;
+    private final ChallengeParticipantRepository participantRepository;
+    private final S3PresignedUrlService s3PresignedUrlService;
     //개설권 조회
     @Transactional
     public CreationTicketResponseDTO getRemainingTickets(Long userId){
@@ -75,6 +80,7 @@ public class ChallengeService {
                     .lat(s.lat())
                     .lng(s.lng())
                     .slotOrder(i)              // 입력 순서대로 표시 순서 부여
+                    .imageKey(s.imageKey())    // 개설자가 등록한 목표 음식 사진(S3 key)
                     .build());
         }
         slotRepository.saveAll(slots);
@@ -102,6 +108,72 @@ public class ChallengeService {
                 throw new CustomException(ErrorCode.CHALLENGE_PERIOD_INVALID);
             }
         }
+    }
+    //챌린지 탐색
+    @Transactional(readOnly = true)
+    public List<ChallengeSummaryDTO> getChallenges(ChallengeListStatus status){
+        LocalDateTime now = LocalDateTime.now();
+        List<ChallengeDex>  list = (status == ChallengeListStatus.FINISHED)
+                ? challengeDexRepository.findFinished(now)
+                : challengeDexRepository.findOngoing(now);
+
+        //참여자 수를 챌린지별 count 쿼리 대신 한 번에 집계(N+1 방지)
+        List<Long> ids = list.stream().map(ChallengeDex::getId).toList();
+        Map<Long, Long> countByDex = ids.isEmpty() ? Map.of()
+                : participantRepository.countByChallengeDexIdIn(ids).stream()
+                        .collect(Collectors.toMap(
+                                ChallengeParticipantRepository.ParticipantCount::getDexId,
+                                ChallengeParticipantRepository.ParticipantCount::getCnt));
+
+        return list.stream()
+                .map(c -> toSummary(c, countByDex.getOrDefault(c.getId(), 0L)))
+                .toList();
+    }
+
+    private ChallengeSummaryDTO toSummary(ChallengeDex c, long participants){
+        return new ChallengeSummaryDTO(
+                c.getId(),
+                c.getName(),
+                c.getDescription(),
+                c.getChallengeType(),
+                c.getPeriodType(),
+                c.getStartsAt(),
+                c.getEndsAt(),
+                participants
+        );
+    }
+    @Transactional(readOnly = true)
+    public ChallengeDetailResponseDTO getDetail(Long userId, Long challengeDexId){
+        ChallengeDex dex = challengeDexRepository.findByIdAndDeletedAtIsNull(challengeDexId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CHALLENGE_NOT_FOUND));
+        Optional<ChallengeParticipant> participant = participantRepository.findByChallengeDexIdAndUserId(challengeDexId, userId);
+
+        //인증한 슬롯 id들
+        Set<Long> unlockedSlotIds =participant
+                .map(p -> unlockRepository.findByChallengeParticipantId(p.getId()).stream()
+                        .map(ChallengeUnlock::getSlotId)
+                        .collect(Collectors.toSet()))
+                        .orElse(Set.of());
+
+        List<ChallengeDetailResponseDTO.SlotDetail> slots =
+                slotRepository.findByChallengeDexIdOrderBySlotOrderAsc(challengeDexId).stream()
+                        .map(s -> new ChallengeDetailResponseDTO.SlotDetail(
+                                s.getId(), s.getFoodName(), s.getPlaceName(), s.getSlotOrder(),
+                                unlockedSlotIds.contains(s.getId()),
+                                // 개설자가 등록한 목표 사진 → 조회용 프리사인 URL (없으면 null)
+                                s.getImageKey() == null ? null
+                                        : s3PresignedUrlService.createDownloadUrl(s.getImageKey())))
+                        .toList();
+
+        return new ChallengeDetailResponseDTO(
+                dex.getId(), dex.getName(), dex.getDescription(),
+                dex.getChallengeType(), dex.getPeriodType(),
+                dex.getStartsAt(), dex.getEndsAt(), dex.getRewardBadgeId(),
+                participantRepository.countByChallengeDexId(challengeDexId),
+                participant.isPresent(),
+                participant.map(ChallengeParticipant::isCompleted).orElse(false),
+                slots);
+
     }
 
 

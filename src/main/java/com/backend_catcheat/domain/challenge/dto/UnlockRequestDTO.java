@@ -1,0 +1,3 @@
+package com.backend_catcheat.domain.challenge.dto;
+
+public record UnlockRequestDTO(Long slotId, String imageKey) {}

@@ -10,8 +10,12 @@ import com.backend_catcheat.domain.challenge.dto.ChallengeCreateResponseDTO;
 import com.backend_catcheat.domain.challenge.dto.CreationTicketResponseDTO;
 import com.backend_catcheat.domain.challenge.entity.ChallengeType;
 import com.backend_catcheat.domain.challenge.entity.PeriodType;
+import com.backend_catcheat.domain.challenge.entity.ChallengeListStatus;
+import com.backend_catcheat.domain.challenge.dto.ChallengeSummaryDTO;
+import com.backend_catcheat.domain.challenge.entity.ChallengeDex;
 import com.backend_catcheat.domain.challenge.repository.ChallengeDexRepository;
 import com.backend_catcheat.domain.challenge.repository.ChallengeDexSlotRepository;
+import com.backend_catcheat.domain.challenge.repository.ChallengeParticipantRepository;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
@@ -46,9 +50,19 @@ class ChallengeServiceTest {
     ChallengeDexRepository challengeDexRepository;
     @Mock
     ChallengeDexSlotRepository slotRepository;
+    @Mock
+    ChallengeParticipantRepository participantRepository;
 
     @InjectMocks
     ChallengeService challengeService;
+
+    private ChallengeDex sampleDex() {
+        return ChallengeDex.builder()
+                .ownerId(99L).name("샘플 챌린지").description("설명")
+                .challengeType(ChallengeType.COLLECTION).periodType(PeriodType.PERMANENT)
+                .startsAt(LocalDateTime.now().minusDays(1)).event(false)
+                .build();
+    }
 
     private User newUser() {
         return User.builder()
@@ -66,7 +80,7 @@ class ChallengeServiceTest {
     private ChallengeCreateRequestDTO req(PeriodType period, LocalDateTime endsAt, int slotCount) {
         List<SlotInput> slots = new ArrayList<>();
         for (int i = 0; i < slotCount; i++) {
-            slots.add(new SlotInput("음식" + i, null, null, null));
+            slots.add(new SlotInput("음식" + i, null, null, null, null));
         }
         return new ChallengeCreateRequestDTO(
                 "테스트 챌린지", "설명",
@@ -130,5 +144,34 @@ class ChallengeServiceTest {
         assertThatThrownBy(() -> challengeService.create(1L, req(PeriodType.PERMANENT, null, 5)))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CHALLENGE_TICKET_EXHAUSTED));
+    }
+
+    @Test
+    @DisplayName("진행중 탐색은 진행중 목록을 요약 DTO로 돌려준다")
+    void getChallenges_ongoing() {
+        when(challengeDexRepository.findOngoing(any())).thenReturn(List.of(sampleDex()));
+        when(participantRepository.countByChallengeDexIdIn(any())).thenReturn(List.of(
+                new ChallengeParticipantRepository.ParticipantCount() {
+                    public Long getDexId() { return null; }   // sampleDex는 미영속이라 id=null
+                    public long getCnt() { return 3L; }
+                }));
+
+        List<ChallengeSummaryDTO> result = challengeService.getChallenges(ChallengeListStatus.ONGOING);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).name()).isEqualTo("샘플 챌린지");
+        assertThat(result.get(0).participantCount()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("완료 탐색은 finished 쿼리를 사용한다")
+    void getChallenges_finished() {
+        when(challengeDexRepository.findFinished(any())).thenReturn(List.of(sampleDex()));
+        when(participantRepository.countByChallengeDexIdIn(any())).thenReturn(List.of());   // 참여자 0명
+
+        List<ChallengeSummaryDTO> result = challengeService.getChallenges(ChallengeListStatus.FINISHED);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).participantCount()).isEqualTo(0);
     }
 }

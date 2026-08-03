@@ -1,15 +1,15 @@
 package com.backend_catcheat.domain.challenge.controller;
 
-import com.backend_catcheat.domain.challenge.dto.ChallengeCreateRequestDTO;
-import com.backend_catcheat.domain.challenge.dto.ChallengeCreateResponseDTO;
-import com.backend_catcheat.domain.challenge.dto.CreationTicketResponseDTO;
-import com.backend_catcheat.domain.challenge.dto.JoinResponseDTO;
+import com.backend_catcheat.domain.challenge.dto.*;
+import com.backend_catcheat.domain.challenge.entity.ChallengeListStatus;
 import com.backend_catcheat.domain.challenge.service.ChallengeParticipationService;
 import com.backend_catcheat.domain.challenge.service.ChallengeService;
 import com.backend_catcheat.global.common.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/challenges")
@@ -40,4 +40,33 @@ public class ChallengeController {
             @PathVariable Long challengeId) {
         return ApiResponse.ok(new JoinResponseDTO(challengeParticipationService.join(userId, challengeId)));
     }
+
+    //해금
+    @PostMapping("/{challengeId}/unlocks")
+    public ApiResponse<UnlockResponseDTO> unlock(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long challengeId,
+            @RequestBody UnlockRequestDTO request
+            ) {
+        return ApiResponse.ok(challengeParticipationService.unlock(
+                userId, challengeId, request.slotId(), request.imageKey()));
+    }
+
+    //탐색
+    @GetMapping
+    public ApiResponse<List<ChallengeSummaryDTO>> list(
+            @RequestParam(defaultValue = "ONGOING")ChallengeListStatus status
+            ){
+        return ApiResponse.ok(challengeService.getChallenges(status));
+    }
+    
+    //상세보기
+    @GetMapping("/{challengeId}")
+    public ApiResponse<ChallengeDetailResponseDTO> detail(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long challengeId) {
+        return ApiResponse.ok(challengeService.getDetail(userId, challengeId));
+    }
+
+
 }
