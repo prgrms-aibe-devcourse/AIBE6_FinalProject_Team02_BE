@@ -54,8 +54,9 @@ public class ChallengeParticipationService {
         if (imageKey == null || imageKey.isBlank()) {
             throw new CustomException(ErrorCode.CHALLENGE_UNLOCK_IMAGE_REQUIRED);
         }
+        //완료 판정 동시성 — 참여자 행 잠금(마지막 슬롯 동시 해금 시 완료·이벤트 누락 방지)
         ChallengeParticipant participant = participantRepository
-                .findByChallengeDexIdAndUserId(challengeDexId, userId)
+                .findForUpdateByChallengeDexIdAndUserId(challengeDexId, userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CHALLENGE_NOT_JOINED));
         //슬롯과 챌린지 관계 확인
         ChallengeDexSlot slot = slotRepository.findById(slotId)

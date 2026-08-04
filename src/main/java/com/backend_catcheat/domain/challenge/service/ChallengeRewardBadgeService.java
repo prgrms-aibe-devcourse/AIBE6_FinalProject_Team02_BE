@@ -39,6 +39,9 @@ public class ChallengeRewardBadgeService {
         if (name == null || name.isEmpty()) {
             throw new CustomException(ErrorCode.REWARD_BADGE_NAME_REQUIRED);
         }
+        if (name.length() > 100) {   // badge.name VARCHAR(100) — FE 우회 대비 서버 검증
+            throw new CustomException(ErrorCode.REWARD_BADGE_NAME_TOO_LONG);
+        }
 
         boolean hasPreset = request.presetCode() != null && !request.presetCode().isBlank();
         boolean hasImage = request.imageKey() != null && !request.imageKey().isBlank();
