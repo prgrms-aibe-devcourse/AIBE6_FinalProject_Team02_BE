@@ -10,6 +10,7 @@ import com.backend_catcheat.domain.challenge.dto.ChallengeCreateResponseDTO;
 import com.backend_catcheat.domain.challenge.dto.CreationTicketResponseDTO;
 import com.backend_catcheat.domain.challenge.entity.ChallengeType;
 import com.backend_catcheat.domain.challenge.entity.PeriodType;
+import com.backend_catcheat.domain.challenge.entity.VerifyType;
 import com.backend_catcheat.domain.challenge.entity.ChallengeListStatus;
 import com.backend_catcheat.domain.challenge.dto.ChallengeSummaryDTO;
 import com.backend_catcheat.domain.challenge.entity.ChallengeDex;
@@ -85,6 +86,7 @@ class ChallengeServiceTest {
         return new ChallengeCreateRequestDTO(
                 "테스트 챌린지", "설명",
                 ChallengeType.COLLECTION, period,
+                VerifyType.FOOD,
                 null, endsAt, null, slots);
     }
 

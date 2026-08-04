@@ -18,6 +18,8 @@ import java.time.LocalDateTime;
 @Service
 @RequiredArgsConstructor
 public class ChallengeParticipationService {
+    private static final double LOCATION_RADIUS_M = 200; // 위치 인증 허용 반경
+
     private final ChallengeDexRepository challengeDexRepository;
     private final ChallengeParticipantRepository  participantRepository;
     private final ChallengeDexSlotRepository slotRepository;
@@ -46,7 +48,8 @@ public class ChallengeParticipationService {
     }
 
     @Transactional
-    public UnlockResponseDTO unlock(Long userId, Long challengeDexId, Long slotId, String imageKey){
+    public UnlockResponseDTO unlock(Long userId, Long challengeDexId, Long slotId, String imageKey,
+                                    Double lat, Double lng){
         //인증 사진 없이 해금 방지
         if (imageKey == null || imageKey.isBlank()) {
             throw new CustomException(ErrorCode.CHALLENGE_UNLOCK_IMAGE_REQUIRED);
@@ -64,6 +67,17 @@ public class ChallengeParticipationService {
         if(unlockRepository.existsByChallengeParticipantIdAndSlotId(participant.getId(), slotId)) {
             throw new CustomException(ErrorCode.CHALLENGE_SLOT_ALREADY_UNLOCKED);
         }
+
+        //위치 인증 챌릱지면 현재 위치가 목표 반경 내인지 확인
+        ChallengeDex dex = challengeDexRepository.findByIdAndDeletedAtIsNull(challengeDexId)
+                .orElseThrow(()-> new CustomException(ErrorCode.CHALLENGE_NOT_FOUND));
+        if (dex.getVerifyType() == VerifyType.LOCATION){
+            throw new CustomException(ErrorCode.CHALLENGE_SLOT_LOCATION_REQUIRED);
+        }
+        if (distanceMeters(lat, lng, slot.getLat(), slot.getLat()) > LOCATION_RADIUS_M){
+            throw new CustomException(ErrorCode.CHALLENGE_LOCATION_TOO_FAR);
+        }
+
         try {
             unlockRepository.save(ChallengeUnlock.of(participant.getId(), slotId, imageKey));
             unlockRepository.flush();
@@ -83,6 +97,16 @@ public class ChallengeParticipationService {
         }
         return new UnlockResponseDTO(unlocked, total, participant.isCompleted());
 
+    }
+
+    private static double distanceMeters(double lat1, double lng1, double lat2, double lng2){
+        double R = 6_371_000;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLng = Math.toRadians(lng2 - lng1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        return 2 * R * Math.asin(Math.sqrt(a));
     }
 
 

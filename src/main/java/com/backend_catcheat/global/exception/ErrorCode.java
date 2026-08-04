@@ -101,6 +101,10 @@ public enum ErrorCode {
     CHALLENGE_SLOT_NOT_FOUND(HttpStatus.NOT_FOUND, "챌린지 목표를 찾을 수 없어요"),
     CHALLENGE_SLOT_ALREADY_UNLOCKED(HttpStatus.CONFLICT, "이미 인증한 목표예요"),
     CHALLENGE_UNLOCK_IMAGE_REQUIRED(HttpStatus.BAD_REQUEST, "인증 사진을 등록해 주세요"),
+    CHALLENGE_SLOT_LOCATION_REQUIRED(HttpStatus.BAD_REQUEST, "위치 인증 챌린지는 목표마다 위치가 필요해요"),
+    CHALLENGE_LOCATION_REQUIRED(HttpStatus.BAD_REQUEST, "현재 위치 정보가 필요해요"),
+    CHALLENGE_LOCATION_TOO_FAR(HttpStatus.BAD_REQUEST, "목표 위치에서 너무 멀어요"),
+
 
 
     // 제작 도감

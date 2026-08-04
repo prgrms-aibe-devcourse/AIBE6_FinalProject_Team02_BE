@@ -49,7 +49,8 @@ public class ChallengeController {
             @RequestBody UnlockRequestDTO request
             ) {
         return ApiResponse.ok(challengeParticipationService.unlock(
-                userId, challengeId, request.slotId(), request.imageKey()));
+                userId, challengeId, request.slotId(), request.imageKey(),
+                request.lat(), request.lng()));
     }
 
     //탐색

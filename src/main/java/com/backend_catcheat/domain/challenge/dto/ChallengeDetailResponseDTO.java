@@ -2,6 +2,7 @@ package com.backend_catcheat.domain.challenge.dto;
 
 import com.backend_catcheat.domain.challenge.entity.ChallengeType;
 import com.backend_catcheat.domain.challenge.entity.PeriodType;
+import com.backend_catcheat.domain.challenge.entity.VerifyType;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -13,6 +14,7 @@ public record ChallengeDetailResponseDTO(
         String description,
         ChallengeType challengeType,
         PeriodType periodType,
+        VerifyType verifyType,
         LocalDateTime startsAt,
         LocalDateTime endsAt,
         Long rewardBadgeId,

@@ -11,6 +11,7 @@ import com.backend_catcheat.domain.challenge.repository.ChallengeParticipantRepo
 import com.backend_catcheat.domain.challenge.repository.ChallengeUnlockRepository;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
+import com.backend_catcheat.global.s3.S3PresignedUrlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,7 +24,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import com.backend_catcheat.global.s3.S3PresignedUrlService;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +36,7 @@ public class ChallengeService {
     private final ChallengeUnlockRepository unlockRepository;
     private final ChallengeParticipantRepository participantRepository;
     private final S3PresignedUrlService s3PresignedUrlService;
+
     //개설권 조회
     @Transactional
     public CreationTicketResponseDTO getRemainingTickets(Long userId){
@@ -56,6 +57,7 @@ public class ChallengeService {
 
         LocalDateTime startsAt = req.startsAt() != null ? req.startsAt() : LocalDateTime.now();
         LocalDateTime endsAt = req.periodType() == PeriodType.LIMITED ? req.endsAt() : null;
+        VerifyType verifyType = req.verifyType() != null ? req.verifyType() : VerifyType.FOOD;
 
         ChallengeDex dex = challengeDexRepository.save(ChallengeDex.builder()
                 .ownerId(ownerId)
@@ -63,6 +65,7 @@ public class ChallengeService {
                 .description(req.description())
                 .challengeType(req.challengeType())
                 .periodType(req.periodType())
+                .verifyType(verifyType)
                 .startsAt(startsAt)
                 .endsAt(endsAt)
                 .rewardBadgeId(req.rewardBadgeId())
@@ -108,7 +111,13 @@ public class ChallengeService {
                 throw new CustomException(ErrorCode.CHALLENGE_PERIOD_INVALID);
             }
         }
+        // 위치 인증 챌린지는 모든 목표에 좌표가 필수
+        if (req.verifyType() == VerifyType.LOCATION
+                && req.slots().stream().anyMatch(s -> s.lat() == null || s.lng() == null)) {
+            throw new CustomException(ErrorCode.CHALLENGE_SLOT_LOCATION_REQUIRED);
+        }
     }
+
     //챌린지 탐색
     @Transactional(readOnly = true)
     public List<ChallengeSummaryDTO> getChallenges(ChallengeListStatus status){
@@ -121,9 +130,9 @@ public class ChallengeService {
         List<Long> ids = list.stream().map(ChallengeDex::getId).toList();
         Map<Long, Long> countByDex = ids.isEmpty() ? Map.of()
                 : participantRepository.countByChallengeDexIdIn(ids).stream()
-                        .collect(Collectors.toMap(
-                                ChallengeParticipantRepository.ParticipantCount::getDexId,
-                                ChallengeParticipantRepository.ParticipantCount::getCnt));
+                  .collect(Collectors.toMap(
+                          ChallengeParticipantRepository.ParticipantCount::getDexId,
+                          ChallengeParticipantRepository.ParticipantCount::getCnt));
 
         return list.stream()
                 .map(c -> toSummary(c, countByDex.getOrDefault(c.getId(), 0L)))
@@ -142,6 +151,7 @@ public class ChallengeService {
                 participants
         );
     }
+
     @Transactional(readOnly = true)
     public ChallengeDetailResponseDTO getDetail(Long userId, Long challengeDexId){
         ChallengeDex dex = challengeDexRepository.findByIdAndDeletedAtIsNull(challengeDexId)
@@ -149,11 +159,11 @@ public class ChallengeService {
         Optional<ChallengeParticipant> participant = participantRepository.findByChallengeDexIdAndUserId(challengeDexId, userId);
 
         //인증한 슬롯 id들
-        Set<Long> unlockedSlotIds =participant
+        Set<Long> unlockedSlotIds = participant
                 .map(p -> unlockRepository.findByChallengeParticipantId(p.getId()).stream()
                         .map(ChallengeUnlock::getSlotId)
                         .collect(Collectors.toSet()))
-                        .orElse(Set.of());
+                .orElse(Set.of());
 
         List<ChallengeDetailResponseDTO.SlotDetail> slots =
                 slotRepository.findByChallengeDexIdOrderBySlotOrderAsc(challengeDexId).stream()
@@ -167,16 +177,13 @@ public class ChallengeService {
 
         return new ChallengeDetailResponseDTO(
                 dex.getId(), dex.getName(), dex.getDescription(),
-                dex.getChallengeType(), dex.getPeriodType(),
+                dex.getChallengeType(), dex.getPeriodType(), dex.getVerifyType(),
                 dex.getStartsAt(), dex.getEndsAt(), dex.getRewardBadgeId(),
                 participantRepository.countByChallengeDexId(challengeDexId),
                 participant.isPresent(),
                 participant.map(ChallengeParticipant::isCompleted).orElse(false),
                 slots);
-
     }
-
-
 
     //yyyymm 정수 (예: 2026년 7월 → 202607)
     private int currentYearMonth() {
