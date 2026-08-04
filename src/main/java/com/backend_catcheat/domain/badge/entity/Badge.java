@@ -58,4 +58,24 @@ public class Badge {
     /** 보관함 정렬 순서 */
     @Column(name = "display_order", nullable = false)
     private int displayOrder;
+
+    /** 챌린지 보상 프리셋 활용 — 개설자가 프리셋 선택 + 이름 지정*/
+    public static Badge presetReward(String name, String presetCode) {
+        Badge badge = new Badge();
+        badge.name = name;
+        badge.code = presetCode;
+        badge.isSystem = false;
+        badge.displayOrder = 0;
+        return badge;
+    }
+
+    /** 유저 제작 보상 — 개설자가 직접 그리거나 크롭한 이미지 */
+    public static Badge drawnReward(String name, String imageKey) {
+        Badge badge = new Badge();
+        badge.name = name;
+        badge.imageUrl = imageKey;
+        badge.isSystem = false;
+        badge.displayOrder = 0;
+        return badge;
+    }
 }

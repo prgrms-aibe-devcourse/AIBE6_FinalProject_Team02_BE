@@ -63,6 +63,12 @@ public class BadgeGrantService {
         }
     }
 
+    /** 챌린지 완료 보상 */
+    @Transactional
+    public void grantChallengeReward(Long userId, Long badgeId) {
+        badgeRepository.findById(badgeId).ifPresent(badge -> grantIfAbsent(userId, badge));
+    }
+
     /** 미보유 시에만 지급 */
     private void grantIfAbsent(Long userId, Badge badge) {
         if (userBadgeRepository.existsByUserIdAndBadge_Id(userId, badge.getId())) {

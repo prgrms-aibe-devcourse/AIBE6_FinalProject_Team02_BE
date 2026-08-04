@@ -107,9 +107,24 @@ public enum ErrorCode {
     MADE_DEX_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "도감 이름을 입력해 주세요"),
     MADE_DEX_NAME_TOO_LONG(HttpStatus.BAD_REQUEST, "도감 이름은 100자까지 쓸 수 있어요"),
     MADE_DEX_DESCRIPTION_TOO_LONG(HttpStatus.BAD_REQUEST, "도감 소개는 500자까지 쓸 수 있어요"),
+    MADE_DEX_NOT_FOUND(HttpStatus.NOT_FOUND, "제작 도감을 찾을 수 없어요"),
+    MADE_DEX_NOT_OWNER(HttpStatus.FORBIDDEN, "그룹장만 할 수 있어요"),
+    MADE_DEX_FULL(HttpStatus.CONFLICT, "인원이 가득 찬 도감이에요"),
+    // 초대 코드 / 참여
+    MADE_DEX_INVITE_CODE_REQUIRED(HttpStatus.BAD_REQUEST, "초대 코드를 입력해 주세요"),
+    MADE_DEX_INVITE_CODE_INVALID(HttpStatus.NOT_FOUND, "존재하지 않는 초대 코드예요"),
+    MADE_DEX_INVITE_CODE_EXPIRED(HttpStatus.GONE, "만료된 초대 코드예요. 새 코드를 요청해 주세요"),
+    MADE_DEX_ALREADY_JOINED(HttpStatus.CONFLICT, "이미 이 제작 도감에 참여 중이에요"),
 
     // 뱃지
-    BADGE_NOT_OWNED(HttpStatus.BAD_REQUEST, "보유하지 않은 뱃지예요");
+    BADGE_NOT_OWNED(HttpStatus.BAD_REQUEST, "보유하지 않은 뱃지예요"),
+
+    // 챌린지 보상 뱃지(커스텀/프리셋)
+    REWARD_BADGE_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "뱃지 이름을 입력해 주세요"),
+    REWARD_BADGE_SOURCE_REQUIRED(HttpStatus.BAD_REQUEST, "프리셋을 고르거나 이미지를 만들어 주세요"),
+    INVALID_PRESET_CODE(HttpStatus.BAD_REQUEST, "존재하지 않는 프리셋이에요"),
+    REWARD_BADGE_NOT_FOUND(HttpStatus.NOT_FOUND, "보상 뱃지를 찾을 수 없어요"),
+    REWARD_BADGE_NAME_TOO_LONG(HttpStatus.BAD_REQUEST, "뱃지 이름은 100자까지 쓸 수 있어요");
 
 
 
