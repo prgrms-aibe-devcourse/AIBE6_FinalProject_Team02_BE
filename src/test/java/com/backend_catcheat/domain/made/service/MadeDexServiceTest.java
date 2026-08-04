@@ -55,9 +55,10 @@ class MadeDexServiceTest {
     }
 
     private MadeDexMember membership(Long madeDexId, MadeDexRole role) {
-        MadeDexMember member = MadeDexMember.owner(madeDexId, OWNER_ID, LocalDateTime.now());
-        ReflectionTestUtils.setField(member, "role", role);
-        return member;
+        LocalDateTime joinedAt = LocalDateTime.now();
+        return role == MadeDexRole.OWNER
+                ? MadeDexMember.owner(madeDexId, OWNER_ID, joinedAt)
+                : MadeDexMember.member(madeDexId, OWNER_ID, joinedAt);
     }
 
     @Test
