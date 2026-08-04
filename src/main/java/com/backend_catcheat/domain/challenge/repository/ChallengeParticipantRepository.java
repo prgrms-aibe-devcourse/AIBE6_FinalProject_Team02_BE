@@ -12,7 +12,9 @@ import java.util.Optional;
 
 public interface ChallengeParticipantRepository extends JpaRepository<ChallengeParticipant, Long> {
     Optional<ChallengeParticipant> findByChallengeDexIdAndUserId(Long challengeDexId, Long userId);
-
+    // 내 참여 목록 (참여 중 / 완료)
+    List<ChallengeParticipant> findByUserIdAndCompletedAtIsNull(Long userId);
+    List<ChallengeParticipant> findByUserIdAndCompletedAtIsNotNull(Long userId);
     // 해금 완료 판정 동시성 — 참여자 행을 잠가 마지막 슬롯 동시 해금 시 완료 누락 방지
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from ChallengeParticipant p " +

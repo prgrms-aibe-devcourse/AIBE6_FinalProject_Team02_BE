@@ -119,21 +119,40 @@ public class ChallengeService {
     }
 
     //챌린지 탐색
+    //챌린지 탐색
     @Transactional(readOnly = true)
     public List<ChallengeSummaryDTO> getChallenges(ChallengeListStatus status){
         LocalDateTime now = LocalDateTime.now();
-        List<ChallengeDex>  list = (status == ChallengeListStatus.FINISHED)
+        List<ChallengeDex> list = (status == ChallengeListStatus.FINISHED)
                 ? challengeDexRepository.findFinished(now)
                 : challengeDexRepository.findOngoing(now);
+        return toSummaries(list);
+    }
 
-        //참여자 수를 챌린지별 count 쿼리 대신 한 번에 집계(N+1 방지)
+    //내 챌린지 (개설한 / 참여 중 / 완료한)
+    @Transactional(readOnly = true)
+    public List<ChallengeSummaryDTO> getMyChallenges(Long userId, MyChallengeRelation relation){
+        List<ChallengeDex> list = switch (relation) {
+            case CREATED -> challengeDexRepository.findByOwnerIdAndDeletedAtIsNullOrderByCreatedAtDesc(userId);
+            case JOINED -> loadByParticipants(participantRepository.findByUserIdAndCompletedAtIsNull(userId));
+            case COMPLETED -> loadByParticipants(participantRepository.findByUserIdAndCompletedAtIsNotNull(userId));
+        };
+        return toSummaries(list);
+    }
+
+    private List<ChallengeDex> loadByParticipants(List<ChallengeParticipant> participants){
+        List<Long> ids = participants.stream().map(ChallengeParticipant::getChallengeDexId).toList();
+        return ids.isEmpty() ? List.of() : challengeDexRepository.findByIdInAndDeletedAtIsNull(ids);
+    }
+
+    //챌린지 목록 → 요약 DTO (참여자 수 한 번에 집계, N+1 방지)
+    private List<ChallengeSummaryDTO> toSummaries(List<ChallengeDex> list){
         List<Long> ids = list.stream().map(ChallengeDex::getId).toList();
         Map<Long, Long> countByDex = ids.isEmpty() ? Map.of()
                 : participantRepository.countByChallengeDexIdIn(ids).stream()
                   .collect(Collectors.toMap(
                           ChallengeParticipantRepository.ParticipantCount::getDexId,
                           ChallengeParticipantRepository.ParticipantCount::getCnt));
-
         return list.stream()
                 .map(c -> toSummary(c, countByDex.getOrDefault(c.getId(), 0L)))
                 .toList();
