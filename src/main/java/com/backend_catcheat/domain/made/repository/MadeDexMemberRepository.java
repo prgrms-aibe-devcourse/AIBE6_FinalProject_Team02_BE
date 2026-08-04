@@ -8,10 +8,17 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface MadeDexMemberRepository extends JpaRepository<MadeDexMember, Long> {
 
     List<MadeDexMember> findByUserId(Long userId);
+
+    Optional<MadeDexMember> findByMadeDexIdAndUserId(Long madeDexId, Long userId);
+
+    boolean existsByMadeDexIdAndUserId(Long madeDexId, Long userId);
+
+    long countByMadeDexId(Long madeDexId);
 
     /** 그룹마다 count를 돌리면 목록 길이만큼 쿼리가 나가므로 한 번에 집계한다 */
     @Query("""
