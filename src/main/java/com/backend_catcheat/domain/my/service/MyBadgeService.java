@@ -6,6 +6,7 @@ import com.backend_catcheat.domain.badge.repository.UserBadgeRepository;
 import com.backend_catcheat.domain.my.dto.MyBadgeResponse;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
+import com.backend_catcheat.global.s3.S3PresignedUrlService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class MyBadgeService {
     private final UserRepository userRepository;
     private final UserBadgeRepository userBadgeRepository;
+    private final S3PresignedUrlService s3PresignedUrlService;
 
     /** 획득 뱃지 목록 (장착 여부 포함, 최신순) */
     public List<MyBadgeResponse> getMyBadges(Long userId) {
@@ -31,7 +33,8 @@ public class MyBadgeService {
                         ub.getBadge().getId(),
                         ub.getBadge().getName(),
                         ub.getBadge().getCode(),
-                        ub.getBadge().getImageUrl(),
+                        // 제작 뱃지는 image_url이 S3 key -> 조회용 프리사인 URL로 변환(프리셋은 null -> code로 렌더)
+                        s3PresignedUrlService.createDownloadUrl(ub.getBadge().getImageUrl()),
                         ub.getBadge().getDescription(),
                         ub.getAcquiredAt(),
                         ub.getBadge().getId().equals(equippedId)))
