@@ -45,7 +45,8 @@ public class MadeDexInviteService {
     /** 그룹장이 코드를 새로 뽑는다. 살아 있던 코드는 무효화된다 */
     @Transactional
     public MadeDexInviteResponseDTO issue(Long userId, Long madeDexId) {
-        MadeDex madeDex = madeDexRepository.findByIdAndDeletedAtIsNull(madeDexId)
+        // 참여와 같은 행을 잠근다. 그래야 "코드를 죽이는 일"과 "코드로 들어오는 일"이 한 줄로 선다
+        MadeDex madeDex = madeDexRepository.findActiveByIdForUpdate(madeDexId)
                 .orElseThrow(() -> new CustomException(ErrorCode.MADE_DEX_NOT_FOUND));
         requireOwner(madeDex, userId);
 
@@ -89,11 +90,17 @@ public class MadeDexInviteService {
 
     @Transactional
     public MadeDexJoinResponseDTO join(Long userId, String rawCode) {
-        Long madeDexId = resolveGroup(rawCode).getId();
+        MadeDexInvite invite = resolveInvite(rawCode);
+        Long madeDexId = invite.getMadeDexId();
 
         // 정원 검사와 삽입 사이에 다른 참여가 끼어들지 못하도록 그룹 행을 잠근다
         MadeDex locked = madeDexRepository.findActiveByIdForUpdate(madeDexId)
                 .orElseThrow(() -> new CustomException(ErrorCode.MADE_DEX_NOT_FOUND));
+
+        // 잠금을 기다리는 사이 그룹장이 재발급했을 수 있다. 잠근 뒤 코드를 다시 확인한다
+        if (!madeDexInviteRepository.existsUsableByCode(invite.getCode(), LocalDateTime.now(clock))) {
+            throw new CustomException(ErrorCode.MADE_DEX_INVITE_CODE_EXPIRED);
+        }
 
         if (madeDexMemberRepository.existsByMadeDexIdAndUserId(madeDexId, userId)) {
             throw new CustomException(ErrorCode.MADE_DEX_ALREADY_JOINED);
@@ -113,8 +120,8 @@ public class MadeDexInviteService {
         return new MadeDexJoinResponseDTO(madeDexId);
     }
 
-    /** 코드 → 살아 있는 그룹. 코드가 없거나 죽었거나 그룹이 지워졌으면 각각의 이유로 던진다 */
-    private MadeDex resolveGroup(String rawCode) {
+    /** 코드 → 쓸 수 있는 초대. 코드가 없거나 죽었으면 각각의 이유로 던진다 */
+    private MadeDexInvite resolveInvite(String rawCode) {
         String code = normalize(rawCode);
         if (code == null) {
             throw new CustomException(ErrorCode.MADE_DEX_INVITE_CODE_REQUIRED);
@@ -126,6 +133,12 @@ public class MadeDexInviteService {
         if (!invite.isUsableAt(LocalDateTime.now(clock))) {
             throw new CustomException(ErrorCode.MADE_DEX_INVITE_CODE_EXPIRED);
         }
+        return invite;
+    }
+
+    /** 코드 → 살아 있는 그룹. 읽기 전용 경로(미리보기)라 잠그지 않는다 */
+    private MadeDex resolveGroup(String rawCode) {
+        MadeDexInvite invite = resolveInvite(rawCode);
 
         return madeDexRepository.findByIdAndDeletedAtIsNull(invite.getMadeDexId())
                 .orElseThrow(() -> new CustomException(ErrorCode.MADE_DEX_NOT_FOUND));
@@ -147,7 +160,11 @@ public class MadeDexInviteService {
         throw new CustomException(ErrorCode.INTERNAL_ERROR);
     }
 
-    /** 손으로 옮겨 적은 값이라 공백·소문자·하이픈을 허용하고 서버에서 맞춘다 */
+    /**
+     * 손으로 옮겨 적거나 메신저에서 복사한 값이라 서버에서 형태를 맞춘다.
+     * 영숫자가 아닌 문자(공백·하이픈·따옴표 등)는 모두 버리고 대문자로 올린다 —
+     * 남은 여섯 글자가 실제로 존재해야 하므로, 관대하게 받아도 아무나 들어오지 못한다.
+     */
     private String normalize(String rawCode) {
         if (!StringUtils.hasText(rawCode)) {
             return null;

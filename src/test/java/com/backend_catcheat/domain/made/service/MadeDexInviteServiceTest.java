@@ -86,7 +86,7 @@ class MadeDexInviteServiceTest {
     @Test
     @DisplayName("발급하면 7일 뒤 만료로 저장된다")
     void issue_expiresInSevenDays() {
-        when(madeDexRepository.findByIdAndDeletedAtIsNull(MADE_DEX_ID))
+        when(madeDexRepository.findActiveByIdForUpdate(MADE_DEX_ID))
                 .thenReturn(Optional.of(madeDex(OWNER_ID)));
         when(inviteCodeGenerator.generate()).thenReturn(CODE);
         when(madeDexInviteRepository.existsByCode(CODE)).thenReturn(false);
@@ -101,7 +101,7 @@ class MadeDexInviteServiceTest {
     @Test
     @DisplayName("재발급하면 살아 있던 코드를 먼저 무효화한다")
     void issue_revokesPrevious() {
-        when(madeDexRepository.findByIdAndDeletedAtIsNull(MADE_DEX_ID))
+        when(madeDexRepository.findActiveByIdForUpdate(MADE_DEX_ID))
                 .thenReturn(Optional.of(madeDex(OWNER_ID)));
         when(inviteCodeGenerator.generate()).thenReturn("XYZ789");
         when(madeDexInviteRepository.existsByCode(anyString())).thenReturn(false);
@@ -115,7 +115,7 @@ class MadeDexInviteServiceTest {
     @Test
     @DisplayName("코드가 이미 쓰이고 있으면 다시 뽑는다")
     void issue_retriesOnCollision() {
-        when(madeDexRepository.findByIdAndDeletedAtIsNull(MADE_DEX_ID))
+        when(madeDexRepository.findActiveByIdForUpdate(MADE_DEX_ID))
                 .thenReturn(Optional.of(madeDex(OWNER_ID)));
         when(inviteCodeGenerator.generate()).thenReturn(CODE, "XYZ789");
         when(madeDexInviteRepository.existsByCode(CODE)).thenReturn(true);
@@ -128,7 +128,7 @@ class MadeDexInviteServiceTest {
     @Test
     @DisplayName("그룹장이 아니면 발급할 수 없다")
     void issue_notOwner() {
-        when(madeDexRepository.findByIdAndDeletedAtIsNull(MADE_DEX_ID))
+        when(madeDexRepository.findActiveByIdForUpdate(MADE_DEX_ID))
                 .thenReturn(Optional.of(madeDex(OWNER_ID)));
 
         assertThatThrownBy(() -> service().issue(JOINER_ID, MADE_DEX_ID))
@@ -142,11 +142,25 @@ class MadeDexInviteServiceTest {
     @Test
     @DisplayName("삭제된 그룹은 발급할 수 없다")
     void issue_deletedGroup() {
-        when(madeDexRepository.findByIdAndDeletedAtIsNull(MADE_DEX_ID)).thenReturn(Optional.empty());
+        when(madeDexRepository.findActiveByIdForUpdate(MADE_DEX_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service().issue(OWNER_ID, MADE_DEX_ID))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.MADE_DEX_NOT_FOUND));
+    }
+
+    @Test
+    @DisplayName("발급도 참여와 같은 그룹 행을 잠근다")
+    void issue_locksGroupRow() {
+        when(madeDexRepository.findActiveByIdForUpdate(MADE_DEX_ID))
+                .thenReturn(Optional.of(madeDex(OWNER_ID)));
+        when(inviteCodeGenerator.generate()).thenReturn(CODE);
+        when(madeDexInviteRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        service().issue(OWNER_ID, MADE_DEX_ID);
+
+        // 잠그지 않으면 참여 중인 요청이 방금 죽인 코드로 들어올 수 있다
+        verify(madeDexRepository).findActiveByIdForUpdate(MADE_DEX_ID);
     }
 
     @Test
@@ -272,6 +286,22 @@ class MadeDexInviteServiceTest {
     }
 
     @Test
+    @DisplayName("잠금을 기다리는 사이 재발급되면 EXPIRED로 막힌다")
+    void join_revokedWhileWaitingForLock() {
+        givenUsableInvite();
+        when(madeDexRepository.findActiveByIdForUpdate(MADE_DEX_ID))
+                .thenReturn(Optional.of(madeDex(OWNER_ID)));
+        // 잠금 전 검증은 통과했지만, 잠금을 얻고 다시 보니 죽어 있다
+        when(madeDexInviteRepository.existsUsableByCode(CODE, NOW)).thenReturn(false);
+
+        assertThatThrownBy(() -> service().join(JOINER_ID, CODE))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.MADE_DEX_INVITE_CODE_EXPIRED));
+
+        verify(madeDexMemberRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("참여는 그룹 행을 잠그고 정원을 센다")
     void join_locksGroupRow() {
         givenUsableInvite();
@@ -313,9 +343,10 @@ class MadeDexInviteServiceTest {
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.MADE_DEX_NOT_FOUND));
     }
 
-    /** 오늘 발급된, 아직 살아 있는 코드 */
+    /** 오늘 발급된, 아직 살아 있는 코드. 잠금 뒤 재확인도 통과한다 */
     private void givenUsableInvite() {
         when(madeDexInviteRepository.findByCode(eq(CODE))).thenReturn(Optional.of(invite(NOW)));
+        when(madeDexInviteRepository.existsUsableByCode(CODE, NOW)).thenReturn(true);
         when(madeDexRepository.findByIdAndDeletedAtIsNull(MADE_DEX_ID))
                 .thenReturn(Optional.of(madeDex(OWNER_ID)));
     }
