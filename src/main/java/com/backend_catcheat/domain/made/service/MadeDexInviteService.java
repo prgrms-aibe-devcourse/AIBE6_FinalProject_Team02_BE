@@ -8,7 +8,6 @@ import com.backend_catcheat.domain.made.entity.MadeDexInvite;
 import com.backend_catcheat.domain.made.entity.MadeDexMember;
 import com.backend_catcheat.domain.made.repository.MadeDexInviteRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexMemberRepository;
-import com.backend_catcheat.domain.made.repository.MadeDexRepository;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +35,7 @@ public class MadeDexInviteService {
     /** 코드 충돌 시 재시도 횟수. 31^6 공간이라 1회로도 충분하지만 여유를 둔다 */
     private static final int CODE_ATTEMPTS = 5;
 
-    private final MadeDexRepository madeDexRepository;
+    private final MadeDexFinder madeDexFinder;
     private final MadeDexMemberRepository madeDexMemberRepository;
     private final MadeDexInviteRepository madeDexInviteRepository;
     private final InviteCodeGenerator inviteCodeGenerator;
@@ -46,9 +45,8 @@ public class MadeDexInviteService {
     @Transactional
     public MadeDexInviteResponseDTO issue(Long userId, Long madeDexId) {
         // 참여와 같은 행을 잠근다. 그래야 "코드를 죽이는 일"과 "코드로 들어오는 일"이 한 줄로 선다
-        MadeDex madeDex = madeDexRepository.findActiveByIdForUpdate(madeDexId)
-                .orElseThrow(() -> new CustomException(ErrorCode.MADE_DEX_NOT_FOUND));
-        requireOwner(madeDex, userId);
+        MadeDex madeDex = madeDexFinder.locked(madeDexId);
+        madeDex.requireOwner(userId);
 
         LocalDateTime now = LocalDateTime.now(clock);
         madeDexInviteRepository.revokeActive(madeDexId, now);
@@ -64,9 +62,7 @@ public class MadeDexInviteService {
      * 아직 한 번도 안 뽑았거나 만료된 상태이고, 화면은 "코드 만들기"를 보여준다.
      */
     public MadeDexInviteResponseDTO findActive(Long userId, Long madeDexId) {
-        MadeDex madeDex = madeDexRepository.findByIdAndDeletedAtIsNull(madeDexId)
-                .orElseThrow(() -> new CustomException(ErrorCode.MADE_DEX_NOT_FOUND));
-        requireOwner(madeDex, userId);
+        madeDexFinder.active(madeDexId).requireOwner(userId);
 
         return madeDexInviteRepository
                 .findFirstByMadeDexIdAndRevokedAtIsNullAndExpiresAtAfterOrderByIdDesc(
@@ -93,9 +89,7 @@ public class MadeDexInviteService {
         MadeDexInvite invite = resolveInvite(rawCode);
         Long madeDexId = invite.getMadeDexId();
 
-        // 정원 검사와 삽입 사이에 다른 참여가 끼어들지 못하도록 그룹 행을 잠근다
-        MadeDex locked = madeDexRepository.findActiveByIdForUpdate(madeDexId)
-                .orElseThrow(() -> new CustomException(ErrorCode.MADE_DEX_NOT_FOUND));
+        MadeDex locked = madeDexFinder.locked(madeDexId);
 
         // 잠금을 기다리는 사이 그룹장이 재발급했을 수 있다. 잠근 뒤 코드를 다시 확인한다
         if (!madeDexInviteRepository.existsUsableByCode(invite.getCode(), LocalDateTime.now(clock))) {
@@ -138,16 +132,7 @@ public class MadeDexInviteService {
 
     /** 코드 → 살아 있는 그룹. 읽기 전용 경로(미리보기)라 잠그지 않는다 */
     private MadeDex resolveGroup(String rawCode) {
-        MadeDexInvite invite = resolveInvite(rawCode);
-
-        return madeDexRepository.findByIdAndDeletedAtIsNull(invite.getMadeDexId())
-                .orElseThrow(() -> new CustomException(ErrorCode.MADE_DEX_NOT_FOUND));
-    }
-
-    private void requireOwner(MadeDex madeDex, Long userId) {
-        if (!madeDex.getOwnerId().equals(userId)) {
-            throw new CustomException(ErrorCode.MADE_DEX_NOT_OWNER);
-        }
+        return madeDexFinder.active(resolveInvite(rawCode).getMadeDexId());
     }
 
     private String nextCode() {

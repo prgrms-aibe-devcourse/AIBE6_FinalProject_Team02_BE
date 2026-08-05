@@ -67,12 +67,12 @@ class MadeDexInviteServiceTest {
 
     private MadeDexInviteService service() {
         return new MadeDexInviteService(
-                madeDexRepository, madeDexMemberRepository, madeDexInviteRepository,
-                inviteCodeGenerator, clock);
+                new MadeDexFinder(madeDexRepository), madeDexMemberRepository,
+                madeDexInviteRepository, inviteCodeGenerator, clock);
     }
 
     private MadeDex madeDex(Long ownerId) {
-        MadeDex madeDex = MadeDex.open(ownerId, "우리 도감", "설명", Visibility.PRIVATE);
+        MadeDex madeDex = MadeDex.open(ownerId, "우리 도감", "설명", Visibility.PRIVATE, null);
         ReflectionTestUtils.setField(madeDex, "id", MADE_DEX_ID);
         return madeDex;
     }

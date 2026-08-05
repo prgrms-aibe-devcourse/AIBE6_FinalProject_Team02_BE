@@ -2,8 +2,10 @@ package com.backend_catcheat.domain.made.service;
 
 import com.backend_catcheat.domain.made.dto.MadeDexCreateRequestDTO;
 import com.backend_catcheat.domain.made.dto.MadeDexCreateResponseDTO;
+import com.backend_catcheat.domain.made.dto.MadeDexDetailDTO;
 import com.backend_catcheat.domain.made.dto.MadeDexMemberCountDTO;
 import com.backend_catcheat.domain.made.dto.MadeDexSummaryDTO;
+import com.backend_catcheat.domain.made.dto.MadeDexUpdateRequestDTO;
 import com.backend_catcheat.domain.made.entity.MadeDex;
 import com.backend_catcheat.domain.made.entity.MadeDexMember;
 import com.backend_catcheat.domain.made.entity.MadeDexRole;
@@ -12,11 +14,13 @@ import com.backend_catcheat.domain.made.repository.MadeDexMemberRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexRepository;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
+import com.backend_catcheat.global.s3.S3PresignedUrlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -30,30 +34,67 @@ public class MadeDexService {
 
     private final MadeDexRepository madeDexRepository;
     private final MadeDexMemberRepository madeDexMemberRepository;
+    private final MadeDexFinder madeDexFinder;
+    private final S3PresignedUrlService s3PresignedUrlService;
+    private final Clock clock;
 
     @Transactional
     public MadeDexCreateResponseDTO create(Long ownerId, MadeDexCreateRequestDTO request) {
-        String name = blankToNull(request.name());
-        if (name == null) {
-            throw new CustomException(ErrorCode.MADE_DEX_NAME_REQUIRED);
-        }
-        if (name.length() > MadeDex.NAME_MAX) {
-            throw new CustomException(ErrorCode.MADE_DEX_NAME_TOO_LONG);
-        }
-
-        String description = blankToNull(request.description());
-        if (description != null && description.length() > MadeDex.DESCRIPTION_MAX) {
-            throw new CustomException(ErrorCode.MADE_DEX_DESCRIPTION_TOO_LONG);
-        }
-
-        Visibility visibility = request.visibility() == null ? Visibility.PRIVATE : request.visibility();
-
-        MadeDex madeDex = madeDexRepository.save(
-                MadeDex.open(ownerId, name, description, visibility));
+        MadeDex madeDex = madeDexRepository.save(MadeDex.open(
+                ownerId,
+                requireName(request.name()),
+                validDescription(request.description()),
+                orPrivate(request.visibility()),
+                validImageKey(request.imageKey())));
         madeDexMemberRepository.save(
-                MadeDexMember.owner(madeDex.getId(), ownerId, LocalDateTime.now()));
+                MadeDexMember.owner(madeDex.getId(), ownerId, LocalDateTime.now(clock)));
 
         return new MadeDexCreateResponseDTO(madeDex.getId());
+    }
+
+    /** 공개 도감은 참여하지 않아도 열람할 수 있다. 비공개는 멤버만 */
+    public MadeDexDetailDTO findDetail(Long userId, Long madeDexId) {
+        MadeDex madeDex = madeDexFinder.active(madeDexId);
+        MadeDexRole myRole = madeDexMemberRepository.findByMadeDexIdAndUserId(madeDexId, userId)
+                .map(MadeDexMember::getRole)
+                .orElse(null);
+        // 403으로 답하면 비공개 도감이 "존재한다"는 사실이 드러난다
+        if (myRole == null && madeDex.getVisibility() != Visibility.PUBLIC) {
+            throw new CustomException(ErrorCode.MADE_DEX_NOT_FOUND);
+        }
+
+        return new MadeDexDetailDTO(
+                madeDex.getId(),
+                madeDex.getName(),
+                madeDex.getDescription(),
+                madeDex.getVisibility(),
+                s3PresignedUrlService.createDownloadUrl(madeDex.getImageKey()),
+                madeDex.getImageKey(),
+                madeDexMemberRepository.countByMadeDexId(madeDexId),
+                madeDex.getMaxMembers(),
+                myRole,
+                madeDex.getCreatedAt());
+    }
+
+    @Transactional
+    public void update(Long userId, Long madeDexId, MadeDexUpdateRequestDTO request) {
+        // 위임과 같은 행을 잠근다. 그래야 방금 그룹장을 넘긴 사람이 수정까지 마치지 못한다
+        MadeDex madeDex = madeDexFinder.locked(madeDexId);
+        madeDex.requireOwner(userId);
+
+        String imageKey = validImageKey(request.imageKey());
+        String oldImageKey = madeDex.getImageKey();
+
+        madeDex.update(
+                requireName(request.name()),
+                validDescription(request.description()),
+                orPrivate(request.visibility()),
+                imageKey);
+
+        // 표지를 바꾸거나 비우면 이전 객체는 아무도 참조하지 않는다
+        if (oldImageKey != null && !oldImageKey.equals(imageKey)) {
+            s3PresignedUrlService.deleteObject(oldImageKey);
+        }
     }
 
     public List<MadeDexSummaryDTO> findMine(Long userId) {
@@ -75,9 +116,41 @@ public class MadeDexService {
                         madeDex.getName(),
                         madeDex.getDescription(),
                         madeDex.getVisibility(),
+                        s3PresignedUrlService.createDownloadUrl(madeDex.getImageKey()),
                         memberCountByMadeDexId.getOrDefault(madeDex.getId(), 0L),
                         roleByMadeDexId.get(madeDex.getId())))
                 .toList();
+    }
+
+    private String requireName(String rawName) {
+        String name = blankToNull(rawName);
+        if (name == null) {
+            throw new CustomException(ErrorCode.MADE_DEX_NAME_REQUIRED);
+        }
+        if (name.length() > MadeDex.NAME_MAX) {
+            throw new CustomException(ErrorCode.MADE_DEX_NAME_TOO_LONG);
+        }
+        return name;
+    }
+
+    private String validDescription(String rawDescription) {
+        String description = blankToNull(rawDescription);
+        if (description != null && description.length() > MadeDex.DESCRIPTION_MAX) {
+            throw new CustomException(ErrorCode.MADE_DEX_DESCRIPTION_TOO_LONG);
+        }
+        return description;
+    }
+
+    private String validImageKey(String rawImageKey) {
+        String imageKey = blankToNull(rawImageKey);
+        if (imageKey != null && imageKey.length() > MadeDex.IMAGE_KEY_MAX) {
+            throw new CustomException(ErrorCode.MADE_DEX_IMAGE_KEY_TOO_LONG);
+        }
+        return imageKey;
+    }
+
+    private Visibility orPrivate(Visibility visibility) {
+        return visibility == null ? Visibility.PRIVATE : visibility;
     }
 
     private String blankToNull(String value) {
