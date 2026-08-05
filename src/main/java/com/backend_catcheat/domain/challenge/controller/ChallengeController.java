@@ -2,9 +2,12 @@ package com.backend_catcheat.domain.challenge.controller;
 
 import com.backend_catcheat.domain.challenge.dto.*;
 import com.backend_catcheat.domain.challenge.entity.ChallengeListStatus;
+import com.backend_catcheat.domain.challenge.entity.ChallengeSortType;
+import com.backend_catcheat.domain.challenge.entity.MyChallengeRelation;
 import com.backend_catcheat.domain.challenge.service.ChallengeParticipationService;
 import com.backend_catcheat.domain.challenge.service.ChallengeService;
 import com.backend_catcheat.global.common.ApiResponse;
+import com.backend_catcheat.global.common.PageResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -49,15 +52,20 @@ public class ChallengeController {
             @RequestBody UnlockRequestDTO request
             ) {
         return ApiResponse.ok(challengeParticipationService.unlock(
-                userId, challengeId, request.slotId(), request.imageKey()));
+                userId, challengeId, request.slotId(), request.imageKey(),
+                request.lat(), request.lng()));
     }
 
-    //탐색
+    //탐색 (정렬 + 페이지)
     @GetMapping
-    public ApiResponse<List<ChallengeSummaryDTO>> list(
-            @RequestParam(defaultValue = "ONGOING")ChallengeListStatus status
-            ){
-        return ApiResponse.ok(challengeService.getChallenges(status));
+    public ApiResponse<PageResponse<ChallengeSummaryDTO>> list(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam(defaultValue = "ONGOING") ChallengeListStatus status,
+            @RequestParam(defaultValue = "LATEST") ChallengeSortType sort,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ){
+        return ApiResponse.ok(challengeService.getChallenges(userId, status, sort, page, size));
     }
     
     //상세보기
@@ -66,6 +74,23 @@ public class ChallengeController {
             @AuthenticationPrincipal Long userId,
             @PathVariable Long challengeId) {
         return ApiResponse.ok(challengeService.getDetail(userId, challengeId));
+    }
+    //내 챌린지 (개설한 / 참여 중 / 완료한)
+    @GetMapping("/mine")
+    public ApiResponse<List<ChallengeSummaryDTO>> myChallenges(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam MyChallengeRelation relation
+    ){
+        return ApiResponse.ok(challengeService.getMyChallenges(userId, relation));
+    }
+
+    //챌린지 포기(나가기)
+    @DeleteMapping("/{challengeId}/participants")
+    public ApiResponse<Void> leave(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long challengeId) {
+        challengeParticipationService.leave(userId, challengeId);
+        return ApiResponse.ok();
     }
 
 

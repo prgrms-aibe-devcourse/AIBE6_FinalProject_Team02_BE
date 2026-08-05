@@ -121,6 +121,7 @@ class ChallengeParticipationServiceTest {
                 .challengeDexId(DEX_ID).foodName("음식").slotOrder(0).build();
         when(slotRepository.findById(SLOT_ID)).thenReturn(Optional.of(slot));
         when(unlockRepository.existsByChallengeParticipantIdAndSlotId(any(), eq(SLOT_ID))).thenReturn(false);
+        when(challengeDexRepository.findByIdAndDeletedAtIsNull(DEX_ID)).thenReturn(Optional.of(permanentDex()));
     }
 
     @Test
@@ -130,7 +131,7 @@ class ChallengeParticipationServiceTest {
         when(unlockRepository.countByChallengeParticipantId(any())).thenReturn(1L);
         when(slotRepository.countByChallengeDexId(DEX_ID)).thenReturn(5L);
 
-        UnlockResponseDTO res = service.unlock(USER_ID, DEX_ID, SLOT_ID, "img-key");
+        UnlockResponseDTO res = service.unlock(USER_ID, DEX_ID, SLOT_ID, "img-key", null, null);
 
         assertThat(res.unlockedCount()).isEqualTo(1);
         assertThat(res.totalSlots()).isEqualTo(5);
@@ -145,7 +146,7 @@ class ChallengeParticipationServiceTest {
         when(unlockRepository.countByChallengeParticipantId(any())).thenReturn(5L);
         when(slotRepository.countByChallengeDexId(DEX_ID)).thenReturn(5L);
 
-        UnlockResponseDTO res = service.unlock(USER_ID, DEX_ID, SLOT_ID, "img-key");
+        UnlockResponseDTO res = service.unlock(USER_ID, DEX_ID, SLOT_ID, "img-key", null, null);
 
         assertThat(res.completed()).isTrue();
     }
@@ -153,10 +154,10 @@ class ChallengeParticipationServiceTest {
     @Test
     @DisplayName("인증 사진(imageKey)이 비어 있으면 CHALLENGE_UNLOCK_IMAGE_REQUIRED")
     void unlock_blankImageKey() {
-        assertThatThrownBy(() -> service.unlock(USER_ID, DEX_ID, SLOT_ID, "  "))
+        assertThatThrownBy(() -> service.unlock(USER_ID, DEX_ID, SLOT_ID, "  ", null, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CHALLENGE_UNLOCK_IMAGE_REQUIRED));
-        assertThatThrownBy(() -> service.unlock(USER_ID, DEX_ID, SLOT_ID, null))
+        assertThatThrownBy(() -> service.unlock(USER_ID, DEX_ID, SLOT_ID, null, null, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CHALLENGE_UNLOCK_IMAGE_REQUIRED));
     }
@@ -167,7 +168,7 @@ class ChallengeParticipationServiceTest {
         when(participantRepository.findByChallengeDexIdAndUserId(DEX_ID, USER_ID))
                 .thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.unlock(USER_ID, DEX_ID, SLOT_ID, "img-key"))
+        assertThatThrownBy(() -> service.unlock(USER_ID, DEX_ID, SLOT_ID, "img-key", null, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CHALLENGE_NOT_JOINED));
     }
@@ -182,7 +183,7 @@ class ChallengeParticipationServiceTest {
         when(slotRepository.findById(SLOT_ID)).thenReturn(Optional.of(slot));
         when(unlockRepository.existsByChallengeParticipantIdAndSlotId(any(), eq(SLOT_ID))).thenReturn(true);
 
-        assertThatThrownBy(() -> service.unlock(USER_ID, DEX_ID, SLOT_ID, "img-key"))
+        assertThatThrownBy(() -> service.unlock(USER_ID, DEX_ID, SLOT_ID, "img-key", null, null))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CHALLENGE_SLOT_ALREADY_UNLOCKED));
     }

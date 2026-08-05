@@ -32,6 +32,10 @@ public class ChallengeDex extends BaseEntity {
     @Column(name = "period_type", nullable = false, length = 20)
     private PeriodType periodType;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "verify_type", nullable = false, length = 20)
+    private VerifyType verifyType;
+
     @Column(name = "starts_at", nullable = false)
     private LocalDateTime startsAt;
 
@@ -47,12 +51,15 @@ public class ChallengeDex extends BaseEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+
+
     @Builder
     public ChallengeDex(
             Long ownerId, String name,
             String description,
             ChallengeType challengeType,
             PeriodType periodType,
+            VerifyType verifyType,
             LocalDateTime startsAt,
             LocalDateTime endsAt,
             Long rewardBadgeId,
@@ -64,6 +71,7 @@ public class ChallengeDex extends BaseEntity {
         this.description = description;
         this.challengeType = challengeType;
         this.periodType = periodType;
+        this.verifyType = verifyType;
         this.startsAt = startsAt;
         this.endsAt = endsAt;
         this.rewardBadgeId = rewardBadgeId;
