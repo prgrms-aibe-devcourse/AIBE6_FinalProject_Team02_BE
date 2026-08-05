@@ -146,6 +146,12 @@ resource "aws_instance" "backend" {
   # 첫 부팅 때 Docker와 Docker Compose plugin을 설치한다.
   user_data = templatefile("${path.module}/user_data.sh.tftpl", {})
 
+  metadata_options {
+    http_endpoint = "enabled"
+    http_tokens = "required"
+    http_put_response_hop_limit = 2
+  }
+
   # 루트 디스크는 gp3, 암호화 활성화로 생성한다.
   root_block_device {
     volume_size = var.root_volume_size_gb

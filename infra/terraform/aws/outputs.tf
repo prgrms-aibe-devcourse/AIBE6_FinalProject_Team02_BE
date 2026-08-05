@@ -16,9 +16,9 @@ output "backend_public_dns" {
   value       = aws_instance.backend.public_dns
 }
 
-output "backend_app_url" {
+output "backend_test_url" {
   # ALB/도메인 연결 전, 8080 포트로 직접 테스트할 URL이다.
-  description = "백엔드 앱 직접 접속 URL"
+  description = "백엔드 앱 직접 접속 URL [초기 배포 검증용 HTTP URL 이 운영환경에서는 사용하지 않음]"
   value       = "http://${aws_instance.backend.public_ip}:${var.app_port}"
 }
 
