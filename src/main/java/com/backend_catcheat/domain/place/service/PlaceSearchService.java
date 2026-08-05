@@ -1,6 +1,8 @@
 package com.backend_catcheat.domain.place.service;
 
 import com.backend_catcheat.domain.place.config.PlaceProperties;
+import com.backend_catcheat.domain.place.dto.GeoPoint;
+import com.backend_catcheat.domain.place.dto.KakaoAddressResponse;
 import com.backend_catcheat.domain.place.dto.KakaoKeywordResponse;
 import com.backend_catcheat.domain.place.dto.KakaoKeywordResponse.Document;
 import com.backend_catcheat.domain.place.dto.PlaceSummary;
@@ -34,7 +36,7 @@ public class PlaceSearchService {
 
     private final RestClient kakaoLocalRestClient;
     private final PlaceProperties properties;
-
+    private static final String ADDRESS_SEARCH_PATH = "/v2/local/search/address.json";
     /**
      * @param lat 선택. 좌표가 오면 반경 20km 안을 가까운 순으로, 없으면 전국 정확도순
      */
@@ -77,6 +79,33 @@ public class PlaceSearchService {
                 .filter(document -> FOOD_CATEGORY_GROUPS.contains(document.categoryGroupCode()))
                 .map(PlaceSearchService::toSummary)
                 .toList();
+    }
+
+    /** 주소 문자열 → 좌표. 위치 인증 챌린지에서 주소로 장소를 지정할 때 사용 */
+    public GeoPoint geocode(String address) {
+        String query = address == null ? "" : address.trim();
+        if (query.isEmpty()) {
+            throw new CustomException(ErrorCode.PLACE_ADDRESS_NOT_FOUND);
+        }
+        KakaoAddressResponse response;
+        try {
+            response = kakaoLocalRestClient.get()
+                    .uri(uri -> uri.path(ADDRESS_SEARCH_PATH)
+                            .queryParam("query", query)
+                            .queryParam("size", 1)
+                            .build())
+                    .retrieve()
+                    .body(KakaoAddressResponse.class);
+        } catch (RestClientException e) {
+            log.error("[장소] 카카오 주소 검색 실패. query={}", query, e);
+            throw new CustomException(ErrorCode.PLACE_SEARCH_FAILED);
+        }
+        if (response == null || response.documents() == null || response.documents().isEmpty()) {
+            throw new CustomException(ErrorCode.PLACE_ADDRESS_NOT_FOUND);
+        }
+        KakaoAddressResponse.Document d = response.documents().get(0);
+        // 카카오는 x가 경도, y가 위도
+        return new GeoPoint(d.addressName(), parseCoordinate(d.y()), parseCoordinate(d.x()));
     }
 
     private static PlaceSummary toSummary(Document document) {
