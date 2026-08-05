@@ -57,4 +57,12 @@ public class MadeDexMember {
     public boolean isOwner() {
         return role == MadeDexRole.OWNER;
     }
+
+    public void promoteToOwner() {
+        this.role = MadeDexRole.OWNER;
+    }
+
+    public void demoteToMember() {
+        this.role = MadeDexRole.MEMBER;
+    }
 }

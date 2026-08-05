@@ -1,0 +1,23 @@
+package com.backend_catcheat.global.s3;
+
+import com.backend_catcheat.global.event.S3ObjectUnusedEvent;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
+
+/**
+ * 쓰이지 않게 된 S3 객체 정리
+ */
+@Component
+@RequiredArgsConstructor
+public class S3ObjectCleanupListener {
+
+    private final S3PresignedUrlService s3PresignedUrlService;
+
+    // 트랜잭션 안에서 지우면 뒤이어 커밋이 실패했을 때 DB는 옛 key를 가리키는데 객체가 없다
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onUnused(S3ObjectUnusedEvent event) {
+        s3PresignedUrlService.deleteObject(event.objectKey());
+    }
+}
