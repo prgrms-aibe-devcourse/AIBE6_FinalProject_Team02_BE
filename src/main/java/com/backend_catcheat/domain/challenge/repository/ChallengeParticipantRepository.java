@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -33,4 +34,19 @@ public interface ChallengeParticipantRepository extends JpaRepository<ChallengeP
         Long getDexId();
         long getCnt();
     }
+
+    // 최근 7일 신규 참여 수(랭킹)
+    @Query("""
+            select p.challengeDexId as dexId, count(p) as score
+            from ChallengeParticipant p
+            where p.challengeDexId in :dexIds and p.joinedAt >= :since
+            group by p.challengeDexId
+            """)
+    List<DexScore> countRecentJoinsByDexIn(@Param("dexIds") List<Long> dexIds,
+                                           @Param("since") LocalDateTime since);
+
+    // 목록에서 내 참여 여부 표시용 — 유저가 참여한 dex id만
+    @Query("select p.challengeDexId from ChallengeParticipant p " +
+            "where p.userId = :userId and p.challengeDexId in :dexIds")
+    List<Long> findJoinedDexIds(@Param("userId") Long userId, @Param("dexIds") List<Long> dexIds);
 }

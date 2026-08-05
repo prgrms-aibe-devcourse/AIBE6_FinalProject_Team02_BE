@@ -11,7 +11,9 @@ import com.backend_catcheat.domain.challenge.dto.CreationTicketResponseDTO;
 import com.backend_catcheat.domain.challenge.entity.ChallengeType;
 import com.backend_catcheat.domain.challenge.entity.PeriodType;
 import com.backend_catcheat.domain.challenge.entity.ChallengeListStatus;
+import com.backend_catcheat.domain.challenge.entity.ChallengeSortType;
 import com.backend_catcheat.domain.challenge.dto.ChallengeSummaryDTO;
+import com.backend_catcheat.global.common.PageResponse;
 import com.backend_catcheat.domain.challenge.entity.ChallengeDex;
 import com.backend_catcheat.domain.challenge.repository.ChallengeDexRepository;
 import com.backend_catcheat.domain.challenge.repository.ChallengeDexSlotRepository;
@@ -156,11 +158,13 @@ class ChallengeServiceTest {
                     public long getCnt() { return 3L; }
                 }));
 
-        List<ChallengeSummaryDTO> result = challengeService.getChallenges(ChallengeListStatus.ONGOING);
+        PageResponse<ChallengeSummaryDTO> result =
+                challengeService.getChallenges(1L, ChallengeListStatus.ONGOING, ChallengeSortType.LATEST, 0, 10);
 
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).name()).isEqualTo("샘플 챌린지");
-        assertThat(result.get(0).participantCount()).isEqualTo(3);
+        assertThat(result.content()).hasSize(1);
+        assertThat(result.content().get(0).name()).isEqualTo("샘플 챌린지");
+        assertThat(result.content().get(0).participantCount()).isEqualTo(3);
+        assertThat(result.content().get(0).rankScore()).isNull();   // LATEST면 점수 없음
     }
 
     @Test
@@ -169,9 +173,26 @@ class ChallengeServiceTest {
         when(challengeDexRepository.findFinished(any())).thenReturn(List.of(sampleDex()));
         when(participantRepository.countByChallengeDexIdIn(any())).thenReturn(List.of());   // 참여자 0명
 
-        List<ChallengeSummaryDTO> result = challengeService.getChallenges(ChallengeListStatus.FINISHED);
+        PageResponse<ChallengeSummaryDTO> result =
+                challengeService.getChallenges(1L, ChallengeListStatus.FINISHED, ChallengeSortType.LATEST, 0, 10);
 
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).participantCount()).isEqualTo(0);
+        assertThat(result.content()).hasSize(1);
+        assertThat(result.content().get(0).participantCount()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("page/size가 음수·0이어도 클램프되어 예외 없이 첫 페이지를 준다")
+    void getChallenges_clampsInvalidPaging() {
+        when(challengeDexRepository.findOngoing(any())).thenReturn(List.of(sampleDex()));
+        when(participantRepository.countByChallengeDexIdIn(any())).thenReturn(List.of());
+
+        // page=-1, size=0 → subList 예외/빈 페이지 없이 클램프(page=0, size=1)
+        PageResponse<ChallengeSummaryDTO> result =
+                challengeService.getChallenges(1L, ChallengeListStatus.ONGOING, ChallengeSortType.LATEST, -1, 0);
+
+        assertThat(result.content()).hasSize(1);
+        assertThat(result.page()).isEqualTo(0);
+        assertThat(result.size()).isEqualTo(1);
+        assertThat(result.hasNext()).isFalse();
     }
 }

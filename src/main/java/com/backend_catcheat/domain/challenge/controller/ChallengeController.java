@@ -2,14 +2,14 @@ package com.backend_catcheat.domain.challenge.controller;
 
 import com.backend_catcheat.domain.challenge.dto.*;
 import com.backend_catcheat.domain.challenge.entity.ChallengeListStatus;
+import com.backend_catcheat.domain.challenge.entity.ChallengeSortType;
 import com.backend_catcheat.domain.challenge.service.ChallengeParticipationService;
 import com.backend_catcheat.domain.challenge.service.ChallengeService;
 import com.backend_catcheat.global.common.ApiResponse;
+import com.backend_catcheat.global.common.PageResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/challenges")
@@ -52,12 +52,16 @@ public class ChallengeController {
                 userId, challengeId, request.slotId(), request.imageKey()));
     }
 
-    //탐색
+    //탐색 (정렬 + 페이지)
     @GetMapping
-    public ApiResponse<List<ChallengeSummaryDTO>> list(
-            @RequestParam(defaultValue = "ONGOING")ChallengeListStatus status
-            ){
-        return ApiResponse.ok(challengeService.getChallenges(status));
+    public ApiResponse<PageResponse<ChallengeSummaryDTO>> list(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam(defaultValue = "ONGOING") ChallengeListStatus status,
+            @RequestParam(defaultValue = "LATEST") ChallengeSortType sort,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ){
+        return ApiResponse.ok(challengeService.getChallenges(userId, status, sort, page, size));
     }
     
     //상세보기
