@@ -14,6 +14,7 @@ import com.backend_catcheat.domain.challenge.repository.DexScore;
 import com.backend_catcheat.global.common.PageResponse;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
+import com.backend_catcheat.global.s3.S3PresignedUrlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,7 +30,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import com.backend_catcheat.global.s3.S3PresignedUrlService;
 
 @Service
 @RequiredArgsConstructor
@@ -65,6 +65,7 @@ public class ChallengeService {
 
         LocalDateTime startsAt = req.startsAt() != null ? req.startsAt() : LocalDateTime.now();
         LocalDateTime endsAt = req.periodType() == PeriodType.LIMITED ? req.endsAt() : null;
+        VerifyType verifyType = req.verifyType() != null ? req.verifyType() : VerifyType.FOOD;
 
         ChallengeDex dex = challengeDexRepository.save(ChallengeDex.builder()
                 .ownerId(ownerId)
@@ -72,6 +73,7 @@ public class ChallengeService {
                 .description(req.description())
                 .challengeType(req.challengeType())
                 .periodType(req.periodType())
+                .verifyType(verifyType)
                 .startsAt(startsAt)
                 .endsAt(endsAt)
                 .rewardBadgeId(req.rewardBadgeId())
@@ -116,6 +118,11 @@ public class ChallengeService {
             if (req.endsAt() == null || !req.endsAt().isAfter(start)) {
                 throw new CustomException(ErrorCode.CHALLENGE_PERIOD_INVALID);
             }
+        }
+        // 위치 인증 챌린지는 모든 목표에 좌표가 필수
+        if (req.verifyType() == VerifyType.LOCATION
+                && req.slots().stream().anyMatch(s -> s.lat() == null || s.lng() == null)) {
+            throw new CustomException(ErrorCode.CHALLENGE_SLOT_LOCATION_REQUIRED);
         }
     }
 
@@ -201,6 +208,7 @@ public class ChallengeService {
         List<ChallengeSummaryDTO> content = slice.stream()
                 .map(c -> toSummary(c,
                         participantByDex.getOrDefault(c.getId(), 0L),
+                        0, 0,
                         scoreByDex == null ? null : scoreByDex.getOrDefault(c.getId(), 0L),
                         joinedIds.contains(c.getId())))
                 .toList();
@@ -210,55 +218,104 @@ public class ChallengeService {
         return new PageResponse<>(content, safePage, safeSize, total, totalPages, hasNext);
     }
 
+    //내 챌린지 (개설한 / 참여 중 / 완료한) — 내 진행도(해금 수/전체) 포함
+    @Transactional(readOnly = true)
+    public List<ChallengeSummaryDTO> getMyChallenges(Long userId, MyChallengeRelation relation){
+        List<ChallengeDex> list = switch (relation) {
+            case CREATED -> challengeDexRepository.findByOwnerIdAndDeletedAtIsNullOrderByCreatedAtDesc(userId);
+            case JOINED -> loadByParticipants(participantRepository.findByUserIdAndCompletedAtIsNull(userId));
+            case COMPLETED -> loadByParticipants(participantRepository.findByUserIdAndCompletedAtIsNotNull(userId));
+        };
+
+        List<Long> ids = list.stream().map(ChallengeDex::getId).toList();
+        Map<Long, Long> countByDex = ids.isEmpty() ? Map.of()
+                : participantRepository.countByChallengeDexIdIn(ids).stream()
+                        .collect(Collectors.toMap(
+                                ChallengeParticipantRepository.ParticipantCount::getDexId,
+                                ChallengeParticipantRepository.ParticipantCount::getCnt));
+
+        return list.stream()
+                .map(c -> {
+                    int totalSlots = (int) slotRepository.countByChallengeDexId(c.getId());
+                    int unlocked = participantRepository
+                            .findByChallengeDexIdAndUserId(c.getId(), userId)
+                            .map(p -> (int) unlockRepository.countByChallengeParticipantId(p.getId()))
+                            .orElse(0);
+                    return toSummary(c, countByDex.getOrDefault(c.getId(), 0L),
+                            totalSlots, unlocked, null, false);
+                })
+                .toList();
+    }
+
+    private List<ChallengeDex> loadByParticipants(List<ChallengeParticipant> participants){
+        List<Long> ids = participants.stream().map(ChallengeParticipant::getChallengeDexId).toList();
+        return ids.isEmpty() ? List.of() : challengeDexRepository.findByIdInAndDeletedAtIsNull(ids);
+    }
+
+    // 챌린지 요약 DTO — 진행도(내 챌린지) + 랭킹/참여여부(탐색) 모두 지원
     private ChallengeSummaryDTO toSummary(
             ChallengeDex c,
             long participants,
+            int totalSlots,
+            int unlockedCount,
             Long rankScore,
             boolean joined
     ){
         return new ChallengeSummaryDTO(
-                c.getId(), c.getName(), c.getDescription(),
-                c.getChallengeType(), c.getPeriodType(),
-                c.getStartsAt(), c.getEndsAt(),
-                participants, rankScore, joined);
+                c.getId(),
+                c.getName(),
+                c.getDescription(),
+                c.getChallengeType(),
+                c.getPeriodType(),
+                c.getStartsAt(),
+                c.getEndsAt(),
+                participants,
+                totalSlots,
+                unlockedCount,
+                rankScore,
+                joined
+        );
     }
 
     @Transactional
-    public ChallengeDetailResponseDTO getDetail(
-            Long userId,
-            Long challengeDexId
-    ){
+    public ChallengeDetailResponseDTO getDetail(Long userId, Long challengeDexId){
         ChallengeDex dex = challengeDexRepository.findByIdAndDeletedAtIsNull(challengeDexId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CHALLENGE_NOT_FOUND));
         viewDailyRepository.increment(challengeDexId);   // 상세 진입 조회수 +1(새로고침 포함)
         Optional<ChallengeParticipant> participant = participantRepository.findByChallengeDexIdAndUserId(challengeDexId, userId);
 
-        //인증한 슬롯 id들
-        Set<Long> unlockedSlotIds =participant
+        //내 인증 기록 (슬롯별) — 해금 여부 + 내 사진/시각
+        Map<Long, ChallengeUnlock> myUnlocks = participant
                 .map(p -> unlockRepository.findByChallengeParticipantId(p.getId()).stream()
-                        .map(ChallengeUnlock::getSlotId)
-                        .collect(Collectors.toSet()))
-                        .orElse(Set.of());
+                        .collect(Collectors.toMap(ChallengeUnlock::getSlotId, u -> u)))
+                .orElse(Map.of());
 
         List<ChallengeDetailResponseDTO.SlotDetail> slots =
                 slotRepository.findByChallengeDexIdOrderBySlotOrderAsc(challengeDexId).stream()
-                        .map(s -> new ChallengeDetailResponseDTO.SlotDetail(
-                                s.getId(), s.getFoodName(), s.getPlaceName(), s.getSlotOrder(),
-                                unlockedSlotIds.contains(s.getId()),
-                                // 개설자가 등록한 목표 사진 → 조회용 프리사인 URL (없으면 null)
-                                s.getImageKey() == null ? null
-                                        : s3PresignedUrlService.createDownloadUrl(s.getImageKey())))
+                        .map(s -> {
+                            ChallengeUnlock mine = myUnlocks.get(s.getId());
+                            return new ChallengeDetailResponseDTO.SlotDetail(
+                                    s.getId(), s.getFoodName(), s.getPlaceName(), s.getSlotOrder(),
+                                    mine != null,
+                                    // 개설자가 등록한 목표 사진 (미해금이면 흑백)
+                                    s.getImageKey() == null ? null
+                                            : s3PresignedUrlService.createDownloadUrl(s.getImageKey()),
+                                    // 내가 인증한 사진 (해금 시)
+                                    mine != null && mine.getImageKey() != null
+                                            ? s3PresignedUrlService.createDownloadUrl(mine.getImageKey())
+                                            : null,
+                                    mine != null ? mine.getUnlockedAt() : null);
+                        })
                         .toList();
 
         return new ChallengeDetailResponseDTO(
                 dex.getId(), dex.getName(), dex.getDescription(),
-                dex.getChallengeType(), dex.getPeriodType(),
+                dex.getChallengeType(), dex.getPeriodType(), dex.getVerifyType(),
                 dex.getStartsAt(), dex.getEndsAt(), dex.getRewardBadgeId(),
                 participantRepository.countByChallengeDexId(challengeDexId),
                 participant.isPresent(),
                 participant.map(ChallengeParticipant::isCompleted).orElse(false),
                 slots);
-
     }
 
     //yyyymm 정수 (예: 2026년 7월 → 202607)

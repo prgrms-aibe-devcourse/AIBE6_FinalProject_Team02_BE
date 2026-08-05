@@ -1,5 +1,6 @@
 package com.backend_catcheat.domain.place.controller;
 
+import com.backend_catcheat.domain.place.dto.GeoPoint;
 import com.backend_catcheat.domain.place.dto.PlaceSummary;
 import com.backend_catcheat.domain.place.service.PlaceSearchService;
 import com.backend_catcheat.global.common.ApiResponse;
@@ -24,5 +25,9 @@ public class PlaceController {
             @RequestParam(required = false) Double lat,
             @RequestParam(required = false) Double lng) {
         return ApiResponse.ok(placeSearchService.search(query, lat, lng));
+    }
+    @GetMapping("/geocode")
+    public ApiResponse<GeoPoint> geocode(@RequestParam String address) {
+        return ApiResponse.ok(placeSearchService.geocode(address));
     }
 }

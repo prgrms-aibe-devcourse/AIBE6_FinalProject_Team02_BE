@@ -72,7 +72,7 @@ public enum ErrorCode {
     // 장소 검색 (카카오 로컬)
     // 카카오 장애는 우리 서버 버그가 아니다. 500으로 두면 모니터링에서 진짜 장애와 섞인다
     PLACE_SEARCH_FAILED(HttpStatus.BAD_GATEWAY, "장소를 찾지 못했어요. 직접 입력해 주세요"),
-
+    PLACE_ADDRESS_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 주소를 찾을 수 없어요"),
     // 관리자 콘솔 (제보 큐 / 음식 등록 요청 큐)
     REPORT_NOT_FOUND(HttpStatus.NOT_FOUND, "제보를 찾을 수 없어요"),
     REGISTRATION_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "등록 요청을 찾을 수 없어요"),
@@ -101,6 +101,10 @@ public enum ErrorCode {
     CHALLENGE_SLOT_NOT_FOUND(HttpStatus.NOT_FOUND, "챌린지 목표를 찾을 수 없어요"),
     CHALLENGE_SLOT_ALREADY_UNLOCKED(HttpStatus.CONFLICT, "이미 인증한 목표예요"),
     CHALLENGE_UNLOCK_IMAGE_REQUIRED(HttpStatus.BAD_REQUEST, "인증 사진을 등록해 주세요"),
+    CHALLENGE_SLOT_LOCATION_REQUIRED(HttpStatus.BAD_REQUEST, "위치 인증 챌린지는 목표마다 위치가 필요해요"),
+    CHALLENGE_LOCATION_REQUIRED(HttpStatus.BAD_REQUEST, "현재 위치 정보가 필요해요"),
+    CHALLENGE_LOCATION_TOO_FAR(HttpStatus.BAD_REQUEST, "목표 위치에서 너무 멀어요"),
+
 
 
     // 제작 도감

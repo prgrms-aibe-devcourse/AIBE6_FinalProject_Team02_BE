@@ -14,8 +14,10 @@ public record ChallengeSummaryDTO (
         LocalDateTime startsAt,
         LocalDateTime endsAt,
         long participantCount,
-        Long rankScore,         // 현재 정렬 지표값(LATEST/FINISHED면 null)
-        boolean joined          // 요청 유저의 참여 여부(목록에서 참여중 표시)
+        int totalSlots,      // 전체 목표 수 (내 챌린지 진행도용)
+        int unlockedCount,   // 내가 해금한 수 (내 챌린지 진행도용)
+        Long rankScore,      // 현재 정렬 지표값(LATEST/FINISHED면 null)
+        boolean joined       // 요청 유저의 참여 여부(목록에서 참여중 표시)
 ){
 
 }

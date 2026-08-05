@@ -11,6 +11,13 @@ import java.util.Optional;
 
 public interface ChallengeDexRepository extends JpaRepository<ChallengeDex, Long> {
     Optional<ChallengeDex> findByIdAndDeletedAtIsNull(Long id);
+
+    // 내가 개설한 챌린지
+    List<ChallengeDex> findByOwnerIdAndDeletedAtIsNullOrderByCreatedAtDesc(Long ownerId);
+
+    // 참여/완료 목록 — 참가 이력의 challengeDexId들로 한 번에 로드
+    List<ChallengeDex> findByIdInAndDeletedAtIsNull(List<Long> ids);
+
     //진행중인 챌린지 조회
     @Query("""
         select c from ChallengeDex c
@@ -29,4 +36,8 @@ public interface ChallengeDexRepository extends JpaRepository<ChallengeDex, Long
             order by c.endsAt desc
             """)
     List<ChallengeDex> findFinished(@Param("now") LocalDateTime now);
+
+
+
+
 }
