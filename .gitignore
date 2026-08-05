@@ -42,7 +42,7 @@ AGENTS.md
 DESIGN.md
 PLAN.md
 TIMELINE.md
-REPORT.md
+
 
 ### AI 비전 스파이크 ###
 src/test/resources/spike/*.jpg
@@ -56,3 +56,15 @@ docs/
 .env.local
 application-local.yml
 *.local.yml
+
+### Terraform ###
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+*.pem
+
+### 내 레포트
+
+REPORT.md

@@ -1,3 +1,6 @@
+server:
+  port: ${SERVER_PORT:8080}
+
 spring:
   application:
     name: backend_catcheat
@@ -119,3 +122,5 @@ cloud:
       access-key-id: ${AWS_ACCESS_KEY_ID:}
       secret-access-key: ${AWS_SECRET_ACCESS_KEY:}
       session-token: ${AWS_SESSION_TOKEN:}
+
+
