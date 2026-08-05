@@ -9,15 +9,21 @@ import com.backend_catcheat.domain.challenge.repository.ChallengeDexRepository;
 import com.backend_catcheat.domain.challenge.repository.ChallengeDexSlotRepository;
 import com.backend_catcheat.domain.challenge.repository.ChallengeParticipantRepository;
 import com.backend_catcheat.domain.challenge.repository.ChallengeUnlockRepository;
+import com.backend_catcheat.domain.challenge.repository.ChallengeViewDailyRepository;
+import com.backend_catcheat.domain.challenge.repository.DexScore;
+import com.backend_catcheat.global.common.PageResponse;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -35,7 +41,9 @@ public class ChallengeService {
     private final ChallengeDexSlotRepository slotRepository;
     private final ChallengeUnlockRepository unlockRepository;
     private final ChallengeParticipantRepository participantRepository;
+    private final ChallengeViewDailyRepository viewDailyRepository;
     private final S3PresignedUrlService s3PresignedUrlService;
+
     //개설권 조회
     @Transactional
     public CreationTicketResponseDTO getRemainingTickets(Long userId){
@@ -109,43 +117,114 @@ public class ChallengeService {
             }
         }
     }
-    //챌린지 탐색
-    @Transactional(readOnly = true)
-    public List<ChallengeSummaryDTO> getChallenges(ChallengeListStatus status){
-        LocalDateTime now = LocalDateTime.now();
-        List<ChallengeDex>  list = (status == ChallengeListStatus.FINISHED)
-                ? challengeDexRepository.findFinished(now)
-                : challengeDexRepository.findOngoing(now);
 
-        //참여자 수를 챌린지별 count 쿼리 대신 한 번에 집계(N+1 방지)
-        List<Long> ids = list.stream().map(ChallengeDex::getId).toList();
-        Map<Long, Long> countByDex = ids.isEmpty() ? Map.of()
-                : participantRepository.countByChallengeDexIdIn(ids).stream()
+    //챌린지 탐색 (정렬 + 페이지)
+    @Transactional(readOnly = true)
+    public PageResponse<ChallengeSummaryDTO> getChallenges(
+            Long userId,
+            ChallengeListStatus status,
+            ChallengeSortType sort,
+            int page,
+            int size
+    ) {
+        LocalDateTime now = LocalDateTime.now();
+
+        // 완료 탭: 랭킹 미적용, 최근 완료순만
+        if (status == ChallengeListStatus.FINISHED) {
+            return paginate(userId, challengeDexRepository.findFinished(now), null, page, size);
+        }
+
+        List<ChallengeDex> ongoing = challengeDexRepository.findOngoing(now); // createdAt desc
+        // 최신순: 이미 정렬됨, 점수 없음
+        if (sort == ChallengeSortType.LATEST) {
+            return paginate(userId, ongoing, null, page, size);
+        }
+
+        // 랭킹: 지표 집계 후 점수 desc 정렬(동점은 createdAt desc 유지 — 안정 정렬)
+        List<Long> ids = ongoing.stream().map(ChallengeDex::getId).toList();
+        Map<Long, Long> scoreByDex = scoreMap(sort, ids, now);
+        List<ChallengeDex> ranked = ongoing.stream()
+                .sorted(Comparator.comparingLong(
+                        (ChallengeDex c) -> scoreByDex.getOrDefault(c.getId(), 0L)).reversed())
+                .toList();
+        return paginate(userId, ranked, scoreByDex, page, size);
+    }
+
+    // 선택 지표의 dex별 점수 맵
+    private Map<Long, Long> scoreMap(
+            ChallengeSortType sort,
+            List<Long> ids,
+            LocalDateTime now
+    ) {
+        if (ids.isEmpty()) return Map.of();
+        // 최근 7일 = 오늘 포함 이전 6일
+        LocalDate sinceDate = now.toLocalDate().minusDays(6);
+        List<DexScore> rows = switch (sort) {
+            case VIEWS -> viewDailyRepository.sumRecentViewsByDexIn(ids, sinceDate);
+            case PARTICIPANTS -> participantRepository.countRecentJoinsByDexIn(ids, sinceDate.atStartOfDay());
+            case UNLOCKS -> unlockRepository.countRecentUnlocksByDexIn(ids, sinceDate.atStartOfDay());
+            case LATEST -> List.of();
+        };
+        return rows.stream().collect(Collectors.toMap(DexScore::getDexId, DexScore::getScore));
+    }
+
+    // 정렬된 전체 목록을 페이지로 자르고, 페이지 슬라이스만 참여자수·참여여부 집계
+    private PageResponse<ChallengeSummaryDTO> paginate(
+            Long userId,
+            List<ChallengeDex> sorted,
+            Map<Long, Long> scoreByDex,
+            int page,
+            int size
+    ) {
+        int total = sorted.size();
+        int from = Math.min(page * size, total);
+        int to = Math.min(from + size, total);
+        List<ChallengeDex> slice = sorted.subList(from, to);
+
+        List<Long> sliceIds = slice.stream().map(ChallengeDex::getId).toList();
+        Map<Long, Long> participantByDex = sliceIds.isEmpty() ? Map.of()
+                : participantRepository.countByChallengeDexIdIn(sliceIds).stream()
                         .collect(Collectors.toMap(
                                 ChallengeParticipantRepository.ParticipantCount::getDexId,
                                 ChallengeParticipantRepository.ParticipantCount::getCnt));
 
-        return list.stream()
-                .map(c -> toSummary(c, countByDex.getOrDefault(c.getId(), 0L)))
+        // 내 참여 여부(로그인 유저 한정)
+        Set<Long> joinedIds = (userId == null || sliceIds.isEmpty()) ? Set.of()
+                : new HashSet<>(participantRepository.findJoinedDexIds(userId, sliceIds));
+
+        List<ChallengeSummaryDTO> content = slice.stream()
+                .map(c -> toSummary(c,
+                        participantByDex.getOrDefault(c.getId(), 0L),
+                        scoreByDex == null ? null : scoreByDex.getOrDefault(c.getId(), 0L),
+                        joinedIds.contains(c.getId())))
                 .toList();
+
+        int totalPages = size == 0 ? 0 : (int) Math.ceil((double) total / size);
+        boolean hasNext = page + 1 < totalPages;
+        return new PageResponse<>(content, page, size, total, totalPages, hasNext);
     }
 
-    private ChallengeSummaryDTO toSummary(ChallengeDex c, long participants){
+    private ChallengeSummaryDTO toSummary(
+            ChallengeDex c,
+            long participants,
+            Long rankScore,
+            boolean joined
+    ){
         return new ChallengeSummaryDTO(
-                c.getId(),
-                c.getName(),
-                c.getDescription(),
-                c.getChallengeType(),
-                c.getPeriodType(),
-                c.getStartsAt(),
-                c.getEndsAt(),
-                participants
-        );
+                c.getId(), c.getName(), c.getDescription(),
+                c.getChallengeType(), c.getPeriodType(),
+                c.getStartsAt(), c.getEndsAt(),
+                participants, rankScore, joined);
     }
-    @Transactional(readOnly = true)
-    public ChallengeDetailResponseDTO getDetail(Long userId, Long challengeDexId){
+
+    @Transactional
+    public ChallengeDetailResponseDTO getDetail(
+            Long userId,
+            Long challengeDexId
+    ){
         ChallengeDex dex = challengeDexRepository.findByIdAndDeletedAtIsNull(challengeDexId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CHALLENGE_NOT_FOUND));
+        viewDailyRepository.increment(challengeDexId);   // 상세 진입 조회수 +1(새로고침 포함)
         Optional<ChallengeParticipant> participant = participantRepository.findByChallengeDexIdAndUserId(challengeDexId, userId);
 
         //인증한 슬롯 id들
@@ -175,8 +254,6 @@ public class ChallengeService {
                 slots);
 
     }
-
-
 
     //yyyymm 정수 (예: 2026년 7월 → 202607)
     private int currentYearMonth() {
