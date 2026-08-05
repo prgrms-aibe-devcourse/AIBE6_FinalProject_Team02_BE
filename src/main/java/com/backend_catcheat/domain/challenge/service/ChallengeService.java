@@ -128,7 +128,7 @@ public class ChallengeService {
         return toSummaries(list);
     }
 
-    //내 챌린지 (개설한 / 참여 중 / 완료한)
+    //내 챌린지 (개설한 / 참여 중 / 완료한) — 내 진행도(해금 수/전체) 포함
     @Transactional(readOnly = true)
     public List<ChallengeSummaryDTO> getMyChallenges(Long userId, MyChallengeRelation relation){
         List<ChallengeDex> list = switch (relation) {
@@ -136,7 +136,24 @@ public class ChallengeService {
             case JOINED -> loadByParticipants(participantRepository.findByUserIdAndCompletedAtIsNull(userId));
             case COMPLETED -> loadByParticipants(participantRepository.findByUserIdAndCompletedAtIsNotNull(userId));
         };
-        return toSummaries(list);
+
+        List<Long> ids = list.stream().map(ChallengeDex::getId).toList();
+        Map<Long, Long> countByDex = ids.isEmpty() ? Map.of()
+                : participantRepository.countByChallengeDexIdIn(ids).stream()
+                  .collect(Collectors.toMap(
+                          ChallengeParticipantRepository.ParticipantCount::getDexId,
+                          ChallengeParticipantRepository.ParticipantCount::getCnt));
+
+        return list.stream()
+                .map(c -> {
+                    int total = (int) slotRepository.countByChallengeDexId(c.getId());
+                    int unlocked = participantRepository
+                            .findByChallengeDexIdAndUserId(c.getId(), userId)
+                            .map(p -> (int) unlockRepository.countByChallengeParticipantId(p.getId()))
+                            .orElse(0);
+                    return toSummary(c, countByDex.getOrDefault(c.getId(), 0L), total, unlocked);
+                })
+                .toList();
     }
 
     private List<ChallengeDex> loadByParticipants(List<ChallengeParticipant> participants){
@@ -153,11 +170,12 @@ public class ChallengeService {
                           ChallengeParticipantRepository.ParticipantCount::getDexId,
                           ChallengeParticipantRepository.ParticipantCount::getCnt));
         return list.stream()
-                .map(c -> toSummary(c, countByDex.getOrDefault(c.getId(), 0L)))
+                .map(c -> toSummary(c, countByDex.getOrDefault(c.getId(), 0L), 0, 0))
                 .toList();
     }
 
-    private ChallengeSummaryDTO toSummary(ChallengeDex c, long participants){
+    private ChallengeSummaryDTO toSummary(ChallengeDex c, long participants,
+                                          int totalSlots, int unlockedCount){
         return new ChallengeSummaryDTO(
                 c.getId(),
                 c.getName(),
@@ -166,7 +184,9 @@ public class ChallengeService {
                 c.getPeriodType(),
                 c.getStartsAt(),
                 c.getEndsAt(),
-                participants
+                participants,
+                totalSlots,
+                unlockedCount
         );
     }
 
