@@ -13,9 +13,11 @@ import com.backend_catcheat.domain.made.entity.Visibility;
 import com.backend_catcheat.domain.made.repository.MadeDexMemberRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexRepository;
 import com.backend_catcheat.global.exception.CustomException;
+import com.backend_catcheat.global.event.S3ObjectUnusedEvent;
 import com.backend_catcheat.global.exception.ErrorCode;
 import com.backend_catcheat.global.s3.S3PresignedUrlService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -36,6 +38,7 @@ public class MadeDexService {
     private final MadeDexMemberRepository madeDexMemberRepository;
     private final MadeDexFinder madeDexFinder;
     private final S3PresignedUrlService s3PresignedUrlService;
+    private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
 
     @Transactional
@@ -91,9 +94,10 @@ public class MadeDexService {
                 orPrivate(request.visibility()),
                 imageKey);
 
-        // 표지를 바꾸거나 비우면 이전 객체는 아무도 참조하지 않는다
+        // 표지를 바꾸거나 비우면 이전 객체는 아무도 참조하지 않는다.
+        // 삭제는 커밋 이후로 미룬다 — 여기서 지우면 롤백됐을 때 되살릴 수 없다
         if (oldImageKey != null && !oldImageKey.equals(imageKey)) {
-            s3PresignedUrlService.deleteObject(oldImageKey);
+            eventPublisher.publishEvent(new S3ObjectUnusedEvent(oldImageKey));
         }
     }
 

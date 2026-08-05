@@ -11,6 +11,7 @@ import com.backend_catcheat.domain.made.entity.MadeDexRole;
 import com.backend_catcheat.domain.made.entity.Visibility;
 import com.backend_catcheat.domain.made.repository.MadeDexMemberRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexRepository;
+import com.backend_catcheat.global.event.S3ObjectUnusedEvent;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import com.backend_catcheat.global.s3.S3PresignedUrlService;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
@@ -56,6 +58,8 @@ class MadeDexServiceTest {
     MadeDexMemberRepository madeDexMemberRepository;
     @Mock
     S3PresignedUrlService s3PresignedUrlService;
+    @Mock
+    ApplicationEventPublisher eventPublisher;
 
     MadeDexService madeDexService;
 
@@ -64,7 +68,8 @@ class MadeDexServiceTest {
     void setUp() {
         madeDexService = new MadeDexService(
                 madeDexRepository, madeDexMemberRepository, new MadeDexFinder(madeDexRepository),
-                s3PresignedUrlService, Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE));
+                s3PresignedUrlService, eventPublisher,
+                Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE));
     }
 
     private MadeDex savedMadeDex(Long id, String name, Visibility visibility) {
@@ -255,8 +260,8 @@ class MadeDexServiceTest {
     }
 
     @Test
-    @DisplayName("표지를 바꾸면 이전 S3 객체를 지운다")
-    void update_deletesReplacedImage() {
+    @DisplayName("표지를 바꾸면 이전 객체 삭제를 커밋 이후로 미룬다")
+    void update_defersReplacedImageDeletion() {
         MadeDex madeDex = MadeDex.open(OWNER_ID, "우리 도감", null, Visibility.PRIVATE, "made/old.jpg");
         ReflectionTestUtils.setField(madeDex, "id", 10L);
         when(madeDexRepository.findActiveByIdForUpdate(10L)).thenReturn(Optional.of(madeDex));
@@ -264,11 +269,26 @@ class MadeDexServiceTest {
         madeDexService.update(OWNER_ID, 10L,
                 new MadeDexUpdateRequestDTO("우리 도감", null, Visibility.PRIVATE, "made/new.jpg"));
 
-        verify(s3PresignedUrlService).deleteObject("made/old.jpg");
+        verify(eventPublisher).publishEvent(new S3ObjectUnusedEvent("made/old.jpg"));
+        // 트랜잭션 안에서 지우면 뒤이어 롤백됐을 때 되살릴 수 없다
+        verify(s3PresignedUrlService, never()).deleteObject(any());
     }
 
     @Test
-    @DisplayName("표지를 그대로 두면 S3 객체를 지우지 않는다")
+    @DisplayName("표지를 비우면 이전 객체 삭제를 커밋 이후로 미룬다")
+    void update_defersClearedImageDeletion() {
+        MadeDex madeDex = MadeDex.open(OWNER_ID, "우리 도감", null, Visibility.PRIVATE, "made/old.jpg");
+        ReflectionTestUtils.setField(madeDex, "id", 10L);
+        when(madeDexRepository.findActiveByIdForUpdate(10L)).thenReturn(Optional.of(madeDex));
+
+        madeDexService.update(OWNER_ID, 10L,
+                new MadeDexUpdateRequestDTO("우리 도감", null, Visibility.PRIVATE, null));
+
+        verify(eventPublisher).publishEvent(new S3ObjectUnusedEvent("made/old.jpg"));
+    }
+
+    @Test
+    @DisplayName("표지를 그대로 두면 삭제를 예약하지 않는다")
     void update_keepsSameImage() {
         MadeDex madeDex = MadeDex.open(OWNER_ID, "우리 도감", null, Visibility.PRIVATE, "made/old.jpg");
         ReflectionTestUtils.setField(madeDex, "id", 10L);
@@ -277,7 +297,7 @@ class MadeDexServiceTest {
         madeDexService.update(OWNER_ID, 10L,
                 new MadeDexUpdateRequestDTO("우리 도감", null, Visibility.PRIVATE, "made/old.jpg"));
 
-        verify(s3PresignedUrlService, never()).deleteObject(any());
+        verify(eventPublisher, never()).publishEvent(any(S3ObjectUnusedEvent.class));
     }
 
     @Test
