@@ -147,8 +147,8 @@ resource "aws_instance" "backend" {
   user_data = templatefile("${path.module}/user_data.sh.tftpl", {})
 
   metadata_options {
-    http_endpoint = "enabled"
-    http_tokens = "required"
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
     http_put_response_hop_limit = 2
   }
 
@@ -162,4 +162,18 @@ resource "aws_instance" "backend" {
   tags = merge(local.tags, {
     Name = "${local.name_prefix}-backend"
   })
+}
+
+resource "aws_eip" "backend" {
+  domain = "vpc"
+
+  tags = merge(local.tags, {
+    Name = "${local.name_prefix}-backend-eip"
+  })
+
+}
+
+resource "aws_eip_association" "backend" {
+  instance_id   = aws_instance.backend.id
+  allocation_id = aws_eip.backend.id
 }
