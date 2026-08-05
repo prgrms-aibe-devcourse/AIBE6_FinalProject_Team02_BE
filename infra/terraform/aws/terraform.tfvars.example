@@ -1,0 +1,19 @@
+project_name = "catcheat"
+environment  = "prod"
+aws_region   = "ap-northeast-2"
+
+# Use an existing EC2 key pair name if you need SSH.
+key_pair_name = "your-existing-key-pair"
+
+# Replace with your current public IP, for example "203.0.113.10/32".
+ssh_allowed_cidr = "YOUR_PUBLIC_IP/32"
+
+# During early testing this can stay public. Narrow it when a frontend/domain path is ready.
+app_allowed_cidr = "0.0.0.0/0"
+
+instance_type       = "t3.micro"
+app_port            = 8080
+root_volume_size_gb = 20
+
+# Existing bucket used by application.yml as AWS_S3_BUCKET.
+s3_bucket_name = "catcheat-storage-495264909330-ap-northeast-2-an"

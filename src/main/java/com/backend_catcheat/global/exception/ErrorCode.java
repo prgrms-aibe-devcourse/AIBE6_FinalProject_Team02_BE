@@ -111,6 +111,20 @@ public enum ErrorCode {
     MADE_DEX_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "도감 이름을 입력해 주세요"),
     MADE_DEX_NAME_TOO_LONG(HttpStatus.BAD_REQUEST, "도감 이름은 100자까지 쓸 수 있어요"),
     MADE_DEX_DESCRIPTION_TOO_LONG(HttpStatus.BAD_REQUEST, "도감 소개는 500자까지 쓸 수 있어요"),
+    MADE_DEX_IMAGE_KEY_TOO_LONG(HttpStatus.BAD_REQUEST, "이미지를 등록하지 못했어요. 다시 시도해 주세요"),
+    MADE_DEX_NOT_FOUND(HttpStatus.NOT_FOUND, "제작 도감을 찾을 수 없어요"),
+    MADE_DEX_NOT_OWNER(HttpStatus.FORBIDDEN, "그룹장만 할 수 있어요"),
+    MADE_DEX_FULL(HttpStatus.CONFLICT, "인원이 가득 찬 도감이에요"),
+    // 초대 코드 / 참여
+    MADE_DEX_INVITE_CODE_REQUIRED(HttpStatus.BAD_REQUEST, "초대 코드를 입력해 주세요"),
+    MADE_DEX_INVITE_CODE_INVALID(HttpStatus.NOT_FOUND, "존재하지 않는 초대 코드예요"),
+    MADE_DEX_INVITE_CODE_EXPIRED(HttpStatus.GONE, "만료된 초대 코드예요. 새 코드를 요청해 주세요"),
+    MADE_DEX_ALREADY_JOINED(HttpStatus.CONFLICT, "이미 이 제작 도감에 참여 중이에요"),
+    // 멤버 관리(추방 / 탈퇴 / 위임)
+    MADE_DEX_NOT_MEMBER(HttpStatus.FORBIDDEN, "참여 중인 제작 도감이 아니에요"),
+    MADE_DEX_MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "이미 나간 참여자예요"),
+    MADE_DEX_CANNOT_KICK_SELF(HttpStatus.BAD_REQUEST, "스스로를 내보낼 수는 없어요. 나가기를 눌러 주세요"),
+    MADE_DEX_ALREADY_OWNER(HttpStatus.CONFLICT, "이미 그룹장이에요"),
 
     // 뱃지
     BADGE_NOT_OWNED(HttpStatus.BAD_REQUEST, "보유하지 않은 뱃지예요"),

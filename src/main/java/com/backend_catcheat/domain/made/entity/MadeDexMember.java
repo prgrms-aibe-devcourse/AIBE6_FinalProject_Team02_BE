@@ -49,7 +49,20 @@ public class MadeDexMember {
         return new MadeDexMember(madeDexId, userId, MadeDexRole.OWNER, joinedAt);
     }
 
+    /** 초대 코드로 합류한 일반 멤버 */
+    public static MadeDexMember member(Long madeDexId, Long userId, LocalDateTime joinedAt) {
+        return new MadeDexMember(madeDexId, userId, MadeDexRole.MEMBER, joinedAt);
+    }
+
     public boolean isOwner() {
         return role == MadeDexRole.OWNER;
+    }
+
+    public void promoteToOwner() {
+        this.role = MadeDexRole.OWNER;
+    }
+
+    public void demoteToMember() {
+        this.role = MadeDexRole.MEMBER;
     }
 }
