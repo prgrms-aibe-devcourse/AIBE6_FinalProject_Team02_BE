@@ -23,5 +23,11 @@ public record ChallengeDetailResponseDTO(
         boolean completed,    // 내가 완료했는지
         List<SlotDetail> slots
 ) {
-    public record SlotDetail(Long id, String foodName, String placeName, int slotOrder, boolean unlocked, String imageUrl) {}
+    public record SlotDetail(
+            Long id, String foodName, String placeName, int slotOrder,
+            boolean unlocked,
+            String imageUrl,          // 개설자가 등록한 목표 사진(미해금이면 흑백)
+            String myImageUrl,        // 내가 인증한 사진(해금 시) — 없으면 null
+            LocalDateTime unlockedAt  // 내가 인증한 시각 — 없으면 null
+    ) {}
 }

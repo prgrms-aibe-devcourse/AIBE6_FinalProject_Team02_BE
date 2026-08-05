@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -177,21 +176,28 @@ public class ChallengeService {
                 .orElseThrow(() -> new CustomException(ErrorCode.CHALLENGE_NOT_FOUND));
         Optional<ChallengeParticipant> participant = participantRepository.findByChallengeDexIdAndUserId(challengeDexId, userId);
 
-        //인증한 슬롯 id들
-        Set<Long> unlockedSlotIds = participant
+        //내 인증 기록 (슬롯별) — 해금 여부 + 내 사진/시각
+        Map<Long, ChallengeUnlock> myUnlocks = participant
                 .map(p -> unlockRepository.findByChallengeParticipantId(p.getId()).stream()
-                        .map(ChallengeUnlock::getSlotId)
-                        .collect(Collectors.toSet()))
-                .orElse(Set.of());
+                        .collect(Collectors.toMap(ChallengeUnlock::getSlotId, u -> u)))
+                .orElse(Map.of());
 
         List<ChallengeDetailResponseDTO.SlotDetail> slots =
                 slotRepository.findByChallengeDexIdOrderBySlotOrderAsc(challengeDexId).stream()
-                        .map(s -> new ChallengeDetailResponseDTO.SlotDetail(
-                                s.getId(), s.getFoodName(), s.getPlaceName(), s.getSlotOrder(),
-                                unlockedSlotIds.contains(s.getId()),
-                                // 개설자가 등록한 목표 사진 → 조회용 프리사인 URL (없으면 null)
-                                s.getImageKey() == null ? null
-                                        : s3PresignedUrlService.createDownloadUrl(s.getImageKey())))
+                        .map(s -> {
+                            ChallengeUnlock mine = myUnlocks.get(s.getId());
+                            return new ChallengeDetailResponseDTO.SlotDetail(
+                                    s.getId(), s.getFoodName(), s.getPlaceName(), s.getSlotOrder(),
+                                    mine != null,
+                                    // 개설자가 등록한 목표 사진 (미해금이면 흑백)
+                                    s.getImageKey() == null ? null
+                                            : s3PresignedUrlService.createDownloadUrl(s.getImageKey()),
+                                    // 내가 인증한 사진 (해금 시)
+                                    mine != null && mine.getImageKey() != null
+                                            ? s3PresignedUrlService.createDownloadUrl(mine.getImageKey())
+                                            : null,
+                                    mine != null ? mine.getUnlockedAt() : null);
+                        })
                         .toList();
 
         return new ChallengeDetailResponseDTO(
