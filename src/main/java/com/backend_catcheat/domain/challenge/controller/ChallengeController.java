@@ -78,5 +78,14 @@ public class ChallengeController {
         return ApiResponse.ok(challengeService.getMyChallenges(userId, relation));
     }
 
+    //챌린지 포기(나가기)
+    @DeleteMapping("/{challengeId}/participants")
+    public ApiResponse<Void> leave(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long challengeId) {
+        challengeParticipationService.leave(userId, challengeId);
+        return ApiResponse.ok();
+    }
+
 
 }

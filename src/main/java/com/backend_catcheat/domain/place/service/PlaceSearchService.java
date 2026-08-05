@@ -81,12 +81,24 @@ public class PlaceSearchService {
                 .toList();
     }
 
-    /** 주소 문자열 → 좌표. 위치 인증 챌린지에서 주소로 장소를 지정할 때 사용 */
+    /** 주소/상호 문자열 → 좌표. 주소검색 우선, 실패하면 키워드검색으로 폴백 */
     public GeoPoint geocode(String address) {
         String query = address == null ? "" : address.trim();
         if (query.isEmpty()) {
             throw new CustomException(ErrorCode.PLACE_ADDRESS_NOT_FOUND);
         }
+        GeoPoint byAddress = tryAddressSearch(query);
+        if (byAddress != null) {
+            return byAddress;
+        }
+        GeoPoint byKeyword = tryKeywordCoordinate(query); // 부분 주소·상호명 대응
+        if (byKeyword != null) {
+            return byKeyword;
+        }
+        throw new CustomException(ErrorCode.PLACE_ADDRESS_NOT_FOUND);
+    }
+
+    private GeoPoint tryAddressSearch(String query) {
         KakaoAddressResponse response;
         try {
             response = kakaoLocalRestClient.get()
@@ -97,15 +109,45 @@ public class PlaceSearchService {
                     .retrieve()
                     .body(KakaoAddressResponse.class);
         } catch (RestClientException e) {
-            log.error("[장소] 카카오 주소 검색 실패. query={}", query, e);
-            throw new CustomException(ErrorCode.PLACE_SEARCH_FAILED);
+            log.warn("[장소] 주소 검색 실패. query={}", query, e);
+            return null;
         }
         if (response == null || response.documents() == null || response.documents().isEmpty()) {
-            throw new CustomException(ErrorCode.PLACE_ADDRESS_NOT_FOUND);
+            return null;
         }
         KakaoAddressResponse.Document d = response.documents().get(0);
+        if (d.x() == null || d.y() == null) {
+            return null;
+        }
         // 카카오는 x가 경도, y가 위도
         return new GeoPoint(d.addressName(), parseCoordinate(d.y()), parseCoordinate(d.x()));
+    }
+
+    private GeoPoint tryKeywordCoordinate(String query) {
+        KakaoKeywordResponse response;
+        try {
+            response = kakaoLocalRestClient.get()
+                    .uri(uri -> uri.path(KEYWORD_SEARCH_PATH)
+                            .queryParam("query", query)
+                            .queryParam("size", 1)
+                            .build())
+                    .retrieve()
+                    .body(KakaoKeywordResponse.class);
+        } catch (RestClientException e) {
+            log.warn("[장소] 키워드 좌표 검색 실패. query={}", query, e);
+            return null;
+        }
+        if (response == null || response.documents() == null || response.documents().isEmpty()) {
+            return null;
+        }
+        KakaoKeywordResponse.Document d = response.documents().get(0);
+        if (d.x() == null || d.y() == null) {
+            return null;
+        }
+        String label = d.roadAddressName() != null && !d.roadAddressName().isBlank()
+                ? d.roadAddressName()
+                : (d.addressName() != null ? d.addressName() : d.placeName());
+        return new GeoPoint(label, parseCoordinate(d.y()), parseCoordinate(d.x()));
     }
 
     private static PlaceSummary toSummary(Document document) {

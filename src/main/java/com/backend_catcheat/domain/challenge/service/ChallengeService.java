@@ -230,6 +230,8 @@ public class ChallengeService {
                 slots);
     }
 
+
+
     //yyyymm 정수 (예: 2026년 7월 → 202607)
     private int currentYearMonth() {
         YearMonth ym = YearMonth.now();

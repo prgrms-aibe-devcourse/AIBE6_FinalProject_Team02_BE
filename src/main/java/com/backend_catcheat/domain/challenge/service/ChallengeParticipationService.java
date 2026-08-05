@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
 @Service
 @RequiredArgsConstructor
 public class ChallengeParticipationService {
-    private static final double LOCATION_RADIUS_M = 200; // 위치 인증 허용 반경
+    private static final double LOCATION_RADIUS_M = 20; // 위치 인증 허용 반경(m)
 
     private final ChallengeDexRepository challengeDexRepository;
     private final ChallengeParticipantRepository  participantRepository;
@@ -75,11 +75,13 @@ public class ChallengeParticipationService {
         //위치 인증 챌릱지면 현재 위치가 목표 반경 내인지 확인
         ChallengeDex dex = challengeDexRepository.findByIdAndDeletedAtIsNull(challengeDexId)
                 .orElseThrow(()-> new CustomException(ErrorCode.CHALLENGE_NOT_FOUND));
-        if (dex.getVerifyType() == VerifyType.LOCATION){
-            throw new CustomException(ErrorCode.CHALLENGE_SLOT_LOCATION_REQUIRED);
-        }
-        if (distanceMeters(lat, lng, slot.getLat(), slot.getLat()) > LOCATION_RADIUS_M){
-            throw new CustomException(ErrorCode.CHALLENGE_LOCATION_TOO_FAR);
+        if (dex.getVerifyType() == VerifyType.LOCATION) {
+            if (lat == null || lng == null || slot.getLat() == null || slot.getLng() == null) {
+                throw new CustomException(ErrorCode.CHALLENGE_LOCATION_REQUIRED);
+            }
+            if (distanceMeters(lat, lng, slot.getLat(), slot.getLng()) > LOCATION_RADIUS_M) {
+                throw new CustomException(ErrorCode.CHALLENGE_LOCATION_TOO_FAR);
+            }
         }
 
         try {
@@ -105,6 +107,15 @@ public class ChallengeParticipationService {
         }
         return new UnlockResponseDTO(unlocked, total, participant.isCompleted());
 
+    }
+    // 챌린지 포기(나가기) — 내 참여와 인증 기록 삭제
+    @Transactional
+    public void leave(Long userId, Long challengeDexId) {
+        ChallengeParticipant participant = participantRepository
+                .findByChallengeDexIdAndUserId(challengeDexId, userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CHALLENGE_NOT_JOINED));
+        unlockRepository.deleteByChallengeParticipantId(participant.getId());
+        participantRepository.delete(participant);
     }
 
     private static double distanceMeters(double lat1, double lng1, double lat2, double lng2){
