@@ -179,4 +179,20 @@ class ChallengeServiceTest {
         assertThat(result.content()).hasSize(1);
         assertThat(result.content().get(0).participantCount()).isEqualTo(0);
     }
+
+    @Test
+    @DisplayName("page/size가 음수·0이어도 클램프되어 예외 없이 첫 페이지를 준다")
+    void getChallenges_clampsInvalidPaging() {
+        when(challengeDexRepository.findOngoing(any())).thenReturn(List.of(sampleDex()));
+        when(participantRepository.countByChallengeDexIdIn(any())).thenReturn(List.of());
+
+        // page=-1, size=0 → subList 예외/빈 페이지 없이 클램프(page=0, size=1)
+        PageResponse<ChallengeSummaryDTO> result =
+                challengeService.getChallenges(1L, ChallengeListStatus.ONGOING, ChallengeSortType.LATEST, -1, 0);
+
+        assertThat(result.content()).hasSize(1);
+        assertThat(result.page()).isEqualTo(0);
+        assertThat(result.size()).isEqualTo(1);
+        assertThat(result.hasNext()).isFalse();
+    }
 }

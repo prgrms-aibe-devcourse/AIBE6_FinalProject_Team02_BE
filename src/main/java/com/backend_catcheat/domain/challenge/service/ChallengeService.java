@@ -35,6 +35,7 @@ import com.backend_catcheat.global.s3.S3PresignedUrlService;
 @RequiredArgsConstructor
 public class ChallengeService {
     private static final int MIN_SLOTS = 5;
+    private static final int MAX_PAGE_SIZE = 50;   // 탐색 페이지 크기 상한(과대 요청 방어)
 
     private final UserRepository userRepository;
     private final ChallengeDexRepository challengeDexRepository;
@@ -176,9 +177,14 @@ public class ChallengeService {
             int page,
             int size
     ) {
+        // page/size 방어
+        int safePage = Math.max(0, page);
+        int safeSize = Math.min(Math.max(1, size), MAX_PAGE_SIZE);
+
         int total = sorted.size();
-        int from = Math.min(page * size, total);
-        int to = Math.min(from + size, total);
+        long fromL = (long) safePage * safeSize;   // 큰 page의 int 오버플로 방지
+        int from = (int) Math.min(fromL, total);
+        int to = (int) Math.min(fromL + safeSize, total);
         List<ChallengeDex> slice = sorted.subList(from, to);
 
         List<Long> sliceIds = slice.stream().map(ChallengeDex::getId).toList();
@@ -199,9 +205,9 @@ public class ChallengeService {
                         joinedIds.contains(c.getId())))
                 .toList();
 
-        int totalPages = size == 0 ? 0 : (int) Math.ceil((double) total / size);
-        boolean hasNext = page + 1 < totalPages;
-        return new PageResponse<>(content, page, size, total, totalPages, hasNext);
+        int totalPages = (int) Math.ceil((double) total / safeSize);
+        boolean hasNext = safePage + 1 < totalPages;
+        return new PageResponse<>(content, safePage, safeSize, total, totalPages, hasNext);
     }
 
     private ChallengeSummaryDTO toSummary(
