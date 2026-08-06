@@ -7,19 +7,14 @@ output "backend_instance_id" {
 output "backend_public_ip" {
   # SSH 접속과 초기 HTTP 테스트에 사용할 public IP다.
   description = "백엔드 EC2 public IP"
-  value       = aws_instance.backend.public_ip
+  value       = aws_eip.backend.public_ip
 }
 
-output "backend_public_dns" {
-  # AWS가 자동으로 부여하는 public DNS 이름이다.
-  description = "백엔드 EC2 public DNS"
-  value       = aws_instance.backend.public_dns
-}
 
 output "backend_test_url" {
   # ALB/도메인 연결 전, 8080 포트로 직접 테스트할 URL이다.
   description = "백엔드 앱 직접 접속 URL [초기 배포 검증용 HTTP URL 이 운영환경에서는 사용하지 않음]"
-  value       = "http://${aws_instance.backend.public_ip}:${var.app_port}"
+  value       = "http://${aws_eip.backend.public_ip}:${var.app_port}"
 }
 
 output "security_group_id" {
