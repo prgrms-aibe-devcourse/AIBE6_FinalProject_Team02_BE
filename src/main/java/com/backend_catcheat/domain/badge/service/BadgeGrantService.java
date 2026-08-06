@@ -63,6 +63,13 @@ public class BadgeGrantService {
         }
     }
 
+    /** 첫 제작 도감 개설 시 지급 */
+    @Transactional
+    public void grantFirstMadeDex(Long userId) {
+        badgeRepository.findByConditionType(BadgeConditionType.FIRST_MADE_DEX)
+                .forEach(badge -> grantIfAbsent(userId, badge));
+    }
+
     /** 챌린지 완료 보상 */
     @Transactional
     public void grantChallengeReward(Long userId, Long badgeId) {
