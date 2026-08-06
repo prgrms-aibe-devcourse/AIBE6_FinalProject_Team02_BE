@@ -1,0 +1,34 @@
+{
+  "type": "object",
+  "properties": {
+    "verdicts": {
+      "type": "array",
+      "description": "유저가 제시한 음식 이름마다 하나씩. 순서와 개수를 입력과 동일하게 유지한다.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "유저가 제시한 음식 이름을 그대로 반복한다."
+          },
+          "matched": {
+            "type": "boolean",
+            "description": "사진에 그 음식이 보이면 true."
+          },
+          "confidence": {
+            "type": "number",
+            "description": "판정 확신도. 0.0 이상 1.0 이하의 실수."
+          },
+          "reason": {
+            "type": "string",
+            "description": "matched가 false일 때만 한국어 한 문장. true면 빈 문자열."
+          }
+        },
+        "required": ["name", "matched", "confidence", "reason"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["verdicts"],
+  "additionalProperties": false
+}

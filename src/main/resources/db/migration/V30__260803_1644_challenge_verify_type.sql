@@ -1,0 +1,2 @@
+ALTER TABLE challenge_dex
+    ADD COLUMN verify_type VARCHAR(20) NOT NULL DEFAULT 'FOOD';
