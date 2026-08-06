@@ -13,6 +13,7 @@ import com.backend_catcheat.domain.made.entity.Visibility;
 import com.backend_catcheat.domain.made.repository.MadeDexMemberRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexRepository;
 import com.backend_catcheat.global.exception.CustomException;
+import com.backend_catcheat.global.event.MadeDexCreatedEvent;
 import com.backend_catcheat.global.event.S3ObjectUnusedEvent;
 import com.backend_catcheat.global.exception.ErrorCode;
 import com.backend_catcheat.global.s3.S3PresignedUrlService;
@@ -51,6 +52,9 @@ public class MadeDexService {
                 validImageKey(request.imageKey())));
         madeDexMemberRepository.save(
                 MadeDexMember.owner(madeDex.getId(), ownerId, LocalDateTime.now(clock)));
+
+        // 첫 제작 도감 뱃지 지급 트리거
+        eventPublisher.publishEvent(new MadeDexCreatedEvent(ownerId));
 
         return new MadeDexCreateResponseDTO(madeDex.getId());
     }
