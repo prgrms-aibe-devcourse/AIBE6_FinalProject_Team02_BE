@@ -53,7 +53,7 @@ class S3PresignedUrlServiceTest {
 
     private PresignedUploadResponseDTO.UploadTarget issueOne(String fileName, String contentType) {
         return service.createUploadUrls(
-                new PresignedUploadRequestDTO(List.of(new FileInfo(fileName, contentType)), null)).uploads().getFirst();
+                new PresignedUploadRequestDTO(List.of(new FileInfo(fileName, contentType))), UploadPurpose.DEFAULT).uploads().getFirst();
     }
 
     @Test
@@ -117,7 +117,7 @@ class S3PresignedUrlServiceTest {
                 .mapToObj(i -> new FileInfo("photo" + i + ".jpg", "image/jpeg"))
                 .toList();
 
-        assertThatThrownBy(() -> service.createUploadUrls(new PresignedUploadRequestDTO(six, null)))
+        assertThatThrownBy(() -> service.createUploadUrls(new PresignedUploadRequestDTO(six), UploadPurpose.DEFAULT))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.UPLOAD_FILE_COUNT_EXCEEDED);
     }
@@ -133,10 +133,10 @@ class S3PresignedUrlServiceTest {
                 .toList();
 
         assertThat(service.createUploadUrls(
-                new PresignedUploadRequestDTO(eight, UploadPurpose.LOGIT_RECORD)).uploads()).hasSize(8);
+                new PresignedUploadRequestDTO(eight), UploadPurpose.LOGIT_RECORD).uploads()).hasSize(8);
 
         assertThatThrownBy(() -> service.createUploadUrls(
-                new PresignedUploadRequestDTO(nine, UploadPurpose.LOGIT_RECORD)))
+                new PresignedUploadRequestDTO(nine), UploadPurpose.LOGIT_RECORD))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.UPLOAD_FILE_COUNT_EXCEEDED);
     }
@@ -144,7 +144,7 @@ class S3PresignedUrlServiceTest {
     @Test
     @DisplayName("사진이 없으면 거부한다")
     void 사진이_없으면_거부한다() {
-        assertThatThrownBy(() -> service.createUploadUrls(new PresignedUploadRequestDTO(List.of(), null)))
+        assertThatThrownBy(() -> service.createUploadUrls(new PresignedUploadRequestDTO(List.of()), UploadPurpose.DEFAULT))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.UPLOAD_FILE_REQUIRED);
     }
@@ -155,7 +155,7 @@ class S3PresignedUrlServiceTest {
         var uploads = service.createUploadUrls(new PresignedUploadRequestDTO(List.of(
                 new FileInfo("a.jpg", "image/jpeg"),
                 new FileInfo("b.png", "image/png"),
-                new FileInfo("c.jpg", "image/jpeg")), null)).uploads();
+                new FileInfo("c.jpg", "image/jpeg"))), UploadPurpose.DEFAULT).uploads();
 
         assertThat(uploads).hasSize(3);
         assertThat(uploads.get(1).key()).endsWith(".png");

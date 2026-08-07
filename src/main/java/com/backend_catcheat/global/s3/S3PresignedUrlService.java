@@ -85,14 +85,14 @@ public class S3PresignedUrlService {
         }
     }
 
-    public PresignedUploadResponseDTO createUploadUrls(PresignedUploadRequestDTO request) {
+    public PresignedUploadResponseDTO createUploadUrls(PresignedUploadRequestDTO request, UploadPurpose purpose) {
 
         // 업로드시 예외처리
         if (request.files() == null || request.files().isEmpty()) {
             throw new CustomException(ErrorCode.UPLOAD_FILE_REQUIRED);
         }
 
-        if (request.files().size() > UploadPurpose.orDefault(request.purpose()).maxFileCount()) {
+        if (request.files().size() > purpose.maxFileCount()) {
             throw new CustomException(ErrorCode.UPLOAD_FILE_COUNT_EXCEEDED);
         }
 

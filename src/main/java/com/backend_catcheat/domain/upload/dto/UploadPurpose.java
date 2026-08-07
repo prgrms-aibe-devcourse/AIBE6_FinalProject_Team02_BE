@@ -15,9 +15,4 @@ public enum UploadPurpose {
     public int maxFileCount() {
         return maxFileCount;
     }
-
-    // 용도를 보내지 않던 기존 화면은 그대로 5장이다
-    public static UploadPurpose orDefault(UploadPurpose purpose) {
-        return purpose == null ? DEFAULT : purpose;
-    }
 }
