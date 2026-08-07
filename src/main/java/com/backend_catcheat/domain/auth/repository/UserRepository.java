@@ -2,8 +2,12 @@ package com.backend_catcheat.domain.auth.repository;
 
 import com.backend_catcheat.domain.auth.entity.Provider;
 import com.backend_catcheat.domain.auth.entity.User;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -28,4 +32,15 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * 초기 세팅·변경 시 유니크 보장을 위해 사용
      */
     boolean existsByNickname(String nickname);
+
+    /**
+     * 닉네임 검색(본인·탈퇴 제외)
+     */
+    @Query("select u from User u "
+            + "where u.id <> :meId and u.deletedAt is null "
+            + "and u.nickname like concat('%', :keyword, '%') "
+            + "order by u.nickname asc")
+    List<User> searchByNicknameContaining(@Param("keyword") String keyword,
+                                          @Param("meId") Long meId,
+                                          Pageable pageable);
 }
