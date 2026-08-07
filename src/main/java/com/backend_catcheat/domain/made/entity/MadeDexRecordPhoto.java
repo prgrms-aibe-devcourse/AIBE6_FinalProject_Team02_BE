@@ -42,4 +42,8 @@ public class MadeDexRecordPhoto {
     public static MadeDexRecordPhoto of(Long recordId, String imageKey, int sortOrder) {
         return new MadeDexRecordPhoto(recordId, imageKey, sortOrder);
     }
+
+    public void moveTo(int sortOrder) {
+        this.sortOrder = sortOrder;
+    }
 }

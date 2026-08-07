@@ -229,11 +229,11 @@ class MadeDexRecordServiceTest {
     @Test
     @DisplayName("남의 기록은 고칠 수 없다 — 그룹장도 마찬가지다")
     void 작성자만_수정한다() {
-        when(madeDexRecordRepository.findByIdAndDeletedAtIsNull(RECORD_ID))
+        when(madeDexRecordRepository.findActiveByIdForUpdate(RECORD_ID))
                 .thenReturn(Optional.of(record(AUTHOR_ID, MADE_DEX_ID)));
 
         assertThatThrownBy(() -> service.update(OTHER_MEMBER_ID, MADE_DEX_ID, RECORD_ID,
-                updateRequest(TODAY_SEOUL, List.of("key1"), List.of("김치찌개"))))
+                updateRequest(TODAY_SEOUL, List.of(), List.of("key1"), List.of("김치찌개"))))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.MADE_DEX_RECORD_NOT_AUTHOR);
     }
@@ -241,7 +241,7 @@ class MadeDexRecordServiceTest {
     @Test
     @DisplayName("남의 기록은 지울 수 없다")
     void 작성자만_삭제한다() {
-        when(madeDexRecordRepository.findByIdAndDeletedAtIsNull(RECORD_ID))
+        when(madeDexRecordRepository.findActiveByIdForUpdate(RECORD_ID))
                 .thenReturn(Optional.of(record(AUTHOR_ID, MADE_DEX_ID)));
 
         assertThatThrownBy(() -> service.delete(OTHER_MEMBER_ID, MADE_DEX_ID, RECORD_ID))
@@ -253,7 +253,7 @@ class MadeDexRecordServiceTest {
     @DisplayName("삭제는 소프트 삭제다 — 슬롯 삭제 판정이 지운 기록까지 세고 있다")
     void 삭제는_소프트_삭제다() {
         MadeDexRecord record = record(AUTHOR_ID, MADE_DEX_ID);
-        when(madeDexRecordRepository.findByIdAndDeletedAtIsNull(RECORD_ID)).thenReturn(Optional.of(record));
+        when(madeDexRecordRepository.findActiveByIdForUpdate(RECORD_ID)).thenReturn(Optional.of(record));
         when(madeDexRecordPhotoRepository.findByRecordIdOrderBySortOrderAsc(RECORD_ID))
                 .thenReturn(List.of(MadeDexRecordPhoto.of(RECORD_ID, "key1", 0)));
 
@@ -268,7 +268,7 @@ class MadeDexRecordServiceTest {
     @Test
     @DisplayName("다른 그룹의 기록 id는 찾을 수 없다고 답한다")
     void 남의_기록은_보이지_않는다() {
-        when(madeDexRecordRepository.findByIdAndDeletedAtIsNull(RECORD_ID))
+        when(madeDexRecordRepository.findActiveByIdForUpdate(RECORD_ID))
                 .thenReturn(Optional.of(record(AUTHOR_ID, OTHER_DEX_ID)));
 
         assertThatThrownBy(() -> service.delete(AUTHOR_ID, MADE_DEX_ID, RECORD_ID))
@@ -280,25 +280,55 @@ class MadeDexRecordServiceTest {
     @DisplayName("수정에서 빠진 사진만 정리 대상으로 알린다")
     void 교체된_사진만_정리한다() {
         MadeDexRecord record = record(AUTHOR_ID, MADE_DEX_ID);
-        when(madeDexRecordRepository.findByIdAndDeletedAtIsNull(RECORD_ID)).thenReturn(Optional.of(record));
+        when(madeDexRecordRepository.findActiveByIdForUpdate(RECORD_ID)).thenReturn(Optional.of(record));
         when(madeDexRecordPhotoRepository.findByRecordIdOrderBySortOrderAsc(RECORD_ID))
-                .thenReturn(List.of(
-                        MadeDexRecordPhoto.of(RECORD_ID, "keep", 0),
-                        MadeDexRecordPhoto.of(RECORD_ID, "drop", 1)));
+                .thenReturn(List.of(photo(1L, "keep", 0), photo(2L, "drop", 1)));
 
         service.update(AUTHOR_ID, MADE_DEX_ID, RECORD_ID,
-                updateRequest(TODAY_SEOUL, List.of("keep"), List.of("김치찌개")));
+                updateRequest(TODAY_SEOUL, List.of(1L), List.of(), List.of("김치찌개")));
 
         verify(eventPublisher).publishEvent(new S3ObjectUnusedEvent("drop"));
         verify(eventPublisher, never()).publishEvent(new S3ObjectUnusedEvent("keep"));
+    }
+
+    @Test
+    @DisplayName("남의 기록에 붙은 사진 id는 유지 목록에 넣을 수 없다")
+    void 이_기록의_사진이_아니면_거절한다() {
+        MadeDexRecord record = record(AUTHOR_ID, MADE_DEX_ID);
+        when(madeDexRecordRepository.findActiveByIdForUpdate(RECORD_ID)).thenReturn(Optional.of(record));
+        when(madeDexRecordPhotoRepository.findByRecordIdOrderBySortOrderAsc(RECORD_ID))
+                .thenReturn(List.of(photo(1L, "mine", 0)));
+
+        assertThatThrownBy(() -> service.update(AUTHOR_ID, MADE_DEX_ID, RECORD_ID,
+                updateRequest(TODAY_SEOUL, List.of(99L), List.of(), List.of("김치찌개"))))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.MADE_DEX_RECORD_PHOTO_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("다른 살아 있는 기록이 같은 사진을 쓰면 지우지 않는다")
+    void 다른_기록이_쓰는_사진은_남긴다() {
+        MadeDexRecord record = record(AUTHOR_ID, MADE_DEX_ID);
+        when(madeDexRecordRepository.findActiveByIdForUpdate(RECORD_ID)).thenReturn(Optional.of(record));
+        when(madeDexRecordPhotoRepository.findByRecordIdOrderBySortOrderAsc(RECORD_ID))
+                .thenReturn(List.of(photo(1L, "shared", 0)));
+        when(madeDexRecordPhotoRepository.existsInOtherActiveRecord("shared", RECORD_ID)).thenReturn(true);
+
+        service.delete(AUTHOR_ID, MADE_DEX_ID, RECORD_ID);
+
+        assertThat(record.isDeleted()).isTrue();
+        verify(eventPublisher, never()).publishEvent(any(S3ObjectUnusedEvent.class));
     }
 
     private MadeDexRecordCreateRequestDTO request(LocalDate loggedOn, List<String> keys, List<String> foods) {
         return new MadeDexRecordCreateRequestDTO(SLOT_ID, loggedOn, keys, foods, null, null, null, null);
     }
 
-    private MadeDexRecordUpdateRequestDTO updateRequest(LocalDate loggedOn, List<String> keys, List<String> foods) {
-        return new MadeDexRecordUpdateRequestDTO(SLOT_ID, loggedOn, keys, foods, null, null, null, null);
+    private MadeDexRecordUpdateRequestDTO updateRequest(LocalDate loggedOn,
+                                                        List<Long> keepPhotoIds, List<String> newKeys,
+                                                        List<String> foods) {
+        return new MadeDexRecordUpdateRequestDTO(
+                SLOT_ID, loggedOn, keepPhotoIds, newKeys, foods, null, null, null, null);
     }
 
     private MadeDex madeDex() {
@@ -311,6 +341,12 @@ class MadeDexRecordServiceTest {
         MadeDexSlot slot = MadeDexSlot.of(madeDexId, "아침", 0);
         ReflectionTestUtils.setField(slot, "id", id);
         return slot;
+    }
+
+    private MadeDexRecordPhoto photo(Long id, String imageKey, int sortOrder) {
+        MadeDexRecordPhoto photo = MadeDexRecordPhoto.of(RECORD_ID, imageKey, sortOrder);
+        ReflectionTestUtils.setField(photo, "id", id);
+        return photo;
     }
 
     private MadeDexRecord record(Long authorId, Long madeDexId) {

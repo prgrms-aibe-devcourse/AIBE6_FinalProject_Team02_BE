@@ -140,6 +140,7 @@ public enum ErrorCode {
     MADE_DEX_RECORD_NOT_AUTHOR(HttpStatus.FORBIDDEN, "내가 남긴 기록만 고칠 수 있어요"),
     MADE_DEX_RECORD_PHOTO_REQUIRED(HttpStatus.BAD_REQUEST, "사진을 한 장 이상 올려 주세요"),
     MADE_DEX_RECORD_PHOTO_TOO_MANY(HttpStatus.BAD_REQUEST, "사진은 8장까지 올릴 수 있어요"),
+    MADE_DEX_RECORD_PHOTO_NOT_FOUND(HttpStatus.BAD_REQUEST, "이 기록의 사진이 아니에요"),
     MADE_DEX_RECORD_FOOD_REQUIRED(HttpStatus.BAD_REQUEST, "먹은 음식을 하나 이상 적어 주세요"),
     MADE_DEX_RECORD_FOOD_NAME_TOO_LONG(HttpStatus.BAD_REQUEST, "음식 이름은 100자까지 쓸 수 있어요"),
     MADE_DEX_RECORD_MEMO_TOO_LONG(HttpStatus.BAD_REQUEST, "메모는 100자까지 쓸 수 있어요"),
