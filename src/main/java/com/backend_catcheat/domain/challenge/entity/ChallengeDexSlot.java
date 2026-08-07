@@ -34,9 +34,16 @@ public class ChallengeDexSlot {
     @Column(name = "image_key", length = 512)
     private String imageKey;                     // 개설자가 등록한 목표 음식 사진(S3 key). 미해금이면 흑백 표시
 
+    @Column(name = "store_name", length = 255)
+    private String storeName;                    // 가게명
+
+    @Column(length = 500)
+    private String description;                  // 설명/팁(선택)
+
     @Builder
     private ChallengeDexSlot(Long challengeDexId, String foodName, String placeName,
-                             Double lat, Double lng, int slotOrder, String imageKey) {
+                             Double lat, Double lng, int slotOrder, String imageKey,
+                             String storeName, String description) {
         this.challengeDexId = challengeDexId;
         this.foodName = foodName;
         this.placeName = placeName;
@@ -44,5 +51,7 @@ public class ChallengeDexSlot {
         this.lng = lng;
         this.slotOrder = slotOrder;
         this.imageKey = imageKey;
+        this.storeName = storeName;
+        this.description = description;
     }
 }
