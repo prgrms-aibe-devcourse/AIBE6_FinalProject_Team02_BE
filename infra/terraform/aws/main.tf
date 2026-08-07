@@ -264,6 +264,9 @@ resource "aws_iam_role_policy" "github_actions_ecr_push" {
   })
 }
 
+# GitHub Actions OIDC 프로바이더는 프로그래머스 AWS 계정 전체에서 공유되는 리소스라
+# 이 스택에서 만들지 않고 이미 존재하는 것을 참조만 한다.
+# (계정에 없다면 먼저 수동/다른 스택에서 생성 필요)
 data "aws_iam_openid_connect_provider" "github" {
   url = "https://token.actions.githubusercontent.com"
 }
