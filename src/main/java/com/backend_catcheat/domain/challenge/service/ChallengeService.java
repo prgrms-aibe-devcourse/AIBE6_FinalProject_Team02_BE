@@ -89,6 +89,8 @@ public class ChallengeService {
                     .lng(s.lng())
                     .slotOrder(i)              // 입력 순서대로 표시 순서 부여
                     .imageKey(s.imageKey())    // 개설자가 등록한 목표 음식 사진(S3 key)
+                    .storeName(s.storeName())
+                    .description(s.description())
                     .build());
         }
         slotRepository.saveAll(slots);
@@ -299,7 +301,9 @@ public class ChallengeService {
                                     mine != null && mine.getImageKey() != null
                                             ? s3PresignedUrlService.createDownloadUrl(mine.getImageKey())
                                             : null,
-                                    mine != null ? mine.getUnlockedAt() : null);
+                                    mine != null ? mine.getUnlockedAt() : null,
+                                    s.getStoreName(),
+                                    s.getDescription());
                         })
                         .toList();
 

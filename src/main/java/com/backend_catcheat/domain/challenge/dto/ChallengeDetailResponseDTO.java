@@ -24,6 +24,8 @@ public record ChallengeDetailResponseDTO(
             boolean unlocked,
             String imageUrl,          // 개설자가 등록한 목표 사진(미해금이면 흑백)
             String myImageUrl,        // 내가 인증한 사진(해금 시) — 없으면 null
-            LocalDateTime unlockedAt  // 내가 인증한 시각 — 없으면 null
+            LocalDateTime unlockedAt, // 내가 인증한 시각 — 없으면 null
+            String storeName,         // 가게명
+            String description        // 설명/팁
     ) {}
 }
