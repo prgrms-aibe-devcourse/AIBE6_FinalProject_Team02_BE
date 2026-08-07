@@ -70,11 +70,12 @@ public class S3PresignedUrlService {
     }
 
     /**
-     * S3 객체 삭제
+     * S3 객체 삭제. 지웠으면 true.
+     * 실패를 삼키되 결과는 알려 준다 — 남아 있는 객체의 발급 기록까지 지우면 아무나 쓸 수 있게 된다.
      */
-    public void deleteObject(String objectLocation) {
+    public boolean deleteObject(String objectLocation) {
         if (objectLocation == null || objectLocation.isBlank()) {
-            return;
+            return false;
         }
         try {
             String key = extractKey(objectLocation);
@@ -82,8 +83,10 @@ public class S3PresignedUrlService {
                     .bucket(s3Properties.bucket())
                     .key(key)
                     .build());
+            return true;
         } catch (Exception e) {
             log.warn("S3 객체 삭제 실패: {}", objectLocation, e);
+            return false;
         }
     }
 
