@@ -1,6 +1,7 @@
 package com.backend_catcheat.global.s3;
 
 import com.backend_catcheat.domain.upload.dto.PresignedUploadRequestDTO;
+import com.backend_catcheat.domain.upload.dto.UploadPurpose;
 import com.backend_catcheat.domain.upload.dto.PresignedUploadRequestDTO.FileInfo;
 import com.backend_catcheat.domain.upload.dto.PresignedUploadResponseDTO;
 import com.backend_catcheat.global.exception.CustomException;
@@ -52,7 +53,7 @@ class S3PresignedUrlServiceTest {
 
     private PresignedUploadResponseDTO.UploadTarget issueOne(String fileName, String contentType) {
         return service.createUploadUrls(
-                new PresignedUploadRequestDTO(List.of(new FileInfo(fileName, contentType)))).uploads().getFirst();
+                new PresignedUploadRequestDTO(List.of(new FileInfo(fileName, contentType))), UploadPurpose.DEFAULT).uploads().getFirst();
     }
 
     @Test
@@ -110,21 +111,40 @@ class S3PresignedUrlServiceTest {
     }
 
     @Test
-    @DisplayName("등록 1건당 사진은 5장까지 (§5.2)")
+    @DisplayName("용도를 안 보내면 5장까지")
     void 다섯장을_넘으면_거부한다() {
         List<FileInfo> six = IntStream.range(0, 6)
                 .mapToObj(i -> new FileInfo("photo" + i + ".jpg", "image/jpeg"))
                 .toList();
 
-        assertThatThrownBy(() -> service.createUploadUrls(new PresignedUploadRequestDTO(six)))
+        assertThatThrownBy(() -> service.createUploadUrls(new PresignedUploadRequestDTO(six), UploadPurpose.DEFAULT))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.UPLOAD_FILE_COUNT_EXCEEDED);
     }
 
     @Test
-    @DisplayName("사진이 없으면 거부한다 — 사진 없는 등록 경로는 만들지 않는다 (§5.2)")
+    @DisplayName("로그잇 기록은 8장까지, 9장은 거부한다")
+    void 로그잇은_여덟장까지_받는다() {
+        List<FileInfo> eight = IntStream.range(0, 8)
+                .mapToObj(i -> new FileInfo("photo" + i + ".jpg", "image/jpeg"))
+                .toList();
+        List<FileInfo> nine = IntStream.range(0, 9)
+                .mapToObj(i -> new FileInfo("photo" + i + ".jpg", "image/jpeg"))
+                .toList();
+
+        assertThat(service.createUploadUrls(
+                new PresignedUploadRequestDTO(eight), UploadPurpose.LOGIT_RECORD).uploads()).hasSize(8);
+
+        assertThatThrownBy(() -> service.createUploadUrls(
+                new PresignedUploadRequestDTO(nine), UploadPurpose.LOGIT_RECORD))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.UPLOAD_FILE_COUNT_EXCEEDED);
+    }
+
+    @Test
+    @DisplayName("사진이 없으면 거부한다")
     void 사진이_없으면_거부한다() {
-        assertThatThrownBy(() -> service.createUploadUrls(new PresignedUploadRequestDTO(List.of())))
+        assertThatThrownBy(() -> service.createUploadUrls(new PresignedUploadRequestDTO(List.of()), UploadPurpose.DEFAULT))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.UPLOAD_FILE_REQUIRED);
     }
@@ -135,7 +155,7 @@ class S3PresignedUrlServiceTest {
         var uploads = service.createUploadUrls(new PresignedUploadRequestDTO(List.of(
                 new FileInfo("a.jpg", "image/jpeg"),
                 new FileInfo("b.png", "image/png"),
-                new FileInfo("c.jpg", "image/jpeg")))).uploads();
+                new FileInfo("c.jpg", "image/jpeg"))), UploadPurpose.DEFAULT).uploads();
 
         assertThat(uploads).hasSize(3);
         assertThat(uploads.get(1).key()).endsWith(".png");
