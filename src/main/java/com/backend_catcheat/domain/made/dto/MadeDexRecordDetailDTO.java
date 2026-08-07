@@ -14,9 +14,9 @@ public record MadeDexRecordDetailDTO(
         boolean mine,
         List<MadeDexRecordPhotoDTO> photos,
         List<String> foodNames,
-        String memo,
         String locationName,
         Double lat,
         Double lng,
-        LocalDateTime createdAt
+        // 올린 시각(Asia/Seoul). created_at은 서버 시간대를 타서 화면에 쓰지 않는다
+        LocalDateTime loggedAt
 ) {}

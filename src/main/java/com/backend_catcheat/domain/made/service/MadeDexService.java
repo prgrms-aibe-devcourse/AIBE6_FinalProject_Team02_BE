@@ -51,7 +51,7 @@ public class MadeDexService {
                 ownerId,
                 requireName(request.name()),
                 validDescription(request.description()),
-                orPrivate(request.visibility()),
+                alwaysPrivate(),
                 validImageKey(request.imageKey())));
         madeDexMemberRepository.save(
                 MadeDexMember.owner(madeDex.getId(), ownerId, LocalDateTime.now(clock)));
@@ -96,7 +96,7 @@ public class MadeDexService {
         madeDex.update(
                 requireName(request.name()),
                 validDescription(request.description()),
-                orPrivate(request.visibility()),
+                alwaysPrivate(),
                 imageKey);
 
         // 표지를 바꾸거나 비우면 이전 객체는 아무도 참조하지 않는다.
@@ -158,8 +158,12 @@ public class MadeDexService {
         return imageKey;
     }
 
-    private Visibility orPrivate(Visibility visibility) {
-        return visibility == null ? Visibility.PRIVATE : visibility;
+    /**
+     * 로그잇에는 공개 개념이 없다. 요청에 PUBLIC이 와도 비공개로 만든다.
+     * 거절하지 않는 이유는 아직 공개 선택이 남아 있는 화면을 깨뜨리지 않기 위해서다.
+     */
+    private Visibility alwaysPrivate() {
+        return Visibility.PRIVATE;
     }
 
     private String blankToNull(String value) {

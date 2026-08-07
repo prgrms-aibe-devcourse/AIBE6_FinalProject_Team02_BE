@@ -4,6 +4,7 @@ package com.backend_catcheat.global.s3;
 import com.backend_catcheat.domain.upload.dto.PresignedUploadRequestDTO;
 import com.backend_catcheat.domain.upload.dto.PresignedUploadResponseDTO;
 import com.backend_catcheat.domain.upload.dto.UploadPurpose;
+import com.backend_catcheat.domain.upload.service.UploadObjectService;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,7 @@ public class S3PresignedUrlService {
     private final S3Presigner s3Presigner;
     private final S3Client s3Client;
     private final S3Properties s3Properties;
+    private final UploadObjectService uploadObjectService;
 
     public String createDownloadUrl(String objectLocation) {
         if (objectLocation == null || objectLocation.isBlank()) {
@@ -68,11 +70,12 @@ public class S3PresignedUrlService {
     }
 
     /**
-     * S3 객체 삭제
+     * S3 객체 삭제. 지웠으면 true.
+     * 실패를 삼키되 결과는 알려 준다 — 남아 있는 객체의 발급 기록까지 지우면 아무나 쓸 수 있게 된다.
      */
-    public void deleteObject(String objectLocation) {
+    public boolean deleteObject(String objectLocation) {
         if (objectLocation == null || objectLocation.isBlank()) {
-            return;
+            return false;
         }
         try {
             String key = extractKey(objectLocation);
@@ -80,12 +83,15 @@ public class S3PresignedUrlService {
                     .bucket(s3Properties.bucket())
                     .key(key)
                     .build());
+            return true;
         } catch (Exception e) {
             log.warn("S3 객체 삭제 실패: {}", objectLocation, e);
+            return false;
         }
     }
 
-    public PresignedUploadResponseDTO createUploadUrls(PresignedUploadRequestDTO request, UploadPurpose purpose) {
+    public PresignedUploadResponseDTO createUploadUrls(Long userId, PresignedUploadRequestDTO request,
+                                                       UploadPurpose purpose) {
 
         // 업로드시 예외처리
         if (request.files() == null || request.files().isEmpty()) {
@@ -101,6 +107,12 @@ public class S3PresignedUrlService {
         List<PresignedUploadResponseDTO.UploadTarget> uploads = request.files().stream()
                 .map(this::createUploadTarget)
                 .toList();
+
+        // 발급받은 사람을 남겨야 나중에 이 key를 쓸 자격을 볼 수 있다
+        uploadObjectService.issued(
+                userId,
+                uploads.stream().map(PresignedUploadResponseDTO.UploadTarget::key).toList(),
+                purpose);
 
         return new PresignedUploadResponseDTO(uploads);
     }

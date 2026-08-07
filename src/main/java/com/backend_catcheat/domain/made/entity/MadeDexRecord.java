@@ -20,6 +20,7 @@ public class MadeDexRecord extends BaseEntity {
     // AI에 보내지 않아 상한 근거가 비용이 아니라 화면·용량이다. 기본 도감의 5장과 다른 값
     public static final int MAX_PHOTOS = 8;
     public static final int MIN_PHOTOS = 1;
+    // 사진별 캡션으로 옮겼다. 이미 남은 글이 있어 컬럼만 남겨 둔다
     public static final int MEMO_MAX = 100;
     public static final int FOOD_NAME_MAX = 100;
     public static final int LOCATION_NAME_MAX = 255;
@@ -36,6 +37,10 @@ public class MadeDexRecord extends BaseEntity {
     @Column(name = "logged_on", nullable = false)
     private LocalDate loggedOn;
 
+    // 사용자가 적었을 때만 채운다. 비어 있으면 화면에도 시각을 띄우지 않는다
+    @Column(name = "logged_at")
+    private LocalDateTime loggedAt;
+
     @Column(name = "memo", length = MEMO_MAX)
     private String memo;
 
@@ -51,28 +56,29 @@ public class MadeDexRecord extends BaseEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    private MadeDexRecord(Long madeDexId, Long slotId, Long authorId, LocalDate loggedOn,
-                          String memo, String locationName, Double lat, Double lng) {
+    private MadeDexRecord(Long madeDexId, Long slotId, Long authorId, LocalDate loggedOn, LocalDateTime loggedAt,
+                          String locationName, Double lat, Double lng) {
         this.madeDexId = madeDexId;
         this.slotId = slotId;
         this.authorId = authorId;
         this.loggedOn = loggedOn;
-        this.memo = memo;
+        this.loggedAt = loggedAt;
         this.locationName = locationName;
         this.lat = lat;
         this.lng = lng;
     }
 
     public static MadeDexRecord write(Long madeDexId, Long slotId, Long authorId, LocalDate loggedOn,
-                                      String memo, String locationName, Double lat, Double lng) {
-        return new MadeDexRecord(madeDexId, slotId, authorId, loggedOn, memo, locationName, lat, lng);
+                                      LocalDateTime loggedAt,
+                                      String locationName, Double lat, Double lng) {
+        return new MadeDexRecord(madeDexId, slotId, authorId, loggedOn, loggedAt, locationName, lat, lng);
     }
 
-    public void update(Long slotId, LocalDate loggedOn,
-                       String memo, String locationName, Double lat, Double lng) {
+    public void update(Long slotId, LocalDate loggedOn, LocalDateTime loggedAt,
+                       String locationName, Double lat, Double lng) {
         this.slotId = slotId;
         this.loggedOn = loggedOn;
-        this.memo = memo;
+        this.loggedAt = loggedAt;
         this.locationName = locationName;
         this.lat = lat;
         this.lng = lng;
