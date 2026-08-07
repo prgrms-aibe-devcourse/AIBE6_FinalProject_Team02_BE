@@ -135,8 +135,10 @@ public class MadeDexSlotService {
         // 숨어 있는 동안에는 유니크 인덱스가 비껴가므로 같은 이름이 새로 생겼을 수 있다
         requireNameNotTaken(madeDexId, slot.getName());
 
+        // restore() 뒤에 부르면 flush된 자기 자신이 최대값 계산에 섞인다
+        int lastOrder = nextSortOrder(madeDexId);
         slot.restore();
-        slot.moveTo(nextSortOrder(madeDexId));
+        slot.moveTo(lastOrder);
         return toDTO(slot);
     }
 

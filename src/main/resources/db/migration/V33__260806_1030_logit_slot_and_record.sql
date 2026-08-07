@@ -9,7 +9,9 @@ CREATE TABLE made_dex_slot (
     hidden_at TIMESTAMP,                              -- 기록이 붙은 슬롯은 삭제 대신 이 값을 채운다
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP,
-    CONSTRAINT fk_made_dex_slot_dex FOREIGN KEY (made_dex_id) REFERENCES made_dex(id) ON DELETE CASCADE
+    CONSTRAINT fk_made_dex_slot_dex FOREIGN KEY (made_dex_id) REFERENCES made_dex(id) ON DELETE CASCADE,
+    -- PK와 겹치지만, 기록의 복합 FK가 참조하려면 이 조합에 유니크가 있어야 한다
+    CONSTRAINT uk_made_dex_slot_id_dex UNIQUE (id, made_dex_id)
 );
 CREATE INDEX idx_made_dex_slot_dex ON made_dex_slot (made_dex_id, sort_order);
 
@@ -19,7 +21,8 @@ CREATE UNIQUE INDEX uk_made_dex_slot_name
     WHERE hidden_at IS NULL;
 
 
--- made_dex_id는 slot을 타면 알 수 있지만, 피드 조회가 (그룹, 날짜)로 들어와 조인을 한 단계 줄인다
+-- made_dex_id는 slot을 타면 알 수 있지만, 피드 조회가 (그룹, 날짜)로 들어와 조인을 한 단계 줄인다.
+-- 비정규화한 값이 슬롯의 도감과 어긋나지 않도록 아래 복합 FK로 묶는다
 CREATE TABLE made_dex_record (
     id BIGSERIAL PRIMARY KEY,
     made_dex_id BIGINT NOT NULL,
@@ -34,7 +37,9 @@ CREATE TABLE made_dex_record (
     updated_at TIMESTAMP,
     deleted_at TIMESTAMP,
     CONSTRAINT fk_made_dex_record_dex FOREIGN KEY (made_dex_id) REFERENCES made_dex(id) ON DELETE CASCADE,
-    CONSTRAINT fk_made_dex_record_slot FOREIGN KEY (slot_id) REFERENCES made_dex_slot(id),
+    -- 다른 도감의 슬롯 id를 넣으면 저장 자체가 막힌다
+    CONSTRAINT fk_made_dex_record_slot FOREIGN KEY (slot_id, made_dex_id)
+        REFERENCES made_dex_slot(id, made_dex_id),
     CONSTRAINT fk_made_dex_record_author FOREIGN KEY (author_id) REFERENCES users(id)
 );
 
