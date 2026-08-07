@@ -142,7 +142,15 @@ public enum ErrorCode {
     REWARD_BADGE_SOURCE_REQUIRED(HttpStatus.BAD_REQUEST, "프리셋을 고르거나 이미지를 만들어 주세요"),
     INVALID_PRESET_CODE(HttpStatus.BAD_REQUEST, "존재하지 않는 프리셋이에요"),
     REWARD_BADGE_NOT_FOUND(HttpStatus.NOT_FOUND, "보상 뱃지를 찾을 수 없어요"),
-    REWARD_BADGE_NAME_TOO_LONG(HttpStatus.BAD_REQUEST, "뱃지 이름은 100자까지 쓸 수 있어요");
+    REWARD_BADGE_NAME_TOO_LONG(HttpStatus.BAD_REQUEST, "뱃지 이름은 100자까지 쓸 수 있어요"),
+
+    // 친구
+    FRIEND_SELF_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "자기 자신에게는 친구 요청을 보낼 수 없어요"),
+    FRIEND_ALREADY(HttpStatus.CONFLICT, "이미 친구예요"),
+    FRIEND_REQUEST_ALREADY_SENT(HttpStatus.CONFLICT, "이미 친구 요청을 보냈어요"),
+    FRIEND_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "친구 요청을 찾을 수 없어요"),
+    FRIEND_NOT_FOUND(HttpStatus.NOT_FOUND, "친구 관계가 아니에요"),
+    FRIEND_FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없어요");
 
 
 
