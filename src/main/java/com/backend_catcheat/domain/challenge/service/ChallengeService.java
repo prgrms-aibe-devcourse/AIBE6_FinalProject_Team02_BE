@@ -65,15 +65,12 @@ public class ChallengeService {
 
         LocalDateTime startsAt = req.startsAt() != null ? req.startsAt() : LocalDateTime.now();
         LocalDateTime endsAt = req.periodType() == PeriodType.LIMITED ? req.endsAt() : null;
-        VerifyType verifyType = req.verifyType() != null ? req.verifyType() : VerifyType.FOOD;
 
         ChallengeDex dex = challengeDexRepository.save(ChallengeDex.builder()
                 .ownerId(ownerId)
                 .name(req.name().trim())
                 .description(req.description())
-                .challengeType(req.challengeType())
                 .periodType(req.periodType())
-                .verifyType(verifyType)
                 .startsAt(startsAt)
                 .endsAt(endsAt)
                 .rewardBadgeId(req.rewardBadgeId())
@@ -106,7 +103,7 @@ public class ChallengeService {
         if (req.name() == null || req.name().trim().isEmpty()) {
             throw new CustomException(ErrorCode.CHALLENGE_NAME_REQUIRED);
         }
-        if (req.challengeType() == null || req.periodType() == null) {
+        if (req.periodType() == null || req.periodType() == null) {
             throw new CustomException(ErrorCode.CHALLENGE_TYPE_REQUIRED);
         }
         if (req.slots() == null || req.slots().size() < MIN_SLOTS
@@ -119,9 +116,8 @@ public class ChallengeService {
                 throw new CustomException(ErrorCode.CHALLENGE_PERIOD_INVALID);
             }
         }
-        // 위치 인증 챌린지는 모든 목표에 좌표가 필수
-        if (req.verifyType() == VerifyType.LOCATION
-                && req.slots().stream().anyMatch(s -> s.lat() == null || s.lng() == null)) {
+
+        if (req.slots().stream().anyMatch(s -> s.lat() == null || s.lng() == null)) {
             throw new CustomException(ErrorCode.CHALLENGE_SLOT_LOCATION_REQUIRED);
         }
     }
@@ -265,7 +261,6 @@ public class ChallengeService {
                 c.getId(),
                 c.getName(),
                 c.getDescription(),
-                c.getChallengeType(),
                 c.getPeriodType(),
                 c.getStartsAt(),
                 c.getEndsAt(),
@@ -310,7 +305,7 @@ public class ChallengeService {
 
         return new ChallengeDetailResponseDTO(
                 dex.getId(), dex.getName(), dex.getDescription(),
-                dex.getChallengeType(), dex.getPeriodType(), dex.getVerifyType(),
+                 dex.getPeriodType(),
                 dex.getStartsAt(), dex.getEndsAt(), dex.getRewardBadgeId(),
                 participantRepository.countByChallengeDexId(challengeDexId),
                 participant.isPresent(),

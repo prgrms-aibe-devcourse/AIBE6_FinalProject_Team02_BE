@@ -1,8 +1,6 @@
 package com.backend_catcheat.domain.challenge.dto;
 
-import com.backend_catcheat.domain.challenge.entity.ChallengeType;
 import com.backend_catcheat.domain.challenge.entity.PeriodType;
-import com.backend_catcheat.domain.challenge.entity.VerifyType;
 
 import java.time.LocalDateTime;
 import java.util.List;
