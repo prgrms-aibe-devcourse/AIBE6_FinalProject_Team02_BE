@@ -52,7 +52,7 @@ public class ChallengeParticipationService {
 
     @Transactional
     public UnlockResponseDTO unlock(Long userId, Long challengeDexId, Long slotId, String imageKey,
-                                    Double lat, Double lng){
+                                    Double lat, Double lng, String review, Integer rating){
         //인증 사진 없이 해금 방지
         if (imageKey == null || imageKey.isBlank()) {
             throw new CustomException(ErrorCode.CHALLENGE_UNLOCK_IMAGE_REQUIRED);
@@ -83,7 +83,7 @@ public class ChallengeParticipationService {
 
 
         try {
-            unlockRepository.save(ChallengeUnlock.of(participant.getId(), slotId, imageKey));
+            unlockRepository.save(ChallengeUnlock.of(participant.getId(), slotId, imageKey, review, rating));
             unlockRepository.flush();
         } catch (DataIntegrityViolationException e) {
             //존재 확인과 저장 사이 동시 요청으로 유니크 제약 위반 시 → 중복 인증으로 처리
