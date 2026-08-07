@@ -72,17 +72,15 @@ public class ChallengeParticipationService {
             throw new CustomException(ErrorCode.CHALLENGE_SLOT_ALREADY_UNLOCKED);
         }
 
-        //위치 인증 챌릱지면 현재 위치가 목표 반경 내인지 확인
         ChallengeDex dex = challengeDexRepository.findByIdAndDeletedAtIsNull(challengeDexId)
                 .orElseThrow(()-> new CustomException(ErrorCode.CHALLENGE_NOT_FOUND));
-        if (dex.getVerifyType() == VerifyType.LOCATION) {
             if (lat == null || lng == null || slot.getLat() == null || slot.getLng() == null) {
                 throw new CustomException(ErrorCode.CHALLENGE_LOCATION_REQUIRED);
             }
             if (distanceMeters(lat, lng, slot.getLat(), slot.getLng()) > LOCATION_RADIUS_M) {
                 throw new CustomException(ErrorCode.CHALLENGE_LOCATION_TOO_FAR);
             }
-        }
+
 
         try {
             unlockRepository.save(ChallengeUnlock.of(participant.getId(), slotId, imageKey));

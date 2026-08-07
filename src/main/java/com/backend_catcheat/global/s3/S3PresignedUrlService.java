@@ -3,6 +3,7 @@ package com.backend_catcheat.global.s3;
 
 import com.backend_catcheat.domain.upload.dto.PresignedUploadRequestDTO;
 import com.backend_catcheat.domain.upload.dto.PresignedUploadResponseDTO;
+import com.backend_catcheat.domain.upload.dto.UploadPurpose;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +32,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class S3PresignedUrlService {
 
-    private static final int MAX_FILE_COUNT = 5;
     private static final Duration SIGNATURE_DURATION = Duration.ofMinutes(10);
     private static final DateTimeFormatter DATE_PATH_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
@@ -85,14 +85,14 @@ public class S3PresignedUrlService {
         }
     }
 
-    public PresignedUploadResponseDTO createUploadUrls(PresignedUploadRequestDTO request) {
+    public PresignedUploadResponseDTO createUploadUrls(PresignedUploadRequestDTO request, UploadPurpose purpose) {
 
         // 업로드시 예외처리
         if (request.files() == null || request.files().isEmpty()) {
             throw new CustomException(ErrorCode.UPLOAD_FILE_REQUIRED);
         }
 
-        if (request.files().size() > MAX_FILE_COUNT) {
+        if (request.files().size() > purpose.maxFileCount()) {
             throw new CustomException(ErrorCode.UPLOAD_FILE_COUNT_EXCEEDED);
         }
 
