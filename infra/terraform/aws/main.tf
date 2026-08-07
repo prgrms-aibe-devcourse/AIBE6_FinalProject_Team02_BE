@@ -212,61 +212,7 @@ resource "aws_eip_association" "backend" {
   allocation_id = aws_eip.backend.id
 }
 
-resource "aws_iam_role" "github_actions_ecr_push" {
-  name = "${local.name_prefix}-github-actions-ecr-push"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Principal = {
-        Federated = data.aws_iam_openid_connect_provider.github.arn
-      }
-      Action = "sts:AssumeRoleWithWebIdentity"
-      Condition = {
-        StringEquals = {
-          "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-        }
-        StringLike = {
-          "token.actions.githubusercontent.com:sub" = "repo:prgrms-aibe-devcourse/AIBE6_FinalProject_Team02_BE:ref:refs/heads/main"
-        }
-      }
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy" "github_actions_ecr_push" {
-  name = "${local.name_prefix}-github-actions-ecr-push"
-  role = aws_iam_role.github_actions_ecr_push.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect   = "Allow"
-        Action   = "ecr:GetAuthorizationToken"
-        Resource = "*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "ecr:BatchCheckLayerAvailability",
-          "ecr:PutImage",
-          "ecr:InitiateLayerUpload",
-          "ecr:UploadLayerPart",
-          "ecr:CompleteLayerUpload",
-          "ecr:BatchGetImage"
-        ]
-        Resource = aws_ecr_repository.backend.arn
-      }
-    ]
-  })
-}
-
-# GitHub Actions OIDC 프로바이더는 프로그래머스 AWS 계정 전체에서 공유되는 리소스라
-# 이 스택에서 만들지 않고 이미 존재하는 것을 참조만 한다.
-# (계정에 없다면 먼저 수동/다른 스택에서 생성 필요)
-data "aws_iam_openid_connect_provider" "github" {
-  url = "https://token.actions.githubusercontent.com"
-}
+# GitHub Actions ECR push용 전용 IAM 사용자를 만들려 했으나, 이 계정은
+# identity 정책에서 iam:CreateUser를 explicit deny로 막고 있어 새 사용자를 만들 수 없다.
+# 그래서 기존 계정 사용자(devcos-team02)의 Access Key를 그대로 GitHub Secrets에 등록해서 쓴다.
+# (devcos-team02가 이미 AdministratorAccess를 갖고 있어 ECR push 권한도 포함되어 있다.)
