@@ -67,7 +67,7 @@ class MadeDexInviteServiceTest {
 
     private MadeDexInviteService service() {
         return new MadeDexInviteService(
-                new MadeDexFinder(madeDexRepository), madeDexMemberRepository,
+                new MadeDexFinder(madeDexRepository, madeDexMemberRepository), madeDexMemberRepository,
                 madeDexInviteRepository, inviteCodeGenerator, clock);
     }
 
