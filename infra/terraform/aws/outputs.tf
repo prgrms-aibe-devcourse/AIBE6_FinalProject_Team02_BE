@@ -34,3 +34,12 @@ output "public_subnet_ids" {
   value       = aws_subnet.public[*].id
 }
 
+output "ecr_repository_url" {
+  description = "백엔드 도커 이미지를 저장하는 ECR 리포지토리 URL"
+  value       = aws_ecr_repository.backend.repository_url
+}
+
+output "github_actions_role_arn" {
+  description = "Workflow 가 참조하는 role ARN"
+  value       = aws_iam_role.github_actions_ecr_push.arn
+}

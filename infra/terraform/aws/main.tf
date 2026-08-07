@@ -54,6 +54,15 @@ resource "aws_security_group" "backend" {
     cidr_blocks = [var.app_allowed_cidr]
   }
 
+  # nginx가 certbot으로 발급한 인증서로 HTTPS를 서빙하는 포트다.
+  ingress {
+    description = "HTTPS"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [var.app_allowed_cidr]
+  }
+
   # 초기 테스트용 Spring Boot 직접 접근 포트다. 운영 단계에서는 ALB 뒤로 숨기는 것이 좋다.
   ingress {
     description = "Spring Boot app"
@@ -128,6 +137,31 @@ resource "aws_iam_role_policy" "backend_s3" {
   })
 }
 
+resource "aws_iam_role_policy" "backend_ecr_pull" {
+  name = "${local.name_prefix}-ecr-pull"
+  role = aws_iam_role.backend.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = "ecr:GetAuthorizationToken"
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:BatchGetImage",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchCheckLayerAvailability"
+        ]
+        Resource = aws_ecr_repository.backend.arn
+      }
+    ]
+  })
+}
+
 # IAM Role을 EC2에 붙이기 위한 Instance Profile이다.
 resource "aws_iam_instance_profile" "backend" {
   name = "${local.name_prefix}-backend-profile"
@@ -176,4 +210,60 @@ resource "aws_eip" "backend" {
 resource "aws_eip_association" "backend" {
   instance_id   = aws_instance.backend.id
   allocation_id = aws_eip.backend.id
+}
+
+resource "aws_iam_role" "github_actions_ecr_push" {
+  name = "${local.name_prefix}-github-actions-ecr-push"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Federated = data.aws_iam_openid_connect_provider.github.arn
+      }
+      Action = "sts:AssumeRoleWithWebIdentity"
+      Condition = {
+        StringEquals = {
+          "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+        }
+        StringLike = {
+          "token.actions.githubusercontent.com:sub" = "repo:prgrms-aibe-devcourse/AIBE6_FinalProject_Team02_BE:ref:refs/heads/main"
+        }
+      }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "github_actions_ecr_push" {
+  name = "${local.name_prefix}-github-actions-ecr-push"
+  role = aws_iam_role.github_actions_ecr_push.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = "ecr:GetAuthorizationToken"
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:PutImage",
+          "ecr:InitiateLayerUpload",
+          "ecr:UploadLayerPart",
+          "ecr:CompleteLayerUpload",
+          "ecr:BatchGetImage"
+        ]
+        Resource = aws_ecr_repository.backend.arn
+      }
+    ]
+  })
+}
+
+data "aws_iam_openid_connect_provider" "github" {
+  url = "https://token.actions.githubusercontent.com"
 }
