@@ -5,8 +5,9 @@ on:
     branches:
       - main
 
+# id-token: write는 OIDC(AssumeRoleWithWebIdentity)에만 필요하다.
+# 이 계정은 SCP/RCP로 보이는 정책이 외부 Federated 인증을 막아서 Access Key 방식을 쓴다.
 permissions:
-  id-token: write
   contents: read
 
 env:
@@ -20,10 +21,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY는 GitHub 리포지토리 Secrets에 등록된 값이다.
+      # catcheat-prod-github-actions-ecr-push IAM 사용자의 Access Key를 발급받아 등록해야 한다.
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::495264909330:role/catcheat-prod-github-actions-ecr-push
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
       - name: Login to Amazon ECR
         id: login-ecr
