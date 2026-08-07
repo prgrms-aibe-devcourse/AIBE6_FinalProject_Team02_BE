@@ -68,7 +68,7 @@ class MadeDexMemberServiceTest {
     // 조회 헬퍼는 진짜를 쓴다. 목으로 감싸면 "삭제된 그룹" 케이스가 스텁 설정만 검증하게 된다
     private MadeDexMemberService service() {
         return new MadeDexMemberService(
-                new MadeDexFinder(madeDexRepository), madeDexMemberRepository,
+                new MadeDexFinder(madeDexRepository, madeDexMemberRepository), madeDexMemberRepository,
                 madeDexInviteRepository, userRepository, s3PresignedUrlService, clock);
     }
 
