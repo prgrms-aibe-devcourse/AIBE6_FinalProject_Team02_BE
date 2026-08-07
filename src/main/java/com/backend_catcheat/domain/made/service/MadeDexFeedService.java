@@ -5,7 +5,6 @@ import com.backend_catcheat.domain.auth.repository.UserRepository;
 import com.backend_catcheat.domain.made.dto.MadeDexFeedCardDTO;
 import com.backend_catcheat.domain.made.dto.MadeDexFeedDTO;
 import com.backend_catcheat.domain.made.dto.MadeDexFeedSlotDTO;
-import com.backend_catcheat.domain.made.dto.MadeDexRecordSummaryDTO;
 import com.backend_catcheat.domain.made.entity.MadeDexMember;
 import com.backend_catcheat.domain.made.entity.MadeDexRecord;
 import com.backend_catcheat.domain.made.entity.MadeDexRecordFood;
@@ -29,6 +28,7 @@ import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -64,14 +64,15 @@ public class MadeDexFeedService {
                 .findByMadeDexIdAndLoggedOnAndDeletedAtIsNullOrderByCreatedAtAsc(madeDexId, loggedOn);
 
         List<MadeDexFeedCardDTO> emptyCards = emptyCards(madeDexId, userId);
-        Map<Long, Map<Long, List<MadeDexRecordSummaryDTO>>> bySlotAndAuthor = summarize(records);
+        Map<Long, Map<Long, List<MadeDexRecord>>> bySlotAndAuthor = groupBySlotAndAuthor(records);
+        Photos photos = loadPhotos(records);
 
         return new MadeDexFeedDTO(loggedOn, visibleSlots(madeDexId, records).stream()
                 .map(slot -> new MadeDexFeedSlotDTO(
                         slot.getId(),
                         slot.getName(),
                         slot.isHidden(),
-                        cardsOf(emptyCards, bySlotAndAuthor.getOrDefault(slot.getId(), Map.of()))))
+                        cardsOf(emptyCards, bySlotAndAuthor.getOrDefault(slot.getId(), Map.of()), photos)))
                 .toList());
     }
 
@@ -106,55 +107,79 @@ public class MadeDexFeedService {
                             user == null ? null : user.getNickname(),
                             user == null ? null : s3PresignedUrlService.createDownloadUrl(user.getProfileImageKey()),
                             member.getUserId().equals(userId),
-                            List.of());
+                            0, null, List.of(), List.of());
                 })
                 .toList();
     }
 
     private List<MadeDexFeedCardDTO> cardsOf(List<MadeDexFeedCardDTO> emptyCards,
-                                             Map<Long, List<MadeDexRecordSummaryDTO>> byAuthor) {
+                                             Map<Long, List<MadeDexRecord>> byAuthor,
+                                             Photos photos) {
         return emptyCards.stream()
-                .map(card -> new MadeDexFeedCardDTO(
-                        card.userId(),
-                        card.nickname(),
-                        card.profileImageUrl(),
-                        card.me(),
-                        byAuthor.getOrDefault(card.userId(), List.of())))
+                .map(card -> {
+                    List<MadeDexRecord> mine = byAuthor.get(card.userId());
+                    return mine == null ? card : toCard(card, mine, photos);
+                })
                 .toList();
     }
 
-    private Map<Long, Map<Long, List<MadeDexRecordSummaryDTO>>> summarize(List<MadeDexRecord> records) {
-        if (records.isEmpty()) {
-            return Map.of();
-        }
-
+    /**
+     * 한 사람이 한 슬롯에 남긴 것을 카드 한 장으로 접는다.
+     * 대표 사진은 가장 먼저 남긴 기록의 첫 장이고, 음식명은 전부 이어 붙인다.
+     */
+    private MadeDexFeedCardDTO toCard(MadeDexFeedCardDTO card, List<MadeDexRecord> records, Photos photos) {
         List<Long> recordIds = records.stream().map(MadeDexRecord::getId).toList();
-        Map<Long, List<MadeDexRecordPhoto>> photosByRecord = madeDexRecordPhotoRepository
-                .findByRecordIdInOrderBySortOrderAsc(recordIds).stream()
-                .collect(Collectors.groupingBy(MadeDexRecordPhoto::getRecordId));
-        Map<Long, List<MadeDexRecordFood>> foodsByRecord = madeDexRecordFoodRepository
-                .findByRecordIdInOrderBySortOrderAsc(recordIds).stream()
-                .collect(Collectors.groupingBy(MadeDexRecordFood::getRecordId));
+        String thumbnailKey = recordIds.stream()
+                .map(photos::firstKeyOf)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+        List<String> foodNames = recordIds.stream()
+                .flatMap(recordId -> photos.foodNamesOf(recordId).stream())
+                .distinct()
+                .toList();
 
-        return records.stream().collect(Collectors.groupingBy(
-                MadeDexRecord::getSlotId,
-                Collectors.groupingBy(
-                        MadeDexRecord::getAuthorId,
-                        Collectors.mapping(
-                                record -> toSummary(record,
-                                        photosByRecord.getOrDefault(record.getId(), List.of()),
-                                        foodsByRecord.getOrDefault(record.getId(), List.of())),
-                                Collectors.toList()))));
+        return new MadeDexFeedCardDTO(
+                card.userId(),
+                card.nickname(),
+                card.profileImageUrl(),
+                card.me(),
+                records.size(),
+                s3PresignedUrlService.createDownloadUrl(thumbnailKey),
+                foodNames,
+                recordIds);
     }
 
-    private MadeDexRecordSummaryDTO toSummary(MadeDexRecord record,
-                                              List<MadeDexRecordPhoto> photos,
-                                              List<MadeDexRecordFood> foods) {
-        String thumbnailKey = photos.isEmpty() ? null : photos.getFirst().getImageKey();
-        return new MadeDexRecordSummaryDTO(
-                record.getId(),
-                s3PresignedUrlService.createDownloadUrl(thumbnailKey),
-                photos.size(),
-                foods.stream().map(MadeDexRecordFood::getFoodName).toList());
+    private Map<Long, Map<Long, List<MadeDexRecord>>> groupBySlotAndAuthor(List<MadeDexRecord> records) {
+        return records.stream().collect(Collectors.groupingBy(
+                MadeDexRecord::getSlotId,
+                Collectors.groupingBy(MadeDexRecord::getAuthorId)));
+    }
+
+    private Photos loadPhotos(List<MadeDexRecord> records) {
+        if (records.isEmpty()) {
+            return new Photos(Map.of(), Map.of());
+        }
+        List<Long> recordIds = records.stream().map(MadeDexRecord::getId).toList();
+        return new Photos(
+                madeDexRecordPhotoRepository.findByRecordIdInOrderBySortOrderAsc(recordIds).stream()
+                        .collect(Collectors.groupingBy(MadeDexRecordPhoto::getRecordId)),
+                madeDexRecordFoodRepository.findByRecordIdInOrderBySortOrderAsc(recordIds).stream()
+                        .collect(Collectors.groupingBy(MadeDexRecordFood::getRecordId)));
+    }
+
+    private record Photos(Map<Long, List<MadeDexRecordPhoto>> byRecord,
+                          Map<Long, List<MadeDexRecordFood>> foodsByRecord) {
+
+        String firstKeyOf(Long recordId) {
+            List<MadeDexRecordPhoto> photos = byRecord.get(recordId);
+            return photos == null || photos.isEmpty() ? null : photos.getFirst().getImageKey();
+        }
+
+        List<String> foodNamesOf(Long recordId) {
+            return foodsByRecord.getOrDefault(recordId, List.of()).stream()
+                    .map(MadeDexRecordFood::getFoodName)
+                    .toList();
+        }
     }
 }

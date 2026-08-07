@@ -114,17 +114,19 @@ class MadeDexFeedServiceTest {
 
         assertThat(feed.slots()).hasSize(2);
         assertThat(feed.slots()).allSatisfy(slot ->
-                assertThat(slot.cards()).hasSize(2).allSatisfy(card ->
-                        assertThat(card.records()).isEmpty()));
+                assertThat(slot.cards()).hasSize(2).allSatisfy(card -> {
+                    assertThat(card.recordCount()).isZero();
+                    assertThat(card.thumbnailUrl()).isNull();
+                    assertThat(card.recordIds()).isEmpty();
+                }));
     }
 
     @Test
     @DisplayName("기록은 슬롯과 작성자에 맞춰 들어간다")
     void 기록이_제자리에_들어간다() {
-        MadeDexRecord mine = record(100L, BREAKFAST, ME);
         when(madeDexRecordRepository
                 .findByMadeDexIdAndLoggedOnAndDeletedAtIsNullOrderByCreatedAtAsc(MADE_DEX_ID, TODAY_SEOUL))
-                .thenReturn(List.of(mine));
+                .thenReturn(List.of(record(100L, BREAKFAST, ME)));
         when(madeDexRecordPhotoRepository.findByRecordIdInOrderBySortOrderAsc(anyCollection()))
                 .thenReturn(List.of(MadeDexRecordPhoto.of(100L, "key1", 0),
                         MadeDexRecordPhoto.of(100L, "key2", 1)));
@@ -133,15 +135,38 @@ class MadeDexFeedServiceTest {
 
         MadeDexFeedDTO feed = service.findFeed(ME, MADE_DEX_ID, TODAY_SEOUL);
 
-        MadeDexFeedSlotDTO breakfast = feed.slots().getFirst();
-        assertThat(breakfast.cards().getFirst().records()).hasSize(1);
-        assertThat(breakfast.cards().getFirst().records().getFirst().photoCount()).isEqualTo(2);
-        assertThat(breakfast.cards().getFirst().records().getFirst().foodNames())
-                .containsExactly("계란 토스트");
+        MadeDexFeedCardDTO mine = feed.slots().getFirst().cards().getFirst();
+        assertThat(mine.recordCount()).isEqualTo(1);
+        assertThat(mine.foodNames()).containsExactly("계란 토스트");
+        assertThat(mine.recordIds()).containsExactly(100L);
         // 친구 카드와 점심 슬롯은 비어 있어야 한다
-        assertThat(breakfast.cards().get(1).records()).isEmpty();
+        assertThat(feed.slots().getFirst().cards().get(1).recordCount()).isZero();
         assertThat(feed.slots().get(1).cards()).allSatisfy(card ->
-                assertThat(card.records()).isEmpty());
+                assertThat(card.recordCount()).isZero());
+    }
+
+    @Test
+    @DisplayName("같은 슬롯의 기록 여러 건을 카드 한 장으로 접는다")
+    void 여러_기록을_한_카드로_접는다() {
+        when(madeDexRecordRepository
+                .findByMadeDexIdAndLoggedOnAndDeletedAtIsNullOrderByCreatedAtAsc(MADE_DEX_ID, TODAY_SEOUL))
+                .thenReturn(List.of(record(100L, BREAKFAST, ME), record(101L, BREAKFAST, ME)));
+        when(madeDexRecordPhotoRepository.findByRecordIdInOrderBySortOrderAsc(anyCollection()))
+                .thenReturn(List.of(MadeDexRecordPhoto.of(100L, "first", 0),
+                        MadeDexRecordPhoto.of(101L, "second", 0)));
+        when(madeDexRecordFoodRepository.findByRecordIdInOrderBySortOrderAsc(anyCollection()))
+                .thenReturn(List.of(MadeDexRecordFood.of(100L, "계란 토스트", 0),
+                        MadeDexRecordFood.of(101L, "그릭요거트 볼", 0)));
+        when(s3PresignedUrlService.createDownloadUrl("first")).thenReturn("url-first");
+
+        MadeDexFeedCardDTO mine = service.findFeed(ME, MADE_DEX_ID, TODAY_SEOUL)
+                .slots().getFirst().cards().getFirst();
+
+        assertThat(mine.recordCount()).isEqualTo(2);
+        // 대표 사진은 먼저 남긴 기록의 첫 장이다
+        assertThat(mine.thumbnailUrl()).isEqualTo("url-first");
+        assertThat(mine.foodNames()).containsExactly("계란 토스트", "그릭요거트 볼");
+        assertThat(mine.recordIds()).containsExactly(100L, 101L);
     }
 
     @Test

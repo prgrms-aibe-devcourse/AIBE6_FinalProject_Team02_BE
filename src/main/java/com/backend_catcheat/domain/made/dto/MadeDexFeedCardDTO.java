@@ -2,11 +2,18 @@ package com.backend_catcheat.domain.made.dto;
 
 import java.util.List;
 
-// records가 비면 화면이 점선 빈 카드를 그린다
+/**
+ * 슬롯 하나에서 한 사람이 남긴 것 전부를 카드 한 장으로 접는다.
+ * 화면이 사진 한 장과 개수만 그리므로 기록마다 상세를 보내지 않는다.
+ * recordCount가 0이면 점선 빈 카드다.
+ */
 public record MadeDexFeedCardDTO(
         Long userId,
         String nickname,
         String profileImageUrl,
         boolean me,
-        List<MadeDexRecordSummaryDTO> records
+        int recordCount,
+        String thumbnailUrl,
+        List<String> foodNames,
+        List<Long> recordIds
 ) {}
