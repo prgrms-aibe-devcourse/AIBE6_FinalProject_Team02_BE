@@ -24,7 +24,8 @@ public enum ErrorCode {
 
     // 업로드시 올바르지 않은 요청
     UPLOAD_FILE_REQUIRED(HttpStatus.BAD_REQUEST, "업로드할 파일이 필요해요"),
-    UPLOAD_FILE_COUNT_EXCEEDED(HttpStatus.BAD_REQUEST, "사진은 한 번에 최대 5장까지 등록할 수 있어요"),
+    // 상한이 용도마다 달라(기본 도감 5장, 로그잇 8장) 문구에 숫자를 박지 않는다
+    UPLOAD_FILE_COUNT_EXCEEDED(HttpStatus.BAD_REQUEST, "한 번에 올릴 수 있는 장수를 넘었어요. 몇 장 덜어 주세요"),
     UPLOAD_FILE_INFO_REQUIRED(HttpStatus.BAD_REQUEST, "업로드할 파일 정보가 필요해요"),
     UPLOAD_FILE_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "파일 이름이 필요해요"),
     INVALID_UPLOAD_FILE(HttpStatus.BAD_REQUEST, "지원하지 않는 이미지 형식이에요"),
@@ -133,6 +134,19 @@ public enum ErrorCode {
     MADE_DEX_SLOT_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "슬롯은 6개까지 만들 수 있어요"),
     MADE_DEX_SLOT_LAST_ONE(HttpStatus.BAD_REQUEST, "슬롯을 모두 없앨 수는 없어요. 최소 한 개는 남겨 주세요"),
     MADE_DEX_SLOT_ORDER_MISMATCH(HttpStatus.BAD_REQUEST, "순서가 바뀌는 중이에요. 새로고침 후 다시 시도해 주세요"),
+    MADE_DEX_SLOT_HIDDEN(HttpStatus.BAD_REQUEST, "지금은 쓰지 않는 슬롯이에요"),
+    // 식사 기록 (로그잇)
+    MADE_DEX_RECORD_NOT_FOUND(HttpStatus.NOT_FOUND, "기록을 찾을 수 없어요"),
+    MADE_DEX_RECORD_NOT_AUTHOR(HttpStatus.FORBIDDEN, "내가 남긴 기록만 고칠 수 있어요"),
+    MADE_DEX_RECORD_PHOTO_REQUIRED(HttpStatus.BAD_REQUEST, "사진을 한 장 이상 올려 주세요"),
+    MADE_DEX_RECORD_PHOTO_TOO_MANY(HttpStatus.BAD_REQUEST, "사진은 8장까지 올릴 수 있어요"),
+    MADE_DEX_RECORD_PHOTO_NOT_FOUND(HttpStatus.BAD_REQUEST, "이 기록의 사진이 아니에요"),
+    MADE_DEX_RECORD_FOOD_REQUIRED(HttpStatus.BAD_REQUEST, "먹은 음식을 하나 이상 적어 주세요"),
+    MADE_DEX_RECORD_FOOD_NAME_TOO_LONG(HttpStatus.BAD_REQUEST, "음식 이름은 100자까지 쓸 수 있어요"),
+    MADE_DEX_RECORD_MEMO_TOO_LONG(HttpStatus.BAD_REQUEST, "메모는 100자까지 쓸 수 있어요"),
+    MADE_DEX_RECORD_LOCATION_TOO_LONG(HttpStatus.BAD_REQUEST, "장소 이름이 너무 길어요"),
+    MADE_DEX_RECORD_DATE_REQUIRED(HttpStatus.BAD_REQUEST, "날짜를 골라 주세요"),
+    MADE_DEX_RECORD_FUTURE_DATE(HttpStatus.BAD_REQUEST, "아직 오지 않은 날은 기록할 수 없어요"),
 
     // 뱃지
     BADGE_NOT_OWNED(HttpStatus.BAD_REQUEST, "보유하지 않은 뱃지예요"),
@@ -142,7 +156,15 @@ public enum ErrorCode {
     REWARD_BADGE_SOURCE_REQUIRED(HttpStatus.BAD_REQUEST, "프리셋을 고르거나 이미지를 만들어 주세요"),
     INVALID_PRESET_CODE(HttpStatus.BAD_REQUEST, "존재하지 않는 프리셋이에요"),
     REWARD_BADGE_NOT_FOUND(HttpStatus.NOT_FOUND, "보상 뱃지를 찾을 수 없어요"),
-    REWARD_BADGE_NAME_TOO_LONG(HttpStatus.BAD_REQUEST, "뱃지 이름은 100자까지 쓸 수 있어요");
+    REWARD_BADGE_NAME_TOO_LONG(HttpStatus.BAD_REQUEST, "뱃지 이름은 100자까지 쓸 수 있어요"),
+
+    // 친구
+    FRIEND_SELF_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "자기 자신에게는 친구 요청을 보낼 수 없어요"),
+    FRIEND_ALREADY(HttpStatus.CONFLICT, "이미 친구예요"),
+    FRIEND_REQUEST_ALREADY_SENT(HttpStatus.CONFLICT, "이미 친구 요청을 보냈어요"),
+    FRIEND_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "친구 요청을 찾을 수 없어요"),
+    FRIEND_NOT_FOUND(HttpStatus.NOT_FOUND, "친구 관계가 아니에요"),
+    FRIEND_FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없어요");
 
 
 
