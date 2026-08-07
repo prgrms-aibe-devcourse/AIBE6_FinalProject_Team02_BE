@@ -265,8 +265,9 @@ class MadeDexServiceTest {
 
         assertThat(madeDex.getName()).isEqualTo("새 이름");
         assertThat(madeDex.getDescription()).isEqualTo("새 소개");
-        assertThat(madeDex.getVisibility()).isEqualTo(Visibility.PUBLIC);
         assertThat(madeDex.getImageKey()).isEqualTo("made/new.jpg");
+        // 공개 요청이 와도 비공개다. 로그잇에는 공개 개념이 없다
+        assertThat(madeDex.getVisibility()).isEqualTo(Visibility.PRIVATE);
     }
 
     @Test
