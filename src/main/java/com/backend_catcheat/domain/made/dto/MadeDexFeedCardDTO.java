@@ -1,5 +1,6 @@
 package com.backend_catcheat.domain.made.dto;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -15,5 +16,7 @@ public record MadeDexFeedCardDTO(
         int recordCount,
         String thumbnailUrl,
         List<String> foodNames,
-        List<Long> recordIds
+        List<Long> recordIds,
+        // 대표 사진을 낸 기록의 올린 시각. 빈 카드는 null
+        LocalDateTime loggedAt
 ) {}

@@ -107,7 +107,7 @@ public class MadeDexFeedService {
                             user == null ? null : user.getNickname(),
                             user == null ? null : s3PresignedUrlService.createDownloadUrl(user.getProfileImageKey()),
                             member.getUserId().equals(userId),
-                            0, null, List.of(), List.of());
+                            0, null, List.of(), List.of(), null);
                 })
                 .toList();
     }
@@ -129,11 +129,12 @@ public class MadeDexFeedService {
      */
     private MadeDexFeedCardDTO toCard(MadeDexFeedCardDTO card, List<MadeDexRecord> records, Photos photos) {
         List<Long> recordIds = records.stream().map(MadeDexRecord::getId).toList();
-        String thumbnailKey = recordIds.stream()
-                .map(photos::firstKeyOf)
-                .filter(Objects::nonNull)
+        // 시각은 대표 사진을 낸 기록의 것을 쓴다. 다른 기록에서 가져오면 사진과 시간이 어긋난다
+        MadeDexRecord cover = records.stream()
+                .filter(record -> photos.firstKeyOf(record.getId()) != null)
                 .findFirst()
-                .orElse(null);
+                .orElse(records.getFirst());
+        String thumbnailKey = photos.firstKeyOf(cover.getId());
         List<String> foodNames = recordIds.stream()
                 .flatMap(recordId -> photos.foodNamesOf(recordId).stream())
                 .distinct()
@@ -147,7 +148,8 @@ public class MadeDexFeedService {
                 records.size(),
                 s3PresignedUrlService.createDownloadUrl(thumbnailKey),
                 foodNames,
-                recordIds);
+                recordIds,
+                cover.getLoggedAt());
     }
 
     private Map<Long, Map<Long, List<MadeDexRecord>>> groupBySlotAndAuthor(List<MadeDexRecord> records) {
