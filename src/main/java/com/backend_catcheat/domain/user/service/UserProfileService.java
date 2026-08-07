@@ -36,15 +36,17 @@ public class UserProfileService {
                 nickname.trim(), meId, PageRequest.of(0, SEARCH_LIMIT));
         Map<Long, RelationStatus> relations = friendService.relationsOf(
                 meId, users.stream().map(User::getId).toList());
-        return users.stream()
-                .map(u -> new UserSearchResultDTO(friendService.toBrief(u),
-                        relations.getOrDefault(u.getId(), RelationStatus.NONE)))
+        List<UserBriefDTO> briefs = friendService.toBriefs(users);
+        return briefs.stream()
+                .map(b -> new UserSearchResultDTO(b,
+                        relations.getOrDefault(b.userId(), RelationStatus.NONE)))
                 .toList();
     }
 
     /** 공개 프로필 */
     public PublicProfileDTO getProfile(Long meId, Long targetUserId) {
         User target = userRepository.findById(targetUserId)
+                .filter(u -> !u.isWithdrawn())
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
         UserBriefDTO brief = friendService.toBrief(target);
         return new PublicProfileDTO(brief, friendService.relationOf(meId, targetUserId));

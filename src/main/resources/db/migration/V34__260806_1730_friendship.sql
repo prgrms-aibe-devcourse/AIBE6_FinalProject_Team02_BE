@@ -9,9 +9,12 @@ CREATE TABLE friendship (
     updated_at TIMESTAMP,
     CONSTRAINT fk_friendship_requester FOREIGN KEY (requester_id) REFERENCES users (id),
     CONSTRAINT fk_friendship_addressee FOREIGN KEY (addressee_id) REFERENCES users (id),
-    CONSTRAINT uk_friendship_pair UNIQUE (requester_id, addressee_id),
     CONSTRAINT ck_friendship_not_self CHECK (requester_id <> addressee_id)
 );
+
+-- 방향 무관 유일성. (A,B)와 (B,A)를 같은 쌍으로 취급 → 중복 요청·역방향 동시 요청 원천 차단
+CREATE UNIQUE INDEX uk_friendship_pair
+    ON friendship (LEAST(requester_id, addressee_id), GREATEST(requester_id, addressee_id));
 
 CREATE INDEX idx_friendship_addressee_status ON friendship (addressee_id, status);
 CREATE INDEX idx_friendship_requester_status ON friendship (requester_id, status);

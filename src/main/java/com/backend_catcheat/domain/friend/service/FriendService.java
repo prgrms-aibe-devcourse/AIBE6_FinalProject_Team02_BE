@@ -14,6 +14,7 @@ import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import com.backend_catcheat.global.s3.S3PresignedUrlService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -66,12 +67,16 @@ public class FriendService {
     /** 친구 요청 */
     @Transactional
     public void sendRequest(Long meId, Long targetUserId) {
+        if (targetUserId == null) {
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
         if (meId.equals(targetUserId)) {
             throw new CustomException(ErrorCode.FRIEND_SELF_NOT_ALLOWED);
         }
-        if (!userRepository.existsById(targetUserId)) {
-            throw new CustomException(ErrorCode.USER_NOT_FOUND);
-        }
+        // 탈퇴 유저에겐 요청 불가
+        userRepository.findById(targetUserId)
+                .filter(u -> !u.isWithdrawn())
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
         friendshipRepository.findBetween(meId, targetUserId).ifPresentOrElse(existing -> {
             if (existing.isAccepted()) {
                 throw new CustomException(ErrorCode.FRIEND_ALREADY);
@@ -81,7 +86,14 @@ public class FriendService {
             }
             // 상대가 이미 나에게 보낸 PENDING → 자동 수락
             existing.accept(LocalDateTime.now());
-        }, () -> friendshipRepository.save(Friendship.request(meId, targetUserId)));
+        }, () -> {
+            try {
+                friendshipRepository.saveAndFlush(Friendship.request(meId, targetUserId));
+            } catch (DataIntegrityViolationException e) {
+                // 유일 인덱스 위반 = 동시 요청 경쟁에서 상대가 먼저 만든 경우
+                throw new CustomException(ErrorCode.FRIEND_REQUEST_ALREADY_SENT);
+            }
+        });
     }
 
     /** 받은 요청 수락 */
@@ -119,7 +131,7 @@ public class FriendService {
                 .findAllByStatusAndMember(meId, FriendshipStatus.ACCEPTED).stream()
                 .map(f -> f.getRequesterId().equals(meId) ? f.getAddresseeId() : f.getRequesterId())
                 .toList();
-        return userRepository.findAllById(friendIds).stream().map(this::toBrief).toList();
+        return toBriefs(userRepository.findAllById(friendIds));
     }
 
     /** 받은/보낸 요청 목록 */
@@ -127,11 +139,19 @@ public class FriendService {
         List<Friendship> rows = received
                 ? friendshipRepository.findByAddresseeIdAndStatus(meId, FriendshipStatus.PENDING)
                 : friendshipRepository.findByRequesterIdAndStatus(meId, FriendshipStatus.PENDING);
+        List<Long> otherIds = rows.stream()
+                .map(f -> received ? f.getRequesterId() : f.getAddresseeId())
+                .toList();
+        // 유저 + 대표뱃지 배치 조회 후 매핑
+        Map<Long, UserBriefDTO> briefById = toBriefs(userRepository.findAllById(otherIds)).stream()
+                .collect(Collectors.toMap(UserBriefDTO::userId, Function.identity()));
         return rows.stream().map(f -> {
             Long otherId = received ? f.getRequesterId() : f.getAddresseeId();
-            User other = userRepository.findById(otherId)
-                    .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-            return new ReceivedRequestDTO(f.getId(), toBrief(other));
+            UserBriefDTO brief = briefById.get(otherId);
+            if (brief == null) {
+                throw new CustomException(ErrorCode.USER_NOT_FOUND);
+            }
+            return new ReceivedRequestDTO(f.getId(), brief);
         }).toList();
     }
 
@@ -143,6 +163,18 @@ public class FriendService {
                 user.getNickname(),
                 s3PresignedUrlService.createDownloadUrl(user.getProfileImageKey()),
                 badge);
+    }
+
+    /** 여러 유저 배치 변환. 대표뱃지를 한 번에 조회 */
+    public List<UserBriefDTO> toBriefs(List<User> users) {
+        Map<Long, EquippedBadgeViewDTO> badgeById = equippedBadgeResolver.resolveByBadgeId(users);
+        return users.stream()
+                .map(u -> new UserBriefDTO(
+                        u.getId(),
+                        u.getNickname(),
+                        s3PresignedUrlService.createDownloadUrl(u.getProfileImageKey()),
+                        u.getEquippedBadgeId() == null ? null : badgeById.get(u.getEquippedBadgeId())))
+                .toList();
     }
 
     private Friendship getPendingOr404(Long requestId) {
