@@ -17,24 +17,23 @@ public interface MadeDexSlotRepository extends JpaRepository<MadeDexSlot, Long> 
 
     boolean existsByMadeDexIdAndNameAndHiddenAtIsNull(Long madeDexId, String name);
 
-    // 아래 셋은 made_dex_record 엔티티가 아직 없어 네이티브로 둔다. TODO(CATCHEAT-34): JPQL로 교체
-
-    @Query(value = """
-            select count(*) from made_dex_record
-            where slot_id = :slotId and deleted_at is null
-            """, nativeQuery = true)
+    @Query("""
+            select count(r) from MadeDexRecord r
+            where r.slotId = :slotId and r.deletedAt is null
+            """)
     long countRecords(@Param("slotId") Long slotId);
 
-    // 지운 기록도 slot_id를 잡고 있어, deleted_at을 걸러 세면 hard delete가 FK 위반으로 터진다
-    @Query(value = """
-            select exists(select 1 from made_dex_record where slot_id = :slotId)
-            """, nativeQuery = true)
+    // 지운 기록도 slot_id를 잡고 있어, deletedAt을 걸러 세면 hard delete가 FK 위반으로 터진다
+    @Query("""
+            select count(r) > 0 from MadeDexRecord r
+            where r.slotId = :slotId
+            """)
     boolean existsRecordReferencing(@Param("slotId") Long slotId);
 
     // 슬롯마다 count를 돌리지 않으려고 한 번에 가져온다
-    @Query(value = """
-            select distinct r.slot_id from made_dex_record r
-            where r.made_dex_id = :madeDexId and r.deleted_at is null
-            """, nativeQuery = true)
+    @Query("""
+            select distinct r.slotId from MadeDexRecord r
+            where r.madeDexId = :madeDexId and r.deletedAt is null
+            """)
     List<Long> findSlotIdsWithRecords(@Param("madeDexId") Long madeDexId);
 }
