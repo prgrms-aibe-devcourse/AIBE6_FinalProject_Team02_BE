@@ -125,6 +125,14 @@ public enum ErrorCode {
     MADE_DEX_MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "이미 나간 참여자예요"),
     MADE_DEX_CANNOT_KICK_SELF(HttpStatus.BAD_REQUEST, "스스로를 내보낼 수는 없어요. 나가기를 눌러 주세요"),
     MADE_DEX_ALREADY_OWNER(HttpStatus.CONFLICT, "이미 그룹장이에요"),
+    // 끼니 슬롯 (로그잇)
+    MADE_DEX_SLOT_NOT_FOUND(HttpStatus.NOT_FOUND, "끼니 슬롯을 찾을 수 없어요"),
+    MADE_DEX_SLOT_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "슬롯 이름을 입력해 주세요"),
+    MADE_DEX_SLOT_NAME_TOO_LONG(HttpStatus.BAD_REQUEST, "슬롯 이름은 20자까지 쓸 수 있어요"),
+    MADE_DEX_SLOT_NAME_DUPLICATED(HttpStatus.CONFLICT, "같은 이름의 슬롯이 이미 있어요"),
+    MADE_DEX_SLOT_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "슬롯은 6개까지 만들 수 있어요"),
+    MADE_DEX_SLOT_LAST_ONE(HttpStatus.BAD_REQUEST, "슬롯을 모두 없앨 수는 없어요. 최소 한 개는 남겨 주세요"),
+    MADE_DEX_SLOT_ORDER_MISMATCH(HttpStatus.BAD_REQUEST, "순서가 바뀌는 중이에요. 새로고침 후 다시 시도해 주세요"),
 
     // 뱃지
     BADGE_NOT_OWNED(HttpStatus.BAD_REQUEST, "보유하지 않은 뱃지예요"),
