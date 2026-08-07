@@ -8,9 +8,11 @@ import com.backend_catcheat.domain.made.dto.MadeDexUpdateRequestDTO;
 import com.backend_catcheat.domain.made.entity.MadeDex;
 import com.backend_catcheat.domain.made.entity.MadeDexMember;
 import com.backend_catcheat.domain.made.entity.MadeDexRole;
+import com.backend_catcheat.domain.made.entity.MadeDexSlot;
 import com.backend_catcheat.domain.made.entity.Visibility;
 import com.backend_catcheat.domain.made.repository.MadeDexMemberRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexRepository;
+import com.backend_catcheat.domain.made.repository.MadeDexSlotRepository;
 import com.backend_catcheat.global.event.S3ObjectUnusedEvent;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
@@ -57,6 +59,8 @@ class MadeDexServiceTest {
     @Mock
     MadeDexMemberRepository madeDexMemberRepository;
     @Mock
+    MadeDexSlotRepository madeDexSlotRepository;
+    @Mock
     S3PresignedUrlService s3PresignedUrlService;
     @Mock
     ApplicationEventPublisher eventPublisher;
@@ -67,7 +71,8 @@ class MadeDexServiceTest {
     @BeforeEach
     void setUp() {
         madeDexService = new MadeDexService(
-                madeDexRepository, madeDexMemberRepository, new MadeDexFinder(madeDexRepository),
+                madeDexRepository, madeDexMemberRepository, madeDexSlotRepository,
+                new MadeDexFinder(madeDexRepository, madeDexMemberRepository),
                 s3PresignedUrlService, eventPublisher,
                 Clock.fixed(NOW.atZone(ZONE).toInstant(), ZONE));
     }
@@ -101,6 +106,24 @@ class MadeDexServiceTest {
         assertThat(member.getMadeDexId()).isEqualTo(10L);
         assertThat(member.getUserId()).isEqualTo(OWNER_ID);
         assertThat(member.isOwner()).isTrue();
+    }
+
+    @Test
+    @DisplayName("개설하면 아침·점심·저녁 기본 슬롯이 함께 만들어진다")
+    void create_savesDefaultSlots() {
+        when(madeDexRepository.save(any())).thenReturn(savedMadeDex(10L, "우리 식탁", Visibility.PRIVATE));
+
+        madeDexService.create(
+                OWNER_ID, new MadeDexCreateRequestDTO("우리 식탁", null, Visibility.PRIVATE, null));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<MadeDexSlot>> captor = ArgumentCaptor.forClass(List.class);
+        verify(madeDexSlotRepository).saveAll(captor.capture());
+
+        // 슬롯이 없으면 첫 기록을 남길 곳이 없다
+        assertThat(captor.getValue()).extracting(MadeDexSlot::getName)
+                .containsExactly("아침", "점심", "저녁");
+        assertThat(captor.getValue()).allMatch(slot -> slot.getMadeDexId().equals(10L));
     }
 
     @Test

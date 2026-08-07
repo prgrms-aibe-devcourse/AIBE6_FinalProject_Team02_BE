@@ -9,9 +9,11 @@ import com.backend_catcheat.domain.made.dto.MadeDexUpdateRequestDTO;
 import com.backend_catcheat.domain.made.entity.MadeDex;
 import com.backend_catcheat.domain.made.entity.MadeDexMember;
 import com.backend_catcheat.domain.made.entity.MadeDexRole;
+import com.backend_catcheat.domain.made.entity.MadeDexSlot;
 import com.backend_catcheat.domain.made.entity.Visibility;
 import com.backend_catcheat.domain.made.repository.MadeDexMemberRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexRepository;
+import com.backend_catcheat.domain.made.repository.MadeDexSlotRepository;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.event.MadeDexCreatedEvent;
 import com.backend_catcheat.global.event.S3ObjectUnusedEvent;
@@ -37,6 +39,7 @@ public class MadeDexService {
 
     private final MadeDexRepository madeDexRepository;
     private final MadeDexMemberRepository madeDexMemberRepository;
+    private final MadeDexSlotRepository madeDexSlotRepository;
     private final MadeDexFinder madeDexFinder;
     private final S3PresignedUrlService s3PresignedUrlService;
     private final ApplicationEventPublisher eventPublisher;
@@ -53,6 +56,9 @@ public class MadeDexService {
         madeDexMemberRepository.save(
                 MadeDexMember.owner(madeDex.getId(), ownerId, LocalDateTime.now(clock)));
 
+        // 슬롯이 하나도 없으면 첫 기록을 남길 곳이 없다. 개설과 같은 트랜잭션에서 만든다
+        madeDexSlotRepository.saveAll(MadeDexSlot.defaultsFor(madeDex.getId()));
+
         // 첫 제작 도감 뱃지 지급 트리거
         eventPublisher.publishEvent(new MadeDexCreatedEvent(ownerId));
 
@@ -61,14 +67,9 @@ public class MadeDexService {
 
     /** 공개 도감은 참여하지 않아도 열람할 수 있다. 비공개는 멤버만 */
     public MadeDexDetailDTO findDetail(Long userId, Long madeDexId) {
-        MadeDex madeDex = madeDexFinder.active(madeDexId);
-        MadeDexRole myRole = madeDexMemberRepository.findByMadeDexIdAndUserId(madeDexId, userId)
-                .map(MadeDexMember::getRole)
-                .orElse(null);
-        // 403으로 답하면 비공개 도감이 "존재한다"는 사실이 드러난다
-        if (myRole == null && madeDex.getVisibility() != Visibility.PUBLIC) {
-            throw new CustomException(ErrorCode.MADE_DEX_NOT_FOUND);
-        }
+        MadeDexFinder.MadeDexAccess access = madeDexFinder.readable(userId, madeDexId);
+        MadeDex madeDex = access.madeDex();
+        MadeDexRole myRole = access.myRole();
 
         return new MadeDexDetailDTO(
                 madeDex.getId(),
