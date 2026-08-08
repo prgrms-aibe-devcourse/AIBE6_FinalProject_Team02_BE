@@ -118,7 +118,8 @@ public class MadeDexDayCardService {
     }
 
     /** 담긴 사람
-     * 작성자 순서대로, 담은 사진 수와 붙인 글(있는 것만) */
+     * 작성자 순서대로, 담은 사진 수와 붙인 글
+     * captions는 사진 순서 그대로 */
     private List<MadeDexDayCardParticipantDTO> buildParticipants(
             List<MadeDexRecord> records,
             Comparator<MadeDexRecord> byAuthor,
@@ -137,7 +138,6 @@ public class MadeDexDayCardService {
                             .map(MadeDexRecordPhoto::getCaption)
                             .map(this::blankToNull)
                             .filter(caption -> caption != null)
-                            .distinct()
                             .toList();
                     MadeDexDayCardAuthorDTO author = loaded.authorOf(authorId);
                     return new MadeDexDayCardParticipantDTO(
