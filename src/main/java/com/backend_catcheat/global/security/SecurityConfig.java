@@ -82,7 +82,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:3000")); // 프론트 주소(운영 시 실제 도메인 추가)
+        config.setAllowedOrigins(List.of("https://projectjm.co.kr")); // 프론트 주소(운영 시 실제 도메인 추가)
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true); // 쿠키 전송 허용 (httpOnly 쿠키 인증에 필수)
