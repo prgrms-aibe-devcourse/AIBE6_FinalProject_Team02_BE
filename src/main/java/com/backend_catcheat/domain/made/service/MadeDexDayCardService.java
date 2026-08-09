@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 하루 카드 뷰
@@ -88,6 +89,7 @@ public class MadeDexDayCardService {
 
         return new MadeDexDayCardDTO(
                 loggedOn,
+                loaded.members(),
                 slots,
                 buildParticipants(records, byAuthor, loaded),
                 buildStats(records, loaded));
@@ -280,26 +282,38 @@ public class MadeDexDayCardService {
                 : madeDexRecordPhotoRepository.findByRecordIdInOrderBySortOrderAsc(recordIds).stream()
                         .collect(Collectors.groupingBy(MadeDexRecordPhoto::getRecordId));
 
-        // 순서 보존은 필요 없이 rank는 getOrDefault 조회에만 쓰인다. 값은 인덱스 그대로, 중복 userId는 첫 등장만 채택
-        List<MadeDexMember> members = madeDexMemberRepository.findByMadeDexIdOrderByJoinedAtAscIdAsc(madeDexId);
+        // 가입 순
+        List<Long> memberIds = madeDexMemberRepository.findByMadeDexIdOrderByJoinedAtAscIdAsc(madeDexId).stream()
+                .map(MadeDexMember::getUserId)
+                .distinct()
+                .toList();
         Map<Long, Integer> rankByUser = new HashMap<>();
-        for (int i = 0; i < members.size(); i++) {
-            rankByUser.putIfAbsent(members.get(i).getUserId(), i);
+        for (int i = 0; i < memberIds.size(); i++) {
+            rankByUser.put(memberIds.get(i), i);
         }
 
-        List<Long> authorIds = records.stream().map(MadeDexRecord::getAuthorId).distinct().toList();
-        Map<Long, User> userById = userRepository.findAllById(authorIds).stream()
+        // 이미 나간 사람의 기록도 남아 있으므로 멤버와 작성자를 합쳐서 조회한다
+        List<Long> userIds = Stream.concat(memberIds.stream(), records.stream().map(MadeDexRecord::getAuthorId))
+                .distinct()
+                .toList();
+        Map<Long, User> userById = userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
-        // 작성자 표시는 여기서 한 번씩만 만들어 재사용
-        Map<Long, MadeDexDayCardAuthorDTO> authorById = authorIds.stream()
-                .collect(Collectors.toMap(Function.identity(), authorId -> author(authorId, userId, userById)));
+        // 사람 표시는 여기서 한 번씩만 만들어 재사용
+        Map<Long, MadeDexDayCardAuthorDTO> authorById = userIds.stream()
+                .collect(Collectors.toMap(Function.identity(), id -> author(id, userId, userById)));
 
-        return new Loaded(photos, rankByUser, authorById);
+        return new Loaded(photos, rankByUser, authorById, memberIds);
     }
 
     private record Loaded(Map<Long, List<MadeDexRecordPhoto>> photosByRecord,
                           Map<Long, Integer> rankByUser,
-                          Map<Long, MadeDexDayCardAuthorDTO> authorById) {
+                          Map<Long, MadeDexDayCardAuthorDTO> authorById,
+                          List<Long> memberIds) {
+
+        /** 가입 순 참여자 전원 */
+        List<MadeDexDayCardAuthorDTO> members() {
+            return memberIds.stream().map(this::authorOf).toList();
+        }
 
         List<MadeDexRecordPhoto> photosOf(Long recordId) {
             return photosByRecord.getOrDefault(recordId, List.of());
