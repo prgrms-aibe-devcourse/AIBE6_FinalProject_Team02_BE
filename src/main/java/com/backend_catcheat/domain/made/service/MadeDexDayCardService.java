@@ -7,6 +7,7 @@ import com.backend_catcheat.domain.made.dto.MadeDexDayCardCalendarDTO;
 import com.backend_catcheat.domain.made.dto.MadeDexDayCardDTO;
 import com.backend_catcheat.domain.made.dto.MadeDexDayCardItemDTO;
 import com.backend_catcheat.domain.made.dto.MadeDexDayCardParticipantDTO;
+import com.backend_catcheat.domain.made.dto.MadeDexDayCardPhotoDTO;
 import com.backend_catcheat.domain.made.dto.MadeDexDayCardSlotDTO;
 import com.backend_catcheat.domain.made.dto.MadeDexDayCardStatsDTO;
 import com.backend_catcheat.domain.made.entity.MadeDexMember;
@@ -127,19 +128,84 @@ public class MadeDexDayCardService {
     }
 
     /** 한 층의 음식 사진 아이템
-     * 작성자(가입 순) → 기록 순 → 사진 순 */
+     * 작성자(가입 순) → 기록 순 → 사진 순
+     */
     private List<MadeDexDayCardItemDTO> buildItems(
             List<MadeDexRecord> slotRecords,
             Comparator<MadeDexRecord> byAuthor,
             Loaded loaded
     ) {
         return slotRecords.stream().sorted(byAuthor)
-                .flatMap(record -> loaded.photosOf(record.getId()).stream()
-                        .map(photo -> new MadeDexDayCardItemDTO(
-                                blankToNull(photo.getCaption()),
-                                s3PresignedUrlService.createDownloadUrl(photo.getImageKey()),
-                                loaded.authorOf(record.getAuthorId()))))
+                .map(record -> new MadeDexDayCardItemDTO(
+                        record.getId(),
+                        loaded.authorOf(record.getAuthorId()),
+                        photos(loaded.photosOf(record.getId()))))
+                // 사진이 없는 기록은 놓을 것이 없음
+                .filter(item -> !item.photos().isEmpty())
                 .toList();
+    }
+
+    private List<MadeDexDayCardPhotoDTO> photos(List<MadeDexRecordPhoto> photos) {
+        return photos.stream()
+                .map(photo -> new MadeDexDayCardPhotoDTO(
+                        photo.getId(),
+                        blankToNull(photo.getCaption()),
+                        s3PresignedUrlService.createDownloadUrl(photo.getImageKey())))
+                .toList();
+    }
+
+    /**
+     * 대표 사진 지정 — 고른 사진을 첫 장으로 옮긴다.
+     * 별도 컬럼을 두지 않고 순서를 바꾼다. "첫 장이 대표"라는 약속이 저절로 지켜지고,
+     * 카드에 뜨는 글도 그 사진의 caption으로 함께 따라온다.
+     */
+    @Transactional
+    public void changeCover(
+            Long userId,
+            Long madeDexId,
+            Long recordId,
+            Long photoId
+    ) {
+        MadeDexRecord record = authoredRecord(userId, madeDexId, recordId);
+
+        List<MadeDexRecordPhoto> photos = madeDexRecordPhotoRepository
+                .findByRecordIdOrderBySortOrderAsc(record.getId());
+        if (photoId == null || photos.stream().noneMatch(photo -> photo.getId().equals(photoId))) {
+            throw new CustomException(ErrorCode.MADE_DEX_RECORD_PHOTO_NOT_FOUND);
+        }
+
+        // 고른 장만 맨 앞으로. 나머지는 원래 상대 순서를 지킨다
+        int order = 0;
+        for (MadeDexRecordPhoto photo : photos) {
+            if (photo.getId().equals(photoId)) {
+                photo.moveTo(0);
+            } else {
+                photo.moveTo(++order);
+            }
+        }
+    }
+
+    /** 그룹장도 남의 기록은 건드리지 못한다 — 기록 수정과 같은 규칙 */
+    private MadeDexRecord authoredRecord(
+            Long userId,
+            Long madeDexId,
+            Long recordId
+    ) {
+        madeDexFinder.active(madeDexId);
+        if (!madeDexMemberRepository.existsByMadeDexIdAndUserId(madeDexId, userId)) {
+            throw new CustomException(ErrorCode.MADE_DEX_NOT_MEMBER);
+        }
+
+        MadeDexRecord record = madeDexRecordRepository.findActiveByIdForUpdate(recordId)
+                .orElseThrow(() -> new CustomException(ErrorCode.MADE_DEX_RECORD_NOT_FOUND));
+        // 다른 그룹의 기록 id를 넣어도 남의 식탁이 드러나지 않는다
+        if (!record.belongsTo(madeDexId)) {
+            throw new CustomException(ErrorCode.MADE_DEX_RECORD_NOT_FOUND);
+        }
+        if (!record.isAuthor(userId)) {
+            throw new CustomException(ErrorCode.MADE_DEX_RECORD_NOT_AUTHOR);
+        }
+        return record;
     }
 
     /** 담긴 사람
