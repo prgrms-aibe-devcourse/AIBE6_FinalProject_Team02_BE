@@ -3,6 +3,7 @@ package com.backend_catcheat.domain.made.service;
 import com.backend_catcheat.domain.auth.entity.User;
 import com.backend_catcheat.domain.auth.repository.UserRepository;
 import com.backend_catcheat.domain.made.dto.MadeDexDayCardAuthorDTO;
+import com.backend_catcheat.domain.made.dto.MadeDexDayCardCalendarDTO;
 import com.backend_catcheat.domain.made.dto.MadeDexDayCardDTO;
 import com.backend_catcheat.domain.made.dto.MadeDexDayCardItemDTO;
 import com.backend_catcheat.domain.made.dto.MadeDexDayCardParticipantDTO;
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -88,6 +90,29 @@ public class MadeDexDayCardService {
                 slots,
                 buildParticipants(records, byAuthor, loaded),
                 buildStats(records, loaded));
+    }
+
+    /** 캘린더 마커 */
+    public MadeDexDayCardCalendarDTO findCalendar(
+            Long userId,
+            Long madeDexId,
+            int year,
+            int month
+    ) {
+        madeDexFinder.readable(userId, madeDexId);
+
+        if (month < 1 || month > 12 || year < 1970 || year > 9999) {
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
+
+        YearMonth target = YearMonth.of(year, month);
+        List<Integer> daysWithRecords = madeDexRecordRepository
+                .findLoggedOnBetween(madeDexId, target.atDay(1), target.atEndOfMonth()).stream()
+                .map(LocalDate::getDayOfMonth)
+                .sorted()
+                .toList();
+
+        return new MadeDexDayCardCalendarDTO(year, month, daysWithRecords);
     }
 
     /** 숨긴 끼니라도 그날 기록이 있으면 층으로 남김 */

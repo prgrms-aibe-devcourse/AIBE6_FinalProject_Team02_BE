@@ -1,5 +1,6 @@
 package com.backend_catcheat.domain.made.controller;
 
+import com.backend_catcheat.domain.made.dto.MadeDexDayCardCalendarDTO;
 import com.backend_catcheat.domain.made.dto.MadeDexDayCardDTO;
 import com.backend_catcheat.domain.made.service.MadeDexDayCardService;
 import com.backend_catcheat.global.common.ApiResponse;
@@ -25,7 +26,19 @@ public class MadeDexDayCardController {
     public ApiResponse<MadeDexDayCardDTO> dayCard(
             @AuthenticationPrincipal Long userId,
             @PathVariable Long madeDexId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ) {
         return ApiResponse.ok(madeDexDayCardService.findDayCard(userId, madeDexId, date));
+    }
+
+    /** 캘린더 마커 */
+    @GetMapping("/calendar")
+    public ApiResponse<MadeDexDayCardCalendarDTO> calendar(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long madeDexId,
+            @RequestParam int year,
+            @RequestParam int month
+    ) {
+        return ApiResponse.ok(madeDexDayCardService.findCalendar(userId, madeDexId, year, month));
     }
 }
