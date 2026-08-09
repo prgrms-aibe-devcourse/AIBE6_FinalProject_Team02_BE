@@ -29,22 +29,14 @@ public class ChallengeUnlock {
     @Column(name = "unlocked_at", nullable = false)
     private LocalDateTime unlockedAt;
 
-    @Column(name = "review", length = 500)
-    private String review;                       // 해금 시 남긴 리뷰(선택)
-
-    @Column(name = "rating")
-    private Integer rating;                       // 별점 1~5(선택)
-
-    private ChallengeUnlock(Long challengeParticipantId, Long slotId, String imageKey, String review, Integer rating) {
+    private ChallengeUnlock(Long challengeParticipantId, Long slotId, String imageKey) {
         this.challengeParticipantId = challengeParticipantId;
         this.slotId = slotId;
         this.imageKey = imageKey;
         this.unlockedAt = LocalDateTime.now();
-        this.review = review;
-        this.rating = rating;
     }
 
-    public static ChallengeUnlock of(Long participantId, Long slotId, String imageKey, String review, Integer rating) {
-        return new ChallengeUnlock(participantId, slotId, imageKey, review, rating);
+    public static ChallengeUnlock of(Long participantId, Long slotId, String imageKey) {
+        return new ChallengeUnlock(participantId, slotId, imageKey);
     }
 }

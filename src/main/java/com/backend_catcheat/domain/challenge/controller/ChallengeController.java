@@ -53,7 +53,7 @@ public class ChallengeController {
             ) {
         return ApiResponse.ok(challengeParticipationService.unlock(
                 userId, challengeId, request.slotId(), request.imageKey(),
-                request.lat(), request.lng(), request.review(), request.rating()));
+                request.lat(), request.lng()));
     }
 
     //탐색 (정렬 + 페이지)

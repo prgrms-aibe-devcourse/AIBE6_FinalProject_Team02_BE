@@ -4,6 +4,4 @@ public record UnlockRequestDTO(
         Long slotId,
         String imageKey,
         Double lat,
-        Double lng,
-        String review,
-        Integer rating) {}
+        Double lng) {}

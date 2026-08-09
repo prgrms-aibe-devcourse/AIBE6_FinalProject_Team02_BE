@@ -26,8 +26,6 @@ public record ChallengeDetailResponseDTO(
             String myImageUrl,        // 내가 인증한 사진(해금 시) — 없으면 null
             LocalDateTime unlockedAt, // 내가 인증한 시각 — 없으면 null
             String storeName,         // 가게명
-            String description,       // 설명/팁
-            String myReview,          // 내가 남긴 리뷰(해금 시) — 없으면 null
-            Integer myRating          // 내 별점 1~5 — 없으면 null
+            String description        // 설명/팁
     ) {}
 }

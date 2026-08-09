@@ -303,9 +303,7 @@ public class ChallengeService {
                                             : null,
                                     mine != null ? mine.getUnlockedAt() : null,
                                     s.getStoreName(),
-                                    s.getDescription(),
-                                    mine != null ? mine.getReview() : null,
-                                    mine != null ? mine.getRating() : null);
+                                    s.getDescription());
                         })
                         .toList();
 
