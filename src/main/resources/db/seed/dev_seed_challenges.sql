@@ -1,53 +1,44 @@
 -- =============================================================================
--- 개발용 더미 데이터: "다른 사람이 만든" 챌린지 3개 + 참여/완주/음식리뷰
+-- 개발용 더미 데이터: "다른 사람이 만든" 챌린지 3개 + 참여/완주/리뷰
 -- =============================================================================
 -- 조건
 --   - 챌린지 3개 (개설자 = 더미 유저 '김맛집', 현재 로그인 유저 아님)
 --   - 챌린지당 음식(슬롯) 10개, 장소는 실존 가게/주소 (좌표는 근사값)
 --   - 챌린지당 참여자 10명 (챌린지마다 다른 10명)
---   - 참여자 중 완주자 8명 (10개 전부 해금 + completed_at), 미완주 2명(6개/3개 해금)
---   - 음식 리뷰: 해금한 모든 슬롯에 리뷰 작성 완료 (별점 3~5)
---   - 리뷰 좋아요: 같은 챌린지의 다른 참여자 0~3명이 좋아요 (중복 방지 반영)
+--   - 완주자 8명 (10개 전부 해금 + completed_at), 미완주 2명(6개/3개 해금)
+--   - 음식 리뷰: 해금한 모든 슬롯에 작성 완료 / 챌린지 리뷰: 완주자 8명 작성
+--   - 리뷰 좋아요: 같은 챌린지 다른 참여자 0~3명 (중복 방지 반영)
 --
--- 실행 (PostgreSQL):
---   psql "<DB URL>" -f src/main/resources/db/seed/dev_seed_challenges.sql
---   (또는 DataGrip / IntelliJ DB 콘솔에서 파일 실행)
+-- 특징: PL/pgSQL(DO 블록) 없이 순수 SQL 문장으로만 구성 → psql / DataGrip / IntelliJ
+--       어디서 실행하든 동일하게 동작한다.
+-- 실행: 이 파일 전체를 대상 DB(catcheat_dev)에서 실행.
 -- 재실행 가능: 앞에서 기존 seed 데이터를 지우고 다시 넣는다.
--- ⚠ 운영 DB에서는 절대 실행하지 말 것. (Flyway 대상 아님 — db/migration 밖에 둠)
+-- ⚠ 운영 DB에서는 절대 실행하지 말 것. (Flyway 대상 폴더 db/migration 밖에 둠)
 -- =============================================================================
 
 BEGIN;
 
--- 0) 기존 seed 데이터 정리 (provider_id 'seedcc_%' 로 식별) ---------------------
+-- 0) 기존 seed 정리 (provider_id 'seedcc_%' 식별) -----------------------------
 DELETE FROM review_like
- WHERE review_id IN (
-     SELECT id FROM review WHERE reviewer_id IN (
-         SELECT id FROM users WHERE provider = 'KAKAO' AND provider_id LIKE 'seedcc_%'
-     )
- );
+ WHERE review_id IN (SELECT id FROM review WHERE reviewer_id IN
+     (SELECT id FROM users WHERE provider = 'KAKAO' AND provider_id LIKE 'seedcc_%'));
 DELETE FROM review
- WHERE reviewer_id IN (
-     SELECT id FROM users WHERE provider = 'KAKAO' AND provider_id LIKE 'seedcc_%'
- );
--- challenge_dex 삭제 시 slot / participant / unlock 은 FK ON DELETE CASCADE 로 정리됨
+ WHERE reviewer_id IN (SELECT id FROM users WHERE provider = 'KAKAO' AND provider_id LIKE 'seedcc_%');
 DELETE FROM challenge_dex
- WHERE owner_id IN (
-     SELECT id FROM users WHERE provider = 'KAKAO' AND provider_id = 'seedcc_owner'
- );
-DELETE FROM users
- WHERE provider = 'KAKAO' AND provider_id LIKE 'seedcc_%';
+ WHERE owner_id IN (SELECT id FROM users WHERE provider = 'KAKAO' AND provider_id = 'seedcc_owner');
+DELETE FROM users WHERE provider = 'KAKAO' AND provider_id LIKE 'seedcc_%';
 
--- 1) seed 유저: 개설자 1명 + 참여자 30명 --------------------------------------
+DROP TABLE IF EXISTS seed_challenge;
+DROP TABLE IF EXISTS seed_slot;
+DROP TABLE IF EXISTS t_ch;
+DROP TABLE IF EXISTS t_user;
+
+-- 1) seed 유저: 개설자 1 + 참여자 30 ----------------------------------------
 INSERT INTO users (provider, provider_id, nickname, email, role, onboarding_completed)
 VALUES ('KAKAO', 'seedcc_owner', '김맛집', 'seed_owner@catcheat.dev', 'USER', true);
 
 INSERT INTO users (provider, provider_id, nickname, email, role, onboarding_completed)
-SELECT 'KAKAO',
-       'seedcc_p' || lpad(g::text, 2, '0'),
-       nk,
-       'seed_p' || g || '@catcheat.dev',
-       'USER',
-       true
+SELECT 'KAKAO', 'seedcc_p' || lpad(g::text, 2, '0'), nk, 'seed_p' || g || '@catcheat.dev', 'USER', true
 FROM (VALUES
     (1, '푸드러버'), (2, '미식가공주'), (3, '먹깨비'), (4, '배부른하마'), (5, '든든한끼'),
     (6, '야식요정'), (7, '맛동산러'), (8, '서울촌놈'), (9, '냉면광'), (10, '국밥형'),
@@ -57,8 +48,8 @@ FROM (VALUES
     (26, '위대한위장'), (27, '맛집탐험대'), (28, '존맛탱'), (29, '겉바속촉'), (30, '입짧은햇님')
 ) AS t(g, nk);
 
--- 2) seed 챌린지/슬롯 정의 (임시 테이블) --------------------------------------
-CREATE TEMP TABLE seed_challenge (cno int, name text, description text) ON COMMIT DROP;
+-- 2) seed 챌린지/슬롯 정의 (임시 테이블) ------------------------------------
+CREATE TEMP TABLE seed_challenge (cno int, name text, description text);
 INSERT INTO seed_challenge VALUES
     (1, '서울 노포 도장깨기', '수십 년 내공의 서울 노포를 도장깨기! 진짜 맛을 아는 사람들의 리스트.'),
     (2, '서울 카페·베이커리 성지순례', '성수부터 연남까지, 줄 서서 먹는 인기 카페·베이커리 10곳.'),
@@ -67,7 +58,7 @@ INSERT INTO seed_challenge VALUES
 CREATE TEMP TABLE seed_slot (
     cno int, slot_order int, food_name text, store_name text,
     place_name text, lat double precision, lng double precision, description text
-) ON COMMIT DROP;
+);
 INSERT INTO seed_slot VALUES
     -- 챌린지 1: 서울 노포 도장깨기
     (1, 0, '평양냉면', '우래옥', '서울 중구 창경궁로 62-29', 37.5686, 126.9967, '슴슴한 육수의 정석'),
@@ -103,141 +94,119 @@ INSERT INTO seed_slot VALUES
     (3, 8, '팥빙수', '옵스 남천점', '부산 수영구 광남로 91', 35.1460, 129.1120, '부산 인기 빵집'),
     (3, 9, '물냉면', '내호냉면', '부산 남구 우암번영로 26-1', 35.1310, 129.0620, '부산 밀면·냉면 원조');
 
--- 3) 생성 로직 --------------------------------------------------------------
-DO $$
-DECLARE
-    v_owner  bigint;
-    c_no     int;
-    p_idx    int;
-    v_ch     bigint;
-    v_uid    bigint;
-    v_part   bigint;
-    v_total  int;
-    v_unlock int;
-    v_done   boolean;
-    v_rating int;
-    v_content text;
-    slot     record;
-    base_ts  timestamp := now() - interval '30 days';
-    tmpl     text[] := ARRAY[
-        '%s %s 정말 맛있었어요. 재방문 각!',
-        '기대 이상이었어요. %2$s 강추합니다.',
-        '%2$s 먹으러 또 올 것 같아요. (%1$s)',
-        '분위기도 좋고 %2$s도 훌륭했어요.',
-        '웨이팅은 있었지만 %1$s 만족스러웠어요.'
-    ];
-BEGIN
-    SELECT id INTO v_owner FROM users
-     WHERE provider = 'KAKAO' AND provider_id = 'seedcc_owner';
+-- 3) 챌린지 3개 생성 (상시형, 30일 전 개설) ---------------------------------
+INSERT INTO challenge_dex (owner_id, name, description, period_type, starts_at, ends_at, is_event, created_at)
+SELECT (SELECT id FROM users WHERE provider = 'KAKAO' AND provider_id = 'seedcc_owner'),
+       sc.name, sc.description, 'PERMANENT', now() - interval '30 days', NULL, false, now() - interval '30 days'
+FROM seed_challenge sc;
 
-    FOR c_no IN 1..3 LOOP
-        -- 챌린지 생성 (상시형, 이벤트 아님, 30일 전 개설)
-        INSERT INTO challenge_dex (owner_id, name, description, period_type,
-                                   starts_at, ends_at, is_event, created_at)
-        SELECT v_owner, sc.name, sc.description, 'PERMANENT', base_ts, NULL, false, base_ts
-        FROM seed_challenge sc
-        WHERE sc.cno = c_no
-        RETURNING id INTO v_ch;
+-- cno → challenge_dex.id 매핑
+CREATE TEMP TABLE t_ch AS
+SELECT sc.cno, c.id AS challenge_id
+FROM challenge_dex c
+JOIN seed_challenge sc ON sc.name = c.name
+WHERE c.owner_id = (SELECT id FROM users WHERE provider = 'KAKAO' AND provider_id = 'seedcc_owner');
 
-        -- 슬롯 10개
-        INSERT INTO challenge_dex_slot (challenge_dex_id, food_name, place_name, lat, lng,
-                                        slot_order, store_name, description, image_key)
-        SELECT v_ch, ss.food_name, ss.place_name, ss.lat, ss.lng,
-               ss.slot_order, ss.store_name, ss.description, NULL
-        FROM seed_slot ss
-        WHERE ss.cno = c_no;
+-- 슬롯 10개씩
+INSERT INTO challenge_dex_slot (challenge_dex_id, food_name, place_name, lat, lng, slot_order, store_name, description, image_key)
+SELECT tc.challenge_id, ss.food_name, ss.place_name, ss.lat, ss.lng, ss.slot_order, ss.store_name, ss.description, NULL
+FROM seed_slot ss
+JOIN t_ch tc ON tc.cno = ss.cno;
 
-        SELECT count(*) INTO v_total FROM challenge_dex_slot WHERE challenge_dex_id = v_ch;
+-- seed 참여자 → (cno, g[1..10]) 매핑
+CREATE TEMP TABLE t_user AS
+SELECT u.id AS user_id,
+       ((cast(substring(u.provider_id from 'seedcc_p([0-9]+)') AS int) - 1) / 10) + 1 AS cno,
+       ((cast(substring(u.provider_id from 'seedcc_p([0-9]+)') AS int) - 1) % 10) + 1 AS g
+FROM users u
+WHERE u.provider = 'KAKAO' AND u.provider_id LIKE 'seedcc_p%';
 
-        -- 참여자 10명 (c_no=1 → p01..p10, 2 → p11..p20, 3 → p21..p30)
-        FOR p_idx IN 1..10 LOOP
-            SELECT id INTO v_uid FROM users
-             WHERE provider = 'KAKAO'
-               AND provider_id = 'seedcc_p' || lpad((((c_no - 1) * 10) + p_idx)::text, 2, '0');
+-- 4) 참여자 10명 (완주자 8: g<=8) -------------------------------------------
+INSERT INTO challenge_participant (challenge_dex_id, user_id, joined_at, completed_at)
+SELECT tc.challenge_id, tu.user_id,
+       now() - interval '30 days' + make_interval(hours => tu.g),
+       CASE WHEN tu.g <= 8
+            THEN now() - interval '30 days' + interval '10 days' + make_interval(hours => tu.g)
+            ELSE NULL END
+FROM t_user tu
+JOIN t_ch tc ON tc.cno = tu.cno;
 
-            v_done := (p_idx <= 8);   -- 앞 8명 완주, 뒤 2명 미완주
+-- 5) 해금 (완주=10, g=9 → 6개, g=10 → 3개) -----------------------------------
+INSERT INTO challenge_unlock (challenge_participant_id, slot_id, image_key, unlocked_at)
+SELECT p.id, s.id, NULL,
+       now() - interval '30 days' + make_interval(days => tu.g, hours => s.slot_order)
+FROM challenge_participant p
+JOIN t_user tu ON tu.user_id = p.user_id
+JOIN challenge_dex_slot s ON s.challenge_dex_id = p.challenge_dex_id
+WHERE s.slot_order < CASE WHEN tu.g <= 8 THEN 10 WHEN tu.g = 9 THEN 6 ELSE 3 END;
 
-            INSERT INTO challenge_participant (challenge_dex_id, user_id, joined_at, completed_at)
-            VALUES (
-                v_ch, v_uid,
-                base_ts + make_interval(hours => p_idx),
-                CASE WHEN v_done
-                     THEN base_ts + interval '10 days' + make_interval(hours => p_idx)
-                     ELSE NULL END
-            )
-            RETURNING id INTO v_part;
+-- 6) 음식 리뷰 (해금한 모든 슬롯) --------------------------------------------
+INSERT INTO review (reviewer_id, review_type, challenge_dex_id, slot_id, content, rating, like_count, created_at)
+SELECT p.user_id, 'FOOD', p.challenge_dex_id, s.id,
+       format(
+           (ARRAY[
+               '%1$s %2$s 정말 맛있었어요. 재방문 각!',
+               '기대 이상이었어요. %2$s 강추합니다.',
+               '%2$s 먹으러 또 올 것 같아요. (%1$s)',
+               '분위기도 좋고 %2$s도 훌륭했어요.',
+               '웨이팅은 있었지만 %1$s 만족스러웠어요.'
+           ])[1 + ((tu.g * 3 + s.slot_order) % 5)],
+           s.store_name, s.food_name
+       ),
+       3 + ((tu.g + s.slot_order) % 3),
+       0,
+       now() - interval '30 days' + make_interval(days => tu.g, hours => s.slot_order + 1)
+FROM challenge_unlock u
+JOIN challenge_participant p ON p.id = u.challenge_participant_id
+JOIN challenge_dex_slot s ON s.id = u.slot_id
+JOIN t_user tu ON tu.user_id = p.user_id;
 
-            -- 해금 슬롯 수: 완주=10, 9번째=6개, 10번째=3개
-            IF v_done THEN
-                v_unlock := v_total;
-            ELSIF p_idx = 9 THEN
-                v_unlock := 6;
-            ELSE
-                v_unlock := 3;
-            END IF;
+-- 7) 챌린지 리뷰 (완주자 8명) ------------------------------------------------
+INSERT INTO review (reviewer_id, review_type, challenge_dex_id, slot_id, content, rating, like_count, created_at)
+SELECT p.user_id, 'CHALLENGE', p.challenge_dex_id, NULL,
+       format(
+           (ARRAY[
+               '%1$s 완주 성공! 코스 구성이 알차서 즐거웠어요.',
+               '%1$s 도장깨기 끝냈습니다. 다음 챌린지도 기대돼요!',
+               '%1$s 덕분에 안 가본 맛집 다 도장 찍었네요. 강추!',
+               '%1$s 완주 인증! 난이도 적당하고 리스트가 좋아요.'
+           ])[1 + (tu.g % 4)],
+           sc.name
+       ),
+       4 + (tu.g % 2),
+       0,
+       now() - interval '30 days' + interval '10 days' + make_interval(hours => tu.g + 1)
+FROM challenge_participant p
+JOIN t_user tu ON tu.user_id = p.user_id
+JOIN t_ch tc ON tc.challenge_id = p.challenge_dex_id
+JOIN seed_challenge sc ON sc.cno = tc.cno
+WHERE tu.g <= 8;
 
-            -- 슬롯 순서대로 해금 + 음식 리뷰
-            FOR slot IN
-                SELECT id, food_name, store_name, slot_order
-                FROM challenge_dex_slot
-                WHERE challenge_dex_id = v_ch
-                ORDER BY slot_order
-                LIMIT v_unlock
-            LOOP
-                INSERT INTO challenge_unlock (challenge_participant_id, slot_id, image_key, unlocked_at)
-                VALUES (
-                    v_part, slot.id, NULL,
-                    base_ts + make_interval(days => p_idx, hours => slot.slot_order)
-                );
+-- 8) 좋아요: 각 리뷰마다 같은 챌린지의 다른 참여자 0~3명 ----------------------
+INSERT INTO review_like (review_id, user_id, created_at)
+SELECT r.id, x.user_id, now()
+FROM review r
+JOIN LATERAL (
+    SELECT p.user_id, row_number() OVER (ORDER BY p.user_id) AS rn
+    FROM challenge_participant p
+    WHERE p.challenge_dex_id = r.challenge_dex_id AND p.user_id <> r.reviewer_id
+) x ON x.rn <= (r.id % 4)
+WHERE r.reviewer_id IN (SELECT id FROM users WHERE provider = 'KAKAO' AND provider_id LIKE 'seedcc_%');
 
-                v_rating  := 3 + ((p_idx + slot.slot_order) % 3);   -- 3,4,5
-                v_content := format(
-                    tmpl[1 + ((p_idx * 3 + slot.slot_order) % 5)],
-                    slot.store_name, slot.food_name
-                );
-
-                INSERT INTO review (reviewer_id, review_type, challenge_dex_id, slot_id,
-                                    content, rating, like_count, created_at)
-                VALUES (
-                    v_uid, 'FOOD', v_ch, slot.id,
-                    v_content, v_rating, 0,
-                    base_ts + make_interval(days => p_idx, hours => slot.slot_order + 1)
-                );
-            END LOOP;
-        END LOOP;
-    END LOOP;
-
-    -- 좋아요: 각 음식 리뷰마다 같은 챌린지의 다른 참여자 0~3명이 좋아요
-    INSERT INTO review_like (review_id, user_id, created_at)
-    SELECT r.id, x.user_id, now()
-    FROM review r
-    JOIN LATERAL (
-        SELECT p.user_id, row_number() OVER (ORDER BY p.user_id) AS rn
-        FROM challenge_participant p
-        WHERE p.challenge_dex_id = r.challenge_dex_id
-          AND p.user_id <> r.reviewer_id
-    ) x ON x.rn <= (r.id % 4)
-    WHERE r.review_type = 'FOOD'
-      AND r.reviewer_id IN (
-          SELECT id FROM users WHERE provider = 'KAKAO' AND provider_id LIKE 'seedcc_%'
-      );
-
-    -- 비정규화 카운터 동기화
-    UPDATE review r
-       SET like_count = (SELECT count(*) FROM review_like l WHERE l.review_id = r.id)
-     WHERE r.reviewer_id IN (
-         SELECT id FROM users WHERE provider = 'KAKAO' AND provider_id LIKE 'seedcc_%'
-     );
-END $$;
+-- 비정규화 카운터 동기화
+UPDATE review r
+   SET like_count = (SELECT count(*) FROM review_like l WHERE l.review_id = r.id)
+ WHERE r.reviewer_id IN (SELECT id FROM users WHERE provider = 'KAKAO' AND provider_id LIKE 'seedcc_%');
 
 COMMIT;
 
--- 4) 확인용 요약 -------------------------------------------------------------
+-- 9) 확인용 요약 -------------------------------------------------------------
 SELECT c.id, c.name,
-       (SELECT count(*) FROM challenge_dex_slot s WHERE s.challenge_dex_id = c.id)                          AS slots,
-       (SELECT count(*) FROM challenge_participant p WHERE p.challenge_dex_id = c.id)                       AS participants,
-       (SELECT count(*) FROM challenge_participant p WHERE p.challenge_dex_id = c.id AND p.completed_at IS NOT NULL) AS completed,
-       (SELECT count(*) FROM review r WHERE r.challenge_dex_id = c.id AND r.review_type = 'FOOD')           AS food_reviews
+       (SELECT count(*) FROM challenge_dex_slot s WHERE s.challenge_dex_id = c.id)                                   AS slots,
+       (SELECT count(*) FROM challenge_participant p WHERE p.challenge_dex_id = c.id)                                AS participants,
+       (SELECT count(*) FROM challenge_participant p WHERE p.challenge_dex_id = c.id AND p.completed_at IS NOT NULL)  AS completed,
+       (SELECT count(*) FROM review r WHERE r.challenge_dex_id = c.id AND r.review_type = 'FOOD')                    AS food_reviews,
+       (SELECT count(*) FROM review r WHERE r.challenge_dex_id = c.id AND r.review_type = 'CHALLENGE')               AS challenge_reviews
 FROM challenge_dex c
 WHERE c.owner_id = (SELECT id FROM users WHERE provider = 'KAKAO' AND provider_id = 'seedcc_owner')
 ORDER BY c.id;
