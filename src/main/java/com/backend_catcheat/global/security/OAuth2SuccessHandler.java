@@ -35,6 +35,9 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     @Value("${app.oauth2.authorized-redirect-uri}")
     private String redirectUri;
 
+    @Value("${app.auth.cookie-secure}")
+    private boolean cookieSecure;
+
     @Override
     public void onAuthenticationSuccess(
             HttpServletRequest request,
@@ -64,10 +67,12 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     private void addCookie(HttpServletResponse response, String name, String value, long maxAgeMs) {
         ResponseCookie cookie = ResponseCookie.from(name, value)
                 .httpOnly(true)          // JS에서 접근 불가 (XSS 방어)
-                .secure(false)           // 운영(HTTPS)에서는 true로. 로컬 http 개발이라 우선 false
+                .secure(cookieSecure)    // 운영(HTTPS) true / 로컬(http) false
                 .path("/")               // 모든 경로에서 전송
                 .maxAge(Duration.ofMillis(maxAgeMs))
-                .sameSite("Lax")         // CSRF 완화. 크로스 사이트 요청엔 쿠키 미전송
+                // CSRF 완화. projectjm.co.kr과 api.projectjm.co.kr은 등록 도메인이 같아
+                // 크로스 오리진이어도 same-site라 Lax로도 쿠키가 실려 간다
+                .sameSite("Lax")
                 .build();
         response.addHeader("Set-Cookie", cookie.toString());
     }

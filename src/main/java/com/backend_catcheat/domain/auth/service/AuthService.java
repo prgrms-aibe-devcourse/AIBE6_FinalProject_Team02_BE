@@ -7,6 +7,7 @@ import com.backend_catcheat.domain.auth.token.RefreshTokenStore;
 import com.backend_catcheat.global.jwt.JwtTokenProvider;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,10 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenStore refreshTokenStore;
     private final UserRepository userRepository;
+
+    /** 로그인 때 구운 쿠키와 같은 값이어야 한다. 다르면 재발급이 Secure를 벗겨 덮어쓴다 */
+    @Value("${app.auth.cookie-secure}")
+    private boolean cookieSecure;
 
     /**
      * access token 재발급.
@@ -87,10 +92,11 @@ public class AuthService {
     private void addCookie(HttpServletResponse response, String name, String value, long maxAgeMs) {
         ResponseCookie cookie = ResponseCookie.from(name, value)
                 .httpOnly(true)
-                .secure(false)      // 운영(HTTPS)에서는 true
+                .secure(cookieSecure)   // 운영(HTTPS) true / 로컬(http) false
                 .path("/")
                 .maxAge(Duration.ofMillis(maxAgeMs))
-                //lax: 크로스 사이트 요청 시 쿠키를 보내지 않음, strict: 크로스 사이트 요청 시 쿠키를 보내지 않음, none: 크로스 사이트 요청 시 쿠키를 보냄
+                // projectjm.co.kr과 api.projectjm.co.kr은 등록 도메인이 같아 same-site다.
+                // 크로스 오리진이어도 Lax로 쿠키가 실려 가므로 None까지 풀 이유가 없다
                 .sameSite("Lax")
                 .build();
         response.addHeader("Set-Cookie", cookie.toString());
@@ -100,7 +106,7 @@ public class AuthService {
     private void expireCookie(HttpServletResponse response, String name) {
         ResponseCookie cookie = ResponseCookie.from(name, "")
                 .httpOnly(true)
-                .secure(false)
+                .secure(cookieSecure)
                 .path("/")
                 .maxAge(0)
                 .sameSite("Lax")
