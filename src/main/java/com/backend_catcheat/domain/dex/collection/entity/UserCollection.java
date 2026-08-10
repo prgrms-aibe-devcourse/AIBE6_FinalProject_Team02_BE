@@ -37,6 +37,10 @@ public class UserCollection extends BaseEntity {
     @Column(name = "first_collected_at", nullable = false)
     private LocalDateTime firstCollectedAt;
 
+    /** New 스티커를 확인한 시각. null이면 아직 안 본 것 */
+    @Column(name = "new_badge_seen_at")
+    private LocalDateTime newBadgeSeenAt;
+
     private UserCollection(Long userId, Long slotId, LocalDateTime collectedAt) {
         this.userId = userId;
         this.slotId = slotId;
@@ -59,5 +63,17 @@ public class UserCollection extends BaseEntity {
 
     public boolean isMaxRank() {
         return rank >= MAX_RANK;
+    }
+
+    /** 상세를 열어 New를 확인한 순간 */
+    public void markNewBadgeSeen(LocalDateTime seenAt) {
+        if (this.newBadgeSeenAt == null) {
+            this.newBadgeSeenAt = seenAt;
+        }
+    }
+
+    /** New 스티커를 붙일 수 있는 상태인지 (24시간 창은 호출부가 함께 본다) */
+    public boolean isNewBadgeUnseen() {
+        return newBadgeSeenAt == null;
     }
 }
