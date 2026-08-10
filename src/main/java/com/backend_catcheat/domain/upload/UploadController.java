@@ -6,6 +6,7 @@ import com.backend_catcheat.domain.upload.dto.UploadPurpose;
 import com.backend_catcheat.global.common.ApiResponse;
 import com.backend_catcheat.global.s3.S3PresignedUrlService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,14 +21,18 @@ public class UploadController {
     private final S3PresignedUrlService s3PresignedUrlService;
 
     @PostMapping
-    public ApiResponse<PresignedUploadResponseDTO> createPresignedUploadUrls(@RequestBody PresignedUploadRequestDTO request) {
-        return ApiResponse.ok(s3PresignedUrlService.createUploadUrls(request, UploadPurpose.DEFAULT));
+    public ApiResponse<PresignedUploadResponseDTO> createPresignedUploadUrls(
+            @AuthenticationPrincipal Long userId,
+            @RequestBody PresignedUploadRequestDTO request) {
+        return ApiResponse.ok(s3PresignedUrlService.createUploadUrls(userId, request, UploadPurpose.DEFAULT));
     }
 
     /** 로그잇 식사 기록용. 기본 도감보다 많은 장수를 허용한다 */
     @PostMapping("/logit-records")
-    public ApiResponse<PresignedUploadResponseDTO> createLogitRecordUploadUrls(@RequestBody PresignedUploadRequestDTO request) {
-        return ApiResponse.ok(s3PresignedUrlService.createUploadUrls(request, UploadPurpose.LOGIT_RECORD));
+    public ApiResponse<PresignedUploadResponseDTO> createLogitRecordUploadUrls(
+            @AuthenticationPrincipal Long userId,
+            @RequestBody PresignedUploadRequestDTO request) {
+        return ApiResponse.ok(s3PresignedUrlService.createUploadUrls(userId, request, UploadPurpose.LOGIT_RECORD));
     }
 
 }

@@ -3,6 +3,8 @@ package com.backend_catcheat.domain.made.service;
 import com.backend_catcheat.domain.auth.entity.User;
 import com.backend_catcheat.domain.auth.repository.UserRepository;
 import com.backend_catcheat.domain.made.dto.MadeDexRecordCreateRequestDTO;
+import com.backend_catcheat.domain.made.dto.MadeDexRecordCreateRequestDTO.PhotoInput;
+import com.backend_catcheat.domain.made.dto.MadeDexRecordUpdateRequestDTO.KeptPhoto;
 import com.backend_catcheat.domain.made.dto.MadeDexRecordCreateResponseDTO;
 import com.backend_catcheat.domain.made.dto.MadeDexRecordDetailDTO;
 import com.backend_catcheat.domain.made.dto.MadeDexRecordPhotoDTO;
@@ -16,6 +18,8 @@ import com.backend_catcheat.domain.made.repository.MadeDexRecordFoodRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexRecordPhotoRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexRecordRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexSlotRepository;
+import com.backend_catcheat.domain.upload.dto.UploadPurpose;
+import com.backend_catcheat.domain.upload.service.UploadObjectService;
 import com.backend_catcheat.global.config.TimeConfig;
 import com.backend_catcheat.global.event.S3ObjectUnusedEvent;
 import com.backend_catcheat.global.exception.CustomException;
@@ -29,8 +33,10 @@ import org.springframework.util.StringUtils;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +58,7 @@ public class MadeDexRecordService {
     private final MadeDexFinder madeDexFinder;
     private final UserRepository userRepository;
     private final S3PresignedUrlService s3PresignedUrlService;
+    private final UploadObjectService uploadObjectService;
     private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
 
@@ -61,15 +68,14 @@ public class MadeDexRecordService {
         requireMember(madeDexId, userId);
         MadeDexSlot slot = writableSlot(madeDexId, request.slotId());
         LocalDate loggedOn = validLoggedOn(request.loggedOn());
-        List<String> imageKeys = validImageKeys(request.imageKeys(), true);
+        List<PhotoInput> photos = validPhotos(userId, request.photos(), true);
         List<String> foodNames = validFoodNames(request.foodNames());
 
         MadeDexRecord record = madeDexRecordRepository.save(MadeDexRecord.write(
-                madeDexId, slot.getId(), userId, loggedOn,
-                validMemo(request.memo()), validLocationName(request.locationName()),
-                request.lat(), request.lng()));
+                madeDexId, slot.getId(), userId, loggedOn, loggedAt(loggedOn, request.loggedTime()),
+                validLocationName(request.locationName()), request.lat(), request.lng()));
 
-        savePhotos(record.getId(), imageKeys, 0);
+        savePhotos(record.getId(), photos, 0);
         saveFoods(record.getId(), foodNames);
 
         return new MadeDexRecordCreateResponseDTO(record.getId());
@@ -85,13 +91,13 @@ public class MadeDexRecordService {
 
         List<MadeDexRecordPhoto> current =
                 madeDexRecordPhotoRepository.findByRecordIdOrderBySortOrderAsc(recordId);
-        List<MadeDexRecordPhoto> kept = keptPhotos(current, request.keepPhotoIds());
-        List<String> newImageKeys = validImageKeys(request.newImageKeys(), false);
-        requirePhotoCount(kept.size() + newImageKeys.size());
+        List<KeptPhoto> keepRequests = request.keepPhotos() == null ? List.of() : request.keepPhotos();
+        List<MadeDexRecordPhoto> kept = keptPhotos(current, keepRequests);
+        List<PhotoInput> newPhotos = validPhotos(userId, request.newPhotos(), false);
+        requirePhotoCount(kept.size() + newPhotos.size());
 
-        record.update(slot.getId(), loggedOn,
-                validMemo(request.memo()), validLocationName(request.locationName()),
-                request.lat(), request.lng());
+        record.update(slot.getId(), loggedOn, loggedAt(loggedOn, request.loggedTime()),
+                validLocationName(request.locationName()), request.lat(), request.lng());
 
         Set<Long> keptIds = kept.stream().map(MadeDexRecordPhoto::getId).collect(Collectors.toSet());
         List<MadeDexRecordPhoto> dropped = current.stream()
@@ -99,11 +105,20 @@ public class MadeDexRecordService {
                 .toList();
         madeDexRecordPhotoRepository.deleteAll(dropped);
 
+        // 글이 없는 사진이 흔하고 Collectors.toMap은 null 값을 받지 않는다
+        Map<Long, String> captionById = new HashMap<>();
+        for (KeptPhoto keep : keepRequests) {
+            if (keep.photoId() != null) {
+                captionById.put(keep.photoId(), validCaption(keep.caption()));
+            }
+        }
+
         int order = 0;
         for (MadeDexRecordPhoto photo : kept) {
             photo.moveTo(order++);
+            photo.writeCaption(captionById.get(photo.getId()));
         }
-        savePhotos(recordId, newImageKeys, order);
+        savePhotos(recordId, newPhotos, order);
 
         madeDexRecordFoodRepository.deleteByRecordId(recordId);
         saveFoods(recordId, foodNames);
@@ -133,13 +148,14 @@ public class MadeDexRecordService {
     }
 
     /** 요청한 순서대로 유지할 사진을 고른다. 이 기록의 사진이 아니면 거절한다 */
-    private List<MadeDexRecordPhoto> keptPhotos(List<MadeDexRecordPhoto> current, List<Long> keepPhotoIds) {
-        if (keepPhotoIds == null || keepPhotoIds.isEmpty()) {
+    private List<MadeDexRecordPhoto> keptPhotos(List<MadeDexRecordPhoto> current, List<KeptPhoto> keepPhotos) {
+        if (keepPhotos.isEmpty()) {
             return List.of();
         }
         Map<Long, MadeDexRecordPhoto> byId = current.stream()
                 .collect(Collectors.toMap(MadeDexRecordPhoto::getId, Function.identity()));
-        return keepPhotoIds.stream()
+        return keepPhotos.stream()
+                .map(KeptPhoto::photoId)
                 .distinct()
                 .map(photoId -> {
                     MadeDexRecordPhoto photo = byId.get(photoId);
@@ -165,7 +181,8 @@ public class MadeDexRecordService {
                 .findByRecordIdOrderBySortOrderAsc(recordId).stream()
                 .map(photo -> new MadeDexRecordPhotoDTO(
                         photo.getId(),
-                        s3PresignedUrlService.createDownloadUrl(photo.getImageKey())))
+                        s3PresignedUrlService.createDownloadUrl(photo.getImageKey()),
+                        photo.getCaption()))
                 .toList();
         List<String> foodNames = madeDexRecordFoodRepository
                 .findByRecordIdOrderBySortOrderAsc(recordId).stream()
@@ -186,11 +203,10 @@ public class MadeDexRecordService {
                 record.isAuthor(userId),
                 photos,
                 foodNames,
-                record.getMemo(),
                 record.getLocationName(),
                 record.getLat(),
                 record.getLng(),
-                record.getCreatedAt());
+                record.getLoggedAt());
     }
 
     private MadeDexRecord authoredRecord(Long userId, Long madeDexId, Long recordId) {
@@ -232,10 +248,12 @@ public class MadeDexRecordService {
         }
     }
 
-    private void savePhotos(Long recordId, List<String> imageKeys, int startOrder) {
-        List<MadeDexRecordPhoto> photos = new ArrayList<>(imageKeys.size());
-        for (int i = 0; i < imageKeys.size(); i++) {
-            photos.add(MadeDexRecordPhoto.of(recordId, imageKeys.get(i), startOrder + i));
+    private void savePhotos(Long recordId, List<PhotoInput> inputs, int startOrder) {
+        List<MadeDexRecordPhoto> photos = new ArrayList<>(inputs.size());
+        for (int i = 0; i < inputs.size(); i++) {
+            PhotoInput input = inputs.get(i);
+            photos.add(MadeDexRecordPhoto.of(
+                    recordId, input.imageKey(), validCaption(input.caption()), startOrder + i));
         }
         madeDexRecordPhotoRepository.saveAll(photos);
     }
@@ -258,20 +276,31 @@ public class MadeDexRecordService {
         return loggedOn;
     }
 
-    private List<String> validImageKeys(List<String> rawImageKeys, boolean required) {
+    private List<PhotoInput> validPhotos(Long userId, List<PhotoInput> rawPhotos, boolean required) {
         // 같은 key가 두 번 오면 한 객체를 가리키는 행이 둘 생겨 장수 표시가 부풀고 정리 판정도 어긋난다
-        List<String> imageKeys = rawImageKeys == null ? List.of() : rawImageKeys.stream()
-                .map(this::blankToNull)
+        Set<String> seen = new HashSet<>();
+        List<PhotoInput> photos = rawPhotos == null ? List.of() : rawPhotos.stream()
                 .filter(Objects::nonNull)
-                .distinct()
+                .filter(photo -> blankToNull(photo.imageKey()) != null)
+                .filter(photo -> seen.add(photo.imageKey().trim()))
+                .map(photo -> new PhotoInput(photo.imageKey().trim(), photo.caption()))
                 .toList();
         if (required) {
-            requirePhotoCount(imageKeys.size());
+            requirePhotoCount(photos.size());
         }
+        List<String> imageKeys = photos.stream().map(PhotoInput::imageKey).toList();
         if (imageKeys.stream().anyMatch(key -> key.length() > MadeDexRecordPhoto.IMAGE_KEY_MAX)) {
             throw new CustomException(ErrorCode.MADE_DEX_IMAGE_KEY_TOO_LONG);
         }
-        return imageKeys;
+        photos.forEach(photo -> validCaption(photo.caption()));
+        // key만 알면 남의 사진을 자기 기록에 붙일 수 있어, 발급받은 사람이 맞는지 본다
+        uploadObjectService.requireUsableBy(userId, imageKeys, UploadPurpose.LOGIT_RECORD);
+        return photos;
+    }
+
+    /** 적지 않으면 시각을 남기지 않는다. 날짜는 기록한 날을 그대로 쓴다 */
+    private LocalDateTime loggedAt(LocalDate loggedOn, LocalTime loggedTime) {
+        return loggedTime == null ? null : loggedOn.atTime(loggedTime);
     }
 
     private void requirePhotoCount(int count) {
@@ -283,26 +312,24 @@ public class MadeDexRecordService {
         }
     }
 
+    /** 음식명은 더 이상 기록 화면에서 받지 않는다. 예전 기록과 냉장고를 위해 받기만 한다 */
     private List<String> validFoodNames(List<String> rawFoodNames) {
         List<String> foodNames = rawFoodNames == null ? List.of() : rawFoodNames.stream()
                 .map(this::blankToNull)
                 .filter(Objects::nonNull)
                 .toList();
-        if (foodNames.isEmpty()) {
-            throw new CustomException(ErrorCode.MADE_DEX_RECORD_FOOD_REQUIRED);
-        }
         if (foodNames.stream().anyMatch(name -> name.length() > MadeDexRecord.FOOD_NAME_MAX)) {
             throw new CustomException(ErrorCode.MADE_DEX_RECORD_FOOD_NAME_TOO_LONG);
         }
         return foodNames;
     }
 
-    private String validMemo(String rawMemo) {
-        String memo = blankToNull(rawMemo);
-        if (memo != null && memo.length() > MadeDexRecord.MEMO_MAX) {
-            throw new CustomException(ErrorCode.MADE_DEX_RECORD_MEMO_TOO_LONG);
+    private String validCaption(String rawCaption) {
+        String caption = blankToNull(rawCaption);
+        if (caption != null && caption.length() > MadeDexRecordPhoto.CAPTION_MAX) {
+            throw new CustomException(ErrorCode.MADE_DEX_RECORD_CAPTION_TOO_LONG);
         }
-        return memo;
+        return caption;
     }
 
     private String validLocationName(String rawLocationName) {

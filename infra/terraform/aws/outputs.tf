@@ -39,7 +39,3 @@ output "ecr_repository_url" {
   value       = aws_ecr_repository.backend.repository_url
 }
 
-output "github_actions_role_arn" {
-  description = "Workflow 가 참조하는 role ARN"
-  value       = aws_iam_role.github_actions_ecr_push.arn
-}
