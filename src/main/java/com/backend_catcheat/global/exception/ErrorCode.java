@@ -29,6 +29,9 @@ public enum ErrorCode {
     UPLOAD_FILE_INFO_REQUIRED(HttpStatus.BAD_REQUEST, "업로드할 파일 정보가 필요해요"),
     UPLOAD_FILE_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "파일 이름이 필요해요"),
     INVALID_UPLOAD_FILE(HttpStatus.BAD_REQUEST, "지원하지 않는 이미지 형식이에요"),
+    // key를 알아내 남의 사진을 자기 기록에 붙이는 것을 막는다
+    UPLOAD_OBJECT_NOT_OWNED(HttpStatus.FORBIDDEN, "내가 올린 사진만 쓸 수 있어요"),
+    UPLOAD_OBJECT_PURPOSE_MISMATCH(HttpStatus.BAD_REQUEST, "다른 곳에 올린 사진이에요. 다시 올려 주세요"),
 
     // 등록 — 입력 검증
     PHOTO_REQUIRED(HttpStatus.BAD_REQUEST, "사진을 최소 1장 올려 주세요"),
@@ -106,7 +109,15 @@ public enum ErrorCode {
     CHALLENGE_LOCATION_REQUIRED(HttpStatus.BAD_REQUEST, "현재 위치 정보가 필요해요"),
     CHALLENGE_LOCATION_TOO_FAR(HttpStatus.BAD_REQUEST, "목표 위치에서 너무 멀어요"),
 
-
+    //리뷰
+    //리뷰 (음식 리뷰=해금 후 / 챌린지 리뷰=완료 후)
+    REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "리뷰를 찾을 수 없어요"),
+    REVIEW_FORBIDDEN(HttpStatus.FORBIDDEN, "내가 쓴 리뷰만 고치거나 지울 수 있어요"),
+    REVIEW_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 리뷰를 남겼어요"),
+    REVIEW_REQUIRES_UNLOCK(HttpStatus.CONFLICT, "이 음식을 인증한 뒤에 리뷰를 쓸 수 있어요"),
+    REVIEW_REQUIRES_COMPLETION(HttpStatus.CONFLICT, "챌린지를 완료한 뒤에 리뷰를 쓸 수 있어요"),
+    REVIEW_CONTENT_TOO_LONG(HttpStatus.BAD_REQUEST, "리뷰는 500자까지 쓸 수 있어요"),
+    REVIEW_RATING_INVALID(HttpStatus.BAD_REQUEST, "별점은 1~5 사이로 골라 주세요"),
 
     // 제작 도감
     MADE_DEX_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "도감 이름을 입력해 주세요"),
@@ -143,7 +154,7 @@ public enum ErrorCode {
     MADE_DEX_RECORD_PHOTO_NOT_FOUND(HttpStatus.BAD_REQUEST, "이 기록의 사진이 아니에요"),
     MADE_DEX_RECORD_FOOD_REQUIRED(HttpStatus.BAD_REQUEST, "먹은 음식을 하나 이상 적어 주세요"),
     MADE_DEX_RECORD_FOOD_NAME_TOO_LONG(HttpStatus.BAD_REQUEST, "음식 이름은 100자까지 쓸 수 있어요"),
-    MADE_DEX_RECORD_MEMO_TOO_LONG(HttpStatus.BAD_REQUEST, "메모는 100자까지 쓸 수 있어요"),
+    MADE_DEX_RECORD_CAPTION_TOO_LONG(HttpStatus.BAD_REQUEST, "사진에 붙이는 글은 100자까지 쓸 수 있어요"),
     MADE_DEX_RECORD_LOCATION_TOO_LONG(HttpStatus.BAD_REQUEST, "장소 이름이 너무 길어요"),
     MADE_DEX_RECORD_DATE_REQUIRED(HttpStatus.BAD_REQUEST, "날짜를 골라 주세요"),
     MADE_DEX_RECORD_FUTURE_DATE(HttpStatus.BAD_REQUEST, "아직 오지 않은 날은 기록할 수 없어요"),

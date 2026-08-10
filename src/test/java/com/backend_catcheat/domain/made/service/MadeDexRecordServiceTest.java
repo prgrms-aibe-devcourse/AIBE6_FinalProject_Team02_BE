@@ -2,6 +2,8 @@ package com.backend_catcheat.domain.made.service;
 
 import com.backend_catcheat.domain.auth.repository.UserRepository;
 import com.backend_catcheat.domain.made.dto.MadeDexRecordCreateRequestDTO;
+import com.backend_catcheat.domain.made.dto.MadeDexRecordCreateRequestDTO.PhotoInput;
+import com.backend_catcheat.domain.made.dto.MadeDexRecordUpdateRequestDTO.KeptPhoto;
 import com.backend_catcheat.domain.made.dto.MadeDexRecordUpdateRequestDTO;
 import com.backend_catcheat.domain.made.entity.MadeDex;
 import com.backend_catcheat.domain.made.entity.MadeDexRecord;
@@ -16,6 +18,8 @@ import com.backend_catcheat.domain.made.repository.MadeDexSlotRepository;
 import com.backend_catcheat.global.event.S3ObjectUnusedEvent;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
+import com.backend_catcheat.domain.upload.dto.UploadPurpose;
+import com.backend_catcheat.domain.upload.service.UploadObjectService;
 import com.backend_catcheat.global.s3.S3PresignedUrlService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,6 +35,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -61,6 +66,7 @@ class MadeDexRecordServiceTest {
     // 한국 시각으로는 8월 7일 오전이지만 UTC로는 아직 8월 6일인 순간
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 8, 6, 23, 30);
     private static final LocalDate TODAY_SEOUL = LocalDate.of(2026, 8, 7);
+    private static final LocalDateTime NOW_SEOUL = LocalDateTime.of(2026, 8, 7, 8, 30);
 
     private final Clock clock = Clock.fixed(NOW.atZone(ZoneId.of("UTC")).toInstant(), ZoneId.of("UTC"));
 
@@ -72,6 +78,7 @@ class MadeDexRecordServiceTest {
     @Mock MadeDexFinder madeDexFinder;
     @Mock UserRepository userRepository;
     @Mock S3PresignedUrlService s3PresignedUrlService;
+    @Mock UploadObjectService uploadObjectService;
     @Mock ApplicationEventPublisher eventPublisher;
 
     MadeDexRecordService service;
@@ -81,7 +88,7 @@ class MadeDexRecordServiceTest {
         service = new MadeDexRecordService(
                 madeDexRecordRepository, madeDexRecordPhotoRepository, madeDexRecordFoodRepository,
                 madeDexSlotRepository, madeDexMemberRepository, madeDexFinder,
-                userRepository, s3PresignedUrlService, eventPublisher, clock);
+                userRepository, s3PresignedUrlService, uploadObjectService, eventPublisher, clock);
 
         when(madeDexFinder.active(MADE_DEX_ID)).thenReturn(madeDex());
         when(madeDexMemberRepository.existsByMadeDexIdAndUserId(MADE_DEX_ID, AUTHOR_ID)).thenReturn(true);
@@ -98,6 +105,61 @@ class MadeDexRecordServiceTest {
         service.create(AUTHOR_ID, MADE_DEX_ID, request(TODAY_SEOUL, List.of("key1"), List.of("김치찌개")));
 
         verify(madeDexRecordRepository).save(any(MadeDexRecord.class));
+    }
+
+    @Test
+    @DisplayName("시각을 적으면 기록한 날짜에 붙여 남긴다")
+    void 적어_준_시각을_남긴다() {
+        service.create(AUTHOR_ID, MADE_DEX_ID, new MadeDexRecordCreateRequestDTO(
+                SLOT_ID, TODAY_SEOUL, LocalTime.of(16, 0),
+                List.of(new PhotoInput("key1", null)), List.of(), null, null, null));
+
+        ArgumentCaptor<MadeDexRecord> captor = ArgumentCaptor.forClass(MadeDexRecord.class);
+        verify(madeDexRecordRepository).save(captor.capture());
+        assertThat(captor.getValue().getLoggedAt()).isEqualTo(TODAY_SEOUL.atTime(16, 0));
+    }
+
+    @Test
+    @DisplayName("시각을 안 적으면 비워 둔다 — 화면도 시각을 띄우지 않는다")
+    void 시각을_안_적으면_비운다() {
+        service.create(AUTHOR_ID, MADE_DEX_ID, request(TODAY_SEOUL, List.of("key1"), List.of()));
+
+        ArgumentCaptor<MadeDexRecord> captor = ArgumentCaptor.forClass(MadeDexRecord.class);
+        verify(madeDexRecordRepository).save(captor.capture());
+        assertThat(captor.getValue().getLoggedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("사진 key를 쓸 자격이 있는지 발급 기록으로 확인한다")
+    void 사진_key의_주인을_확인한다() {
+        service.create(AUTHOR_ID, MADE_DEX_ID, request(TODAY_SEOUL, List.of("key1"), List.of("김치찌개")));
+
+        verify(uploadObjectService).requireUsableBy(AUTHOR_ID, List.of("key1"), UploadPurpose.LOGIT_RECORD);
+    }
+
+    @Test
+    @DisplayName("글은 사진마다 붙는다")
+    void 캡션을_사진마다_저장한다() {
+        service.create(AUTHOR_ID, MADE_DEX_ID, requestWithPhotos(TODAY_SEOUL,
+                List.of(new PhotoInput("key1", "츠르릅"), new PhotoInput("key2", null)),
+                List.of("김치찌개")));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<MadeDexRecordPhoto>> captor = ArgumentCaptor.forClass(List.class);
+        verify(madeDexRecordPhotoRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).extracting(MadeDexRecordPhoto::getCaption)
+                .containsExactly("츠르릅", null);
+    }
+
+    @Test
+    @DisplayName("사진에 붙이는 글이 100자를 넘으면 거절한다")
+    void 너무_긴_캡션은_거절한다() {
+        String tooLong = "가".repeat(MadeDexRecordPhoto.CAPTION_MAX + 1);
+
+        assertThatThrownBy(() -> service.create(AUTHOR_ID, MADE_DEX_ID, requestWithPhotos(TODAY_SEOUL,
+                List.of(new PhotoInput("key1", tooLong)), List.of("김치찌개"))))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.MADE_DEX_RECORD_CAPTION_TOO_LONG);
     }
 
     @Test
@@ -177,7 +239,8 @@ class MadeDexRecordServiceTest {
     void 너무_긴_장소_이름은_거절한다() {
         String tooLong = "가".repeat(MadeDexRecord.LOCATION_NAME_MAX + 1);
         MadeDexRecordCreateRequestDTO request = new MadeDexRecordCreateRequestDTO(
-                SLOT_ID, TODAY_SEOUL, List.of("key1"), List.of("김치찌개"), null, tooLong, null, null);
+                SLOT_ID, TODAY_SEOUL, null, List.of(new PhotoInput("key1", null)), List.of("김치찌개"),
+                tooLong, null, null);
 
         assertThatThrownBy(() -> service.create(AUTHOR_ID, MADE_DEX_ID, request))
                 .isInstanceOf(CustomException.class)
@@ -185,12 +248,11 @@ class MadeDexRecordServiceTest {
     }
 
     @Test
-    @DisplayName("음식 이름이 없으면 거절한다")
-    void 음식명이_없으면_거절한다() {
-        assertThatThrownBy(() -> service.create(AUTHOR_ID, MADE_DEX_ID,
-                request(TODAY_SEOUL, List.of("key1"), List.of("  "))))
-                .isInstanceOf(CustomException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.MADE_DEX_RECORD_FOOD_REQUIRED);
+    @DisplayName("음식 이름은 없어도 된다 — 기록 화면에서 더 이상 받지 않는다")
+    void 음식명이_없어도_기록한다() {
+        service.create(AUTHOR_ID, MADE_DEX_ID, request(TODAY_SEOUL, List.of("key1"), List.of()));
+
+        verify(madeDexRecordRepository).save(any(MadeDexRecord.class));
     }
 
     @Test
@@ -255,7 +317,7 @@ class MadeDexRecordServiceTest {
         MadeDexRecord record = record(AUTHOR_ID, MADE_DEX_ID);
         when(madeDexRecordRepository.findActiveByIdForUpdate(RECORD_ID)).thenReturn(Optional.of(record));
         when(madeDexRecordPhotoRepository.findByRecordIdOrderBySortOrderAsc(RECORD_ID))
-                .thenReturn(List.of(MadeDexRecordPhoto.of(RECORD_ID, "key1", 0)));
+                .thenReturn(List.of(MadeDexRecordPhoto.of(RECORD_ID, "key1", null, 0)));
 
         service.delete(AUTHOR_ID, MADE_DEX_ID, RECORD_ID);
 
@@ -292,6 +354,22 @@ class MadeDexRecordServiceTest {
     }
 
     @Test
+    @DisplayName("사진은 그대로 두고 글만 고칠 수 있다")
+    void 남겨_둔_사진의_글을_고친다() {
+        MadeDexRecord record = record(AUTHOR_ID, MADE_DEX_ID);
+        MadeDexRecordPhoto kept = photo(1L, "keep", 0);
+        when(madeDexRecordRepository.findActiveByIdForUpdate(RECORD_ID)).thenReturn(Optional.of(record));
+        when(madeDexRecordPhotoRepository.findByRecordIdOrderBySortOrderAsc(RECORD_ID))
+                .thenReturn(List.of(kept));
+
+        service.update(AUTHOR_ID, MADE_DEX_ID, RECORD_ID, new MadeDexRecordUpdateRequestDTO(
+                SLOT_ID, TODAY_SEOUL, null, List.of(new KeptPhoto(1L, "고친 글")), List.of(),
+                List.of("김치찌개"), null, null, null));
+
+        assertThat(kept.getCaption()).isEqualTo("고친 글");
+    }
+
+    @Test
     @DisplayName("남의 기록에 붙은 사진 id는 유지 목록에 넣을 수 없다")
     void 이_기록의_사진이_아니면_거절한다() {
         MadeDexRecord record = record(AUTHOR_ID, MADE_DEX_ID);
@@ -321,14 +399,22 @@ class MadeDexRecordServiceTest {
     }
 
     private MadeDexRecordCreateRequestDTO request(LocalDate loggedOn, List<String> keys, List<String> foods) {
-        return new MadeDexRecordCreateRequestDTO(SLOT_ID, loggedOn, keys, foods, null, null, null, null);
+        return requestWithPhotos(loggedOn, keys.stream().map(key -> new PhotoInput(key, null)).toList(), foods);
+    }
+
+    private MadeDexRecordCreateRequestDTO requestWithPhotos(LocalDate loggedOn, List<PhotoInput> photos,
+                                                            List<String> foods) {
+        return new MadeDexRecordCreateRequestDTO(SLOT_ID, loggedOn, null, photos, foods, null, null, null);
     }
 
     private MadeDexRecordUpdateRequestDTO updateRequest(LocalDate loggedOn,
                                                         List<Long> keepPhotoIds, List<String> newKeys,
                                                         List<String> foods) {
         return new MadeDexRecordUpdateRequestDTO(
-                SLOT_ID, loggedOn, keepPhotoIds, newKeys, foods, null, null, null, null);
+                SLOT_ID, loggedOn, null,
+                keepPhotoIds.stream().map(photoId -> new KeptPhoto(photoId, null)).toList(),
+                newKeys.stream().map(key -> new PhotoInput(key, null)).toList(),
+                foods, null, null, null);
     }
 
     private MadeDex madeDex() {
@@ -344,14 +430,14 @@ class MadeDexRecordServiceTest {
     }
 
     private MadeDexRecordPhoto photo(Long id, String imageKey, int sortOrder) {
-        MadeDexRecordPhoto photo = MadeDexRecordPhoto.of(RECORD_ID, imageKey, sortOrder);
+        MadeDexRecordPhoto photo = MadeDexRecordPhoto.of(RECORD_ID, imageKey, null, sortOrder);
         ReflectionTestUtils.setField(photo, "id", id);
         return photo;
     }
 
     private MadeDexRecord record(Long authorId, Long madeDexId) {
         MadeDexRecord record = MadeDexRecord.write(
-                madeDexId, SLOT_ID, authorId, TODAY_SEOUL, null, null, null, null);
+                madeDexId, SLOT_ID, authorId, TODAY_SEOUL, NOW_SEOUL, null, null, null);
         ReflectionTestUtils.setField(record, "id", RECORD_ID);
         return record;
     }

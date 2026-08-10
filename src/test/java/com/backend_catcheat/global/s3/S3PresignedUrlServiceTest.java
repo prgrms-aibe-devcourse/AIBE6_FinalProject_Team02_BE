@@ -2,6 +2,7 @@ package com.backend_catcheat.global.s3;
 
 import com.backend_catcheat.domain.upload.dto.PresignedUploadRequestDTO;
 import com.backend_catcheat.domain.upload.dto.UploadPurpose;
+import com.backend_catcheat.domain.upload.service.UploadObjectService;
 import com.backend_catcheat.domain.upload.dto.PresignedUploadRequestDTO.FileInfo;
 import com.backend_catcheat.domain.upload.dto.PresignedUploadResponseDTO;
 import com.backend_catcheat.global.exception.CustomException;
@@ -19,6 +20,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -35,8 +37,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class S3PresignedUrlServiceTest {
 
     private static final String BUCKET = "test-bucket";
+    private static final long UPLOADER_ID = 1L;
 
     private S3PresignedUrlService service;
+    private UploadObjectService uploadObjectService;
 
     @BeforeEach
     void setUp() {
@@ -46,13 +50,15 @@ class S3PresignedUrlServiceTest {
                         AwsBasicCredentials.create("dummy-access-key", "dummy-secret-key")))
                 .build();
 
+        uploadObjectService = mock(UploadObjectService.class);
         service = new S3PresignedUrlService(
                 presigner, mock(S3Client.class),
-                new S3Properties(BUCKET, "ap-northeast-2", "dummy-access-key", "dummy-secret-key", null));
+                new S3Properties(BUCKET, "ap-northeast-2", "dummy-access-key", "dummy-secret-key", null),
+                uploadObjectService);
     }
 
     private PresignedUploadResponseDTO.UploadTarget issueOne(String fileName, String contentType) {
-        return service.createUploadUrls(
+        return service.createUploadUrls(UPLOADER_ID,
                 new PresignedUploadRequestDTO(List.of(new FileInfo(fileName, contentType))), UploadPurpose.DEFAULT).uploads().getFirst();
     }
 
@@ -117,7 +123,7 @@ class S3PresignedUrlServiceTest {
                 .mapToObj(i -> new FileInfo("photo" + i + ".jpg", "image/jpeg"))
                 .toList();
 
-        assertThatThrownBy(() -> service.createUploadUrls(new PresignedUploadRequestDTO(six), UploadPurpose.DEFAULT))
+        assertThatThrownBy(() -> service.createUploadUrls(UPLOADER_ID, new PresignedUploadRequestDTO(six), UploadPurpose.DEFAULT))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.UPLOAD_FILE_COUNT_EXCEEDED);
     }
@@ -132,19 +138,30 @@ class S3PresignedUrlServiceTest {
                 .mapToObj(i -> new FileInfo("photo" + i + ".jpg", "image/jpeg"))
                 .toList();
 
-        assertThat(service.createUploadUrls(
+        assertThat(service.createUploadUrls(UPLOADER_ID,
                 new PresignedUploadRequestDTO(eight), UploadPurpose.LOGIT_RECORD).uploads()).hasSize(8);
 
-        assertThatThrownBy(() -> service.createUploadUrls(
+        assertThatThrownBy(() -> service.createUploadUrls(UPLOADER_ID,
                 new PresignedUploadRequestDTO(nine), UploadPurpose.LOGIT_RECORD))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.UPLOAD_FILE_COUNT_EXCEEDED);
     }
 
     @Test
+    @DisplayName("발급한 key의 주인을 남긴다 — 남의 key를 막을 근거가 여기서 생긴다")
+    void 발급한_key의_주인을_남긴다() {
+        var uploads = service.createUploadUrls(UPLOADER_ID,
+                new PresignedUploadRequestDTO(List.of(new FileInfo("a.jpg", "image/jpeg"))),
+                UploadPurpose.LOGIT_RECORD).uploads();
+
+        verify(uploadObjectService).issued(
+                UPLOADER_ID, List.of(uploads.getFirst().key()), UploadPurpose.LOGIT_RECORD);
+    }
+
+    @Test
     @DisplayName("사진이 없으면 거부한다")
     void 사진이_없으면_거부한다() {
-        assertThatThrownBy(() -> service.createUploadUrls(new PresignedUploadRequestDTO(List.of()), UploadPurpose.DEFAULT))
+        assertThatThrownBy(() -> service.createUploadUrls(UPLOADER_ID, new PresignedUploadRequestDTO(List.of()), UploadPurpose.DEFAULT))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.UPLOAD_FILE_REQUIRED);
     }
@@ -152,7 +169,7 @@ class S3PresignedUrlServiceTest {
     @Test
     @DisplayName("여러 장은 요청 순서대로, 서로 다른 key로 발급한다")
     void 여러장은_서로_다른_key를_받는다() {
-        var uploads = service.createUploadUrls(new PresignedUploadRequestDTO(List.of(
+        var uploads = service.createUploadUrls(UPLOADER_ID, new PresignedUploadRequestDTO(List.of(
                 new FileInfo("a.jpg", "image/jpeg"),
                 new FileInfo("b.png", "image/png"),
                 new FileInfo("c.jpg", "image/jpeg"))), UploadPurpose.DEFAULT).uploads();
