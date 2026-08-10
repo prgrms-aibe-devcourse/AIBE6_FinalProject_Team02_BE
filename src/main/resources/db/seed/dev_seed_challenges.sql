@@ -90,7 +90,11 @@ FROM (VALUES
     ('부산 먹킷리스트', 6, '완당', '18번완당집', '부산 중구 광복로56번길 12-1', 35.0990, 129.0320, '부산식 완탕'),
     ('부산 먹킷리스트', 7, '한우갈비', '소문난암소갈비집', '부산 해운대구 중동2로10번길 32-10', 35.1630, 129.1640, '해운대 갈비 명가'),
     ('부산 먹킷리스트', 8, '팥빙수', '옵스 남천점', '부산 수영구 광남로 91', 35.1460, 129.1120, '부산 인기 빵집'),
-    ('부산 먹킷리스트', 9, '물냉면', '내호냉면', '부산 남구 우암번영로 26-1', 35.1310, 129.0620, '부산 밀면·냉면 원조')
+    ('부산 먹킷리스트', 9, '물냉면', '내호냉면', '부산 남구 우암번영로 26-1', 35.1310, 129.0620, '부산 밀면·냉면 원조'),
+    -- 위치 인증 테스트용 공통 슬롯 (낙성대역 인근). 좌표는 근사값 — 실제 인증 안 되면 아래 UPDATE로 보정
+    ('서울 노포 도장깨기', 10, '오늘의 한 끼', '낙성대 테스트 스팟', '낙성대역 6길 17-7', 37.47443343592232, 126.96232374692559, '위치 인증 테스트용 슬롯'),
+    ('서울 카페·베이커리 성지순례', 10, '오늘의 한 끼', '낙성대 테스트 스팟', '낙성대역 6길 17-7', 37.47443343592232, 126.96232374692559, '위치 인증 테스트용 슬롯'),
+    ('부산 먹킷리스트', 10, '오늘의 한 끼', '낙성대 테스트 스팟', '낙성대역 6길 17-7', 37.47443343592232, 126.96232374692559, '위치 인증 테스트용 슬롯')
 ) AS v(cname, slot_order, food_name, store_name, place_name, lat, lng, description)
 JOIN challenge_dex c
   ON c.name = v.cname
@@ -130,7 +134,7 @@ JOIN (
     WHERE u.provider = 'KAKAO' AND u.provider_id LIKE 'seedcc_p%'
 ) su ON su.user_id = p.user_id
 JOIN challenge_dex_slot s ON s.challenge_dex_id = p.challenge_dex_id
-WHERE s.slot_order < CASE WHEN su.g <= 8 THEN 10 WHEN su.g = 9 THEN 6 ELSE 3 END;
+WHERE s.slot_order < CASE WHEN su.g <= 8 THEN 11 WHEN su.g = 9 THEN 6 ELSE 3 END;
 
 -- 6) 음식 리뷰 (해금한 모든 슬롯) --------------------------------------------
 INSERT INTO review (reviewer_id, review_type, challenge_dex_id, slot_id, content, rating, like_count, created_at)
@@ -209,3 +213,12 @@ SELECT c.id, c.name,
 FROM challenge_dex c
 WHERE c.owner_id = (SELECT id FROM users WHERE provider = 'KAKAO' AND provider_id = 'seedcc_owner')
 ORDER BY c.id;
+
+-- ---------------------------------------------------------------------------
+-- (참고) 낙성대 테스트 슬롯 좌표 보정
+--   위치 인증은 슬롯 좌표 기준 40m 반경 안에서만 성공한다. 위 좌표는 근사값이라
+--   실제 그 자리에서 인증이 안 되면, 내 실제 GPS 좌표로 아래 값을 바꿔 실행하세요.
+--   (브라우저 콘솔에서: navigator.geolocation.getCurrentPosition(p=>console.log(p.coords.latitude,p.coords.longitude)))
+-- UPDATE challenge_dex_slot
+--    SET lat = 37.47443343592232, lng = 126.96232374692559
+--  WHERE place_name = '낙성대역 6길 17-7';
