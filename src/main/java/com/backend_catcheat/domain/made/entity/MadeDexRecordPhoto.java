@@ -18,6 +18,7 @@ import lombok.NoArgsConstructor;
 public class MadeDexRecordPhoto {
 
     public static final int IMAGE_KEY_MAX = 512;
+    public static final int CAPTION_MAX = 100;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -33,17 +34,27 @@ public class MadeDexRecordPhoto {
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 
-    private MadeDexRecordPhoto(Long recordId, String imageKey, int sortOrder) {
+    // 사진마다 붙이는 한마디. 기록 전체 메모를 대신한다
+    @Column(name = "caption", length = CAPTION_MAX)
+    private String caption;
+
+    private MadeDexRecordPhoto(Long recordId, String imageKey, String caption, int sortOrder) {
         this.recordId = recordId;
         this.imageKey = imageKey;
+        this.caption = caption;
         this.sortOrder = sortOrder;
     }
 
-    public static MadeDexRecordPhoto of(Long recordId, String imageKey, int sortOrder) {
-        return new MadeDexRecordPhoto(recordId, imageKey, sortOrder);
+    public static MadeDexRecordPhoto of(Long recordId, String imageKey, String caption, int sortOrder) {
+        return new MadeDexRecordPhoto(recordId, imageKey, caption, sortOrder);
     }
 
     public void moveTo(int sortOrder) {
         this.sortOrder = sortOrder;
+    }
+
+    /** 남겨 두는 사진도 글은 고칠 수 있다 */
+    public void writeCaption(String caption) {
+        this.caption = caption;
     }
 }

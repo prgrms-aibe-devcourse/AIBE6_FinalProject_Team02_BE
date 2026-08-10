@@ -128,8 +128,8 @@ class MadeDexFeedServiceTest {
                 .findByMadeDexIdAndLoggedOnAndDeletedAtIsNullOrderByCreatedAtAsc(MADE_DEX_ID, TODAY_SEOUL))
                 .thenReturn(List.of(record(100L, BREAKFAST, ME)));
         when(madeDexRecordPhotoRepository.findByRecordIdInOrderBySortOrderAsc(anyCollection()))
-                .thenReturn(List.of(MadeDexRecordPhoto.of(100L, "key1", 0),
-                        MadeDexRecordPhoto.of(100L, "key2", 1)));
+                .thenReturn(List.of(MadeDexRecordPhoto.of(100L, "key1", null, 0),
+                        MadeDexRecordPhoto.of(100L, "key2", null, 1)));
         when(madeDexRecordFoodRepository.findByRecordIdInOrderBySortOrderAsc(anyCollection()))
                 .thenReturn(List.of(MadeDexRecordFood.of(100L, "계란 토스트", 0)));
 
@@ -152,8 +152,8 @@ class MadeDexFeedServiceTest {
                 .findByMadeDexIdAndLoggedOnAndDeletedAtIsNullOrderByCreatedAtAsc(MADE_DEX_ID, TODAY_SEOUL))
                 .thenReturn(List.of(record(100L, BREAKFAST, ME), record(101L, BREAKFAST, ME)));
         when(madeDexRecordPhotoRepository.findByRecordIdInOrderBySortOrderAsc(anyCollection()))
-                .thenReturn(List.of(MadeDexRecordPhoto.of(100L, "first", 0),
-                        MadeDexRecordPhoto.of(101L, "second", 0)));
+                .thenReturn(List.of(MadeDexRecordPhoto.of(100L, "first", null, 0),
+                        MadeDexRecordPhoto.of(101L, "second", null, 0)));
         when(madeDexRecordFoodRepository.findByRecordIdInOrderBySortOrderAsc(anyCollection()))
                 .thenReturn(List.of(MadeDexRecordFood.of(100L, "계란 토스트", 0),
                         MadeDexRecordFood.of(101L, "그릭요거트 볼", 0)));
@@ -219,8 +219,12 @@ class MadeDexFeedServiceTest {
     }
 
     private MadeDexRecord record(Long id, Long slotId, Long authorId) {
+        return record(id, slotId, authorId, LocalDateTime.of(2026, 8, 7, 8, 30));
+    }
+
+    private MadeDexRecord record(Long id, Long slotId, Long authorId, LocalDateTime loggedAt) {
         MadeDexRecord record = MadeDexRecord.write(
-                MADE_DEX_ID, slotId, authorId, TODAY_SEOUL, null, null, null, null);
+                MADE_DEX_ID, slotId, authorId, TODAY_SEOUL, loggedAt, null, null, null);
         ReflectionTestUtils.setField(record, "id", id);
         return record;
     }
