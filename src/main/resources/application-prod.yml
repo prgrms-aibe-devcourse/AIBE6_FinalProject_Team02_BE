@@ -1,3 +1,8 @@
+app:
+  auth:
+    # 운영은 HTTPS다. 환경변수를 빠뜨려도 켜지도록 여기서 못 박는다
+    cookie-secure: true
+
 spring:
   datasource:
     url: ${DB_URL}
