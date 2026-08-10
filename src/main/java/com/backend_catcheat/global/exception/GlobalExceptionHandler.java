@@ -5,8 +5,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 /**
  * 전역 예외 처리
@@ -37,6 +39,22 @@ public class GlobalExceptionHandler {
             .findFirst()
             .map(err -> err.getDefaultMessage())
             .orElse(ErrorCode.INVALID_INPUT.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(ApiResponse.fail(ErrorCode.INVALID_INPUT.name(), message));
+    }
+
+    // 쿼리 파라미터 누락
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingParameter(MissingServletRequestParameterException e) {
+        String message = String.format("%s 값이 필요해요", e.getParameterName());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(ApiResponse.fail(ErrorCode.INVALID_INPUT.name(), message));
+    }
+
+    // 파라미터 타입 불일치
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        String message = String.format("%s 값을 확인해 주세요", e.getName());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
             .body(ApiResponse.fail(ErrorCode.INVALID_INPUT.name(), message));
     }
