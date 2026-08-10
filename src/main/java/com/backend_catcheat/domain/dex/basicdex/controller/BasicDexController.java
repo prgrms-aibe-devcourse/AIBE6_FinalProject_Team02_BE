@@ -7,6 +7,7 @@ import com.backend_catcheat.global.common.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,5 +30,14 @@ public class BasicDexController {
             @AuthenticationPrincipal Long userId,
             @PathVariable Long slotId) {
         return ApiResponse.ok(basicDexService.findMyBasicDexDetail(userId, slotId));
+    }
+
+    /** New 스티커 확인 처리 */
+    @PatchMapping("/me/basic/{slotId}/new-badge-seen")
+    public ApiResponse<Void> markNewBadgeSeen(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long slotId) {
+        basicDexService.markNewBadgeSeen(userId, slotId);
+        return ApiResponse.ok();
     }
 }
