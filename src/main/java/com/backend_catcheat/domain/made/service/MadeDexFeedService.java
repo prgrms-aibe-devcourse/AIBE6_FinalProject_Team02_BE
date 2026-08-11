@@ -7,11 +7,9 @@ import com.backend_catcheat.domain.made.dto.MadeDexFeedDTO;
 import com.backend_catcheat.domain.made.dto.MadeDexFeedSlotDTO;
 import com.backend_catcheat.domain.made.entity.MadeDexMember;
 import com.backend_catcheat.domain.made.entity.MadeDexRecord;
-import com.backend_catcheat.domain.made.entity.MadeDexRecordFood;
 import com.backend_catcheat.domain.made.entity.MadeDexRecordPhoto;
 import com.backend_catcheat.domain.made.entity.MadeDexSlot;
 import com.backend_catcheat.domain.made.repository.MadeDexMemberRepository;
-import com.backend_catcheat.domain.made.repository.MadeDexRecordFoodRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexRecordPhotoRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexRecordRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexSlotRepository;
@@ -42,7 +40,6 @@ public class MadeDexFeedService {
     private final MadeDexMemberRepository madeDexMemberRepository;
     private final MadeDexRecordRepository madeDexRecordRepository;
     private final MadeDexRecordPhotoRepository madeDexRecordPhotoRepository;
-    private final MadeDexRecordFoodRepository madeDexRecordFoodRepository;
     private final MadeDexFinder madeDexFinder;
     private final UserRepository userRepository;
     private final S3PresignedUrlService s3PresignedUrlService;
@@ -55,8 +52,9 @@ public class MadeDexFeedService {
     public MadeDexFeedDTO findFeed(Long userId, Long madeDexId, LocalDate date) {
         madeDexFinder.readable(userId, madeDexId);
 
-        LocalDate loggedOn = date == null ? LocalDate.now(clock.withZone(TimeConfig.SERVICE_ZONE)) : date;
-        if (loggedOn.isAfter(LocalDate.now(clock.withZone(TimeConfig.SERVICE_ZONE)))) {
+        LocalDate today = LocalDate.now(clock.withZone(TimeConfig.SERVICE_ZONE));
+        LocalDate loggedOn = date == null ? today : date;
+        if (loggedOn.isAfter(today)) {
             throw new CustomException(ErrorCode.MADE_DEX_RECORD_FUTURE_DATE);
         }
 
@@ -67,7 +65,7 @@ public class MadeDexFeedService {
         Map<Long, Map<Long, List<MadeDexRecord>>> bySlotAndAuthor = groupBySlotAndAuthor(records);
         Photos photos = loadPhotos(records);
 
-        return new MadeDexFeedDTO(loggedOn, visibleSlots(madeDexId, records).stream()
+        return new MadeDexFeedDTO(loggedOn, today, visibleSlots(madeDexId, records).stream()
                 .map(slot -> new MadeDexFeedSlotDTO(
                         slot.getId(),
                         slot.getName(),
@@ -107,7 +105,7 @@ public class MadeDexFeedService {
                             user == null ? null : user.getNickname(),
                             user == null ? null : s3PresignedUrlService.createDownloadUrl(user.getProfileImageKey()),
                             member.getUserId().equals(userId),
-                            0, null, List.of(), List.of(), null);
+                            0, null, 50, 50, List.of(), null);
                 })
                 .toList();
     }
@@ -125,20 +123,18 @@ public class MadeDexFeedService {
 
     /**
      * 한 사람이 한 슬롯에 남긴 것을 카드 한 장으로 접는다.
-     * 대표 사진은 가장 먼저 남긴 기록의 첫 장이고, 음식명은 전부 이어 붙인다.
+     * 대표 사진은 가장 먼저 남긴 기록의 첫 장이다.
      */
     private MadeDexFeedCardDTO toCard(MadeDexFeedCardDTO card, List<MadeDexRecord> records, Photos photos) {
         List<Long> recordIds = records.stream().map(MadeDexRecord::getId).toList();
-        // 시각은 대표 사진을 낸 기록의 것을 쓴다. 다른 기록에서 가져오면 사진과 시간이 어긋난다
         MadeDexRecord cover = records.stream()
                 .filter(record -> photos.firstKeyOf(record.getId()) != null)
                 .findFirst()
                 .orElse(records.getFirst());
-        String thumbnailKey = photos.firstKeyOf(cover.getId());
-        List<String> foodNames = recordIds.stream()
-                .flatMap(recordId -> photos.foodNamesOf(recordId).stream())
-                .distinct()
-                .toList();
+        MadeDexRecordPhoto coverPhoto = photos.firstOf(cover.getId());
+        String thumbnailKey = coverPhoto == null ? null : coverPhoto.getImageKey();
+        double cropX = coverPhoto == null ? 50 : coverPhoto.getCropX();
+        double cropY = coverPhoto == null ? 50 : coverPhoto.getCropY();
 
         return new MadeDexFeedCardDTO(
                 card.userId(),
@@ -147,7 +143,8 @@ public class MadeDexFeedService {
                 card.me(),
                 records.size(),
                 s3PresignedUrlService.createDownloadUrl(thumbnailKey),
-                foodNames,
+                cropX,
+                cropY,
                 recordIds,
                 cover.getLoggedAt());
     }
@@ -160,28 +157,24 @@ public class MadeDexFeedService {
 
     private Photos loadPhotos(List<MadeDexRecord> records) {
         if (records.isEmpty()) {
-            return new Photos(Map.of(), Map.of());
+            return new Photos(Map.of());
         }
         List<Long> recordIds = records.stream().map(MadeDexRecord::getId).toList();
         return new Photos(
                 madeDexRecordPhotoRepository.findByRecordIdInOrderBySortOrderAsc(recordIds).stream()
-                        .collect(Collectors.groupingBy(MadeDexRecordPhoto::getRecordId)),
-                madeDexRecordFoodRepository.findByRecordIdInOrderBySortOrderAsc(recordIds).stream()
-                        .collect(Collectors.groupingBy(MadeDexRecordFood::getRecordId)));
+                        .collect(Collectors.groupingBy(MadeDexRecordPhoto::getRecordId)));
     }
 
-    private record Photos(Map<Long, List<MadeDexRecordPhoto>> byRecord,
-                          Map<Long, List<MadeDexRecordFood>> foodsByRecord) {
+    private record Photos(Map<Long, List<MadeDexRecordPhoto>> byRecord) {
 
-        String firstKeyOf(Long recordId) {
+        MadeDexRecordPhoto firstOf(Long recordId) {
             List<MadeDexRecordPhoto> photos = byRecord.get(recordId);
-            return photos == null || photos.isEmpty() ? null : photos.getFirst().getImageKey();
+            return photos == null || photos.isEmpty() ? null : photos.getFirst();
         }
 
-        List<String> foodNamesOf(Long recordId) {
-            return foodsByRecord.getOrDefault(recordId, List.of()).stream()
-                    .map(MadeDexRecordFood::getFoodName)
-                    .toList();
+        String firstKeyOf(Long recordId) {
+            MadeDexRecordPhoto first = firstOf(recordId);
+            return first == null ? null : first.getImageKey();
         }
     }
 }
