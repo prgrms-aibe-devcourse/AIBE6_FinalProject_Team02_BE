@@ -2,6 +2,8 @@ package com.backend_catcheat.domain.challenge.service;
 
 import com.backend_catcheat.domain.auth.entity.User;
 import com.backend_catcheat.domain.auth.repository.UserRepository;
+import com.backend_catcheat.domain.badge.dto.EquippedBadgeViewDTO;
+import com.backend_catcheat.domain.badge.service.EquippedBadgeResolver;
 import com.backend_catcheat.domain.challenge.dto.ReviewCreateResponseDTO;
 import com.backend_catcheat.domain.challenge.dto.ReviewLikeResponseDTO;
 import com.backend_catcheat.domain.challenge.dto.ReviewResponseDTO;
@@ -16,6 +18,7 @@ import com.backend_catcheat.domain.challenge.repository.ReviewLikeRepository;
 import com.backend_catcheat.domain.challenge.repository.ReviewRepository;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
+import com.backend_catcheat.global.s3.S3PresignedUrlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +39,8 @@ public class ReviewService {
     private final ChallengeParticipantRepository participantRepository;
     private final ChallengeUnlockRepository unlockRepository;
     private final UserRepository userRepository;
+    private final EquippedBadgeResolver equippedBadgeResolver;
+    private final S3PresignedUrlService s3PresignedUrlService;
 
     @Transactional
     public ReviewCreateResponseDTO writeFoodReview(Long userId, Long challengeDexId, Long slotId,
@@ -134,24 +139,41 @@ public class ReviewService {
         List<Long> reviewIds = reviews.stream().map(Review::getId).toList();
         List<Long> reviewerIds = reviews.stream().map(Review::getReviewerId).distinct().toList();
 
-        Map<Long, String> nicknameById = userRepository.findAllById(reviewerIds).stream()
-                .collect(Collectors.toMap(User::getId, User::getNickname));
+
+        List<User> reviewers = userRepository.findAllById(reviewerIds);
+        Map<Long, User> userById = reviewers.stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+
+        Map<Long, EquippedBadgeViewDTO> badgeById = equippedBadgeResolver.resolveByBadgeId(reviewers);
+
         Set<Long> likedReviewIds = reviewLikeRepository.findByReviewIdInAndUserId(reviewIds, userId).stream()
                 .map(ReviewLike::getReviewId)
                 .collect(Collectors.toSet());
 
         return reviews.stream()
-                .map(r -> new ReviewResponseDTO(
-                        r.getId(),
-                        r.getReviewerId(),
-                        nicknameById.get(r.getReviewerId()),
-                        r.getContent(),
-                        r.getRating(),
-                        r.getLikeCount(),
-                        likedReviewIds.contains(r.getId()),
-                        r.getReviewerId().equals(userId),
-                        r.getCreatedAt(),
-                        r.getUpdatedAt()))
+                .map(r -> {
+                    User reviewer = userById.get(r.getReviewerId());
+                    String nickname = reviewer == null ? null : reviewer.getNickname();
+                    String profileImageUrl = reviewer == null
+                            ? null
+                            : s3PresignedUrlService.createDownloadUrl(reviewer.getProfileImageKey());
+                    EquippedBadgeViewDTO badge = (reviewer == null || reviewer.getEquippedBadgeId() == null)
+                            ? null
+                            : badgeById.get(reviewer.getEquippedBadgeId());
+                    return new ReviewResponseDTO(
+                            r.getId(),
+                            r.getReviewerId(),
+                            nickname,
+                            profileImageUrl,
+                            badge,
+                            r.getContent(),
+                            r.getRating(),
+                            r.getLikeCount(),
+                            likedReviewIds.contains(r.getId()),
+                            r.getReviewerId().equals(userId),
+                            r.getCreatedAt(),
+                            r.getUpdatedAt());
+                })
                 .toList();
     }
 }
