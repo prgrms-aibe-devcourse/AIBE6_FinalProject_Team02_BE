@@ -10,7 +10,6 @@ import com.backend_catcheat.domain.made.entity.MadeDex;
 import com.backend_catcheat.domain.made.entity.MadeDexMember;
 import com.backend_catcheat.domain.made.entity.MadeDexRole;
 import com.backend_catcheat.domain.made.entity.MadeDexSlot;
-import com.backend_catcheat.domain.made.entity.Visibility;
 import com.backend_catcheat.domain.made.repository.MadeDexMemberRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexSlotRepository;
@@ -51,7 +50,6 @@ public class MadeDexService {
                 ownerId,
                 requireName(request.name()),
                 validDescription(request.description()),
-                alwaysPrivate(),
                 validImageKey(request.imageKey())));
         madeDexMemberRepository.save(
                 MadeDexMember.owner(madeDex.getId(), ownerId, LocalDateTime.now(clock)));
@@ -65,7 +63,7 @@ public class MadeDexService {
         return new MadeDexCreateResponseDTO(madeDex.getId());
     }
 
-    /** 공개 도감은 참여하지 않아도 열람할 수 있다. 비공개는 멤버만 */
+    /** 로그잇은 비공개 전용이라 멤버만 열람한다 */
     public MadeDexDetailDTO findDetail(Long userId, Long madeDexId) {
         MadeDexFinder.MadeDexAccess access = madeDexFinder.readable(userId, madeDexId);
         MadeDex madeDex = access.madeDex();
@@ -75,7 +73,6 @@ public class MadeDexService {
                 madeDex.getId(),
                 madeDex.getName(),
                 madeDex.getDescription(),
-                madeDex.getVisibility(),
                 s3PresignedUrlService.createDownloadUrl(madeDex.getImageKey()),
                 madeDex.getImageKey(),
                 madeDexMemberRepository.countByMadeDexId(madeDexId),
@@ -96,7 +93,6 @@ public class MadeDexService {
         madeDex.update(
                 requireName(request.name()),
                 validDescription(request.description()),
-                alwaysPrivate(),
                 imageKey);
 
         // 표지를 바꾸거나 비우면 이전 객체는 아무도 참조하지 않는다.
@@ -124,7 +120,6 @@ public class MadeDexService {
                         madeDex.getId(),
                         madeDex.getName(),
                         madeDex.getDescription(),
-                        madeDex.getVisibility(),
                         s3PresignedUrlService.createDownloadUrl(madeDex.getImageKey()),
                         memberCountByMadeDexId.getOrDefault(madeDex.getId(), 0L),
                         roleByMadeDexId.get(madeDex.getId())))
@@ -156,14 +151,6 @@ public class MadeDexService {
             throw new CustomException(ErrorCode.MADE_DEX_IMAGE_KEY_TOO_LONG);
         }
         return imageKey;
-    }
-
-    /**
-     * 로그잇에는 공개 개념이 없다. 요청에 PUBLIC이 와도 비공개로 만든다.
-     * 거절하지 않는 이유는 아직 공개 선택이 남아 있는 화면을 깨뜨리지 않기 위해서다.
-     */
-    private Visibility alwaysPrivate() {
-        return Visibility.PRIVATE;
     }
 
     private String blankToNull(String value) {

@@ -9,7 +9,6 @@ import com.backend_catcheat.domain.made.dto.MadeDexMembersResponseDTO;
 import com.backend_catcheat.domain.made.entity.MadeDex;
 import com.backend_catcheat.domain.made.entity.MadeDexMember;
 import com.backend_catcheat.domain.made.entity.MadeDexRole;
-import com.backend_catcheat.domain.made.entity.Visibility;
 import com.backend_catcheat.domain.made.repository.MadeDexInviteRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexMemberRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexRepository;
@@ -73,7 +72,7 @@ class MadeDexMemberServiceTest {
     }
 
     private MadeDex madeDex(Long ownerId) {
-        MadeDex madeDex = MadeDex.open(ownerId, "우리 도감", "설명", Visibility.PRIVATE, null);
+        MadeDex madeDex = MadeDex.open(ownerId, "우리 도감", "설명", null);
         ReflectionTestUtils.setField(madeDex, "id", MADE_DEX_ID);
         return madeDex;
     }

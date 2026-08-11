@@ -20,10 +20,6 @@ public class MadeDexRecord extends BaseEntity {
     // AI에 보내지 않아 상한 근거가 비용이 아니라 화면·용량이다. 기본 도감의 5장과 다른 값
     public static final int MAX_PHOTOS = 8;
     public static final int MIN_PHOTOS = 1;
-    // 사진별 캡션으로 옮겼다. 이미 남은 글이 있어 컬럼만 남겨 둔다
-    public static final int MEMO_MAX = 100;
-    public static final int FOOD_NAME_MAX = 100;
-    public static final int LOCATION_NAME_MAX = 255;
 
     @Column(name = "made_dex_id", nullable = false)
     private Long madeDexId;
@@ -41,50 +37,29 @@ public class MadeDexRecord extends BaseEntity {
     @Column(name = "logged_at")
     private LocalDateTime loggedAt;
 
-    @Column(name = "memo", length = MEMO_MAX)
-    private String memo;
-
-    @Column(name = "location_name", length = LOCATION_NAME_MAX)
-    private String locationName;
-
-    @Column(name = "lat")
-    private Double lat;
-
-    @Column(name = "lng")
-    private Double lng;
-
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    private MadeDexRecord(Long madeDexId, Long slotId, Long authorId, LocalDate loggedOn, LocalDateTime loggedAt,
-                          String locationName, Double lat, Double lng) {
+    private MadeDexRecord(Long madeDexId, Long slotId, Long authorId, LocalDate loggedOn, LocalDateTime loggedAt) {
         this.madeDexId = madeDexId;
         this.slotId = slotId;
         this.authorId = authorId;
         this.loggedOn = loggedOn;
         this.loggedAt = loggedAt;
-        this.locationName = locationName;
-        this.lat = lat;
-        this.lng = lng;
     }
 
     public static MadeDexRecord write(Long madeDexId, Long slotId, Long authorId, LocalDate loggedOn,
-                                      LocalDateTime loggedAt,
-                                      String locationName, Double lat, Double lng) {
-        return new MadeDexRecord(madeDexId, slotId, authorId, loggedOn, loggedAt, locationName, lat, lng);
+                                      LocalDateTime loggedAt) {
+        return new MadeDexRecord(madeDexId, slotId, authorId, loggedOn, loggedAt);
     }
 
-    public void update(Long slotId, LocalDate loggedOn, LocalDateTime loggedAt,
-                       String locationName, Double lat, Double lng) {
+    public void update(Long slotId, LocalDate loggedOn, LocalDateTime loggedAt) {
         this.slotId = slotId;
         this.loggedOn = loggedOn;
         this.loggedAt = loggedAt;
-        this.locationName = locationName;
-        this.lat = lat;
-        this.lng = lng;
     }
 
-    // 사진·음식명 행은 지우지 않는다. 조회 경로가 모두 deleted_at으로 걸러진다
+    // 사진 행은 지우지 않는다. 조회 경로가 모두 deleted_at으로 걸러진다
     public void delete(LocalDateTime now) {
         this.deletedAt = now;
     }
