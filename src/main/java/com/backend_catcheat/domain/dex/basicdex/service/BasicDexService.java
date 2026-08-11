@@ -105,8 +105,9 @@ public class BasicDexService {
                             unlocked && recentSince != null
                                     && collection.getCreatedAt().isAfter(recentSince)
                                     && collection.isNewBadgeUnseen(),
-                            // 이미 열린 칸에 걸린 요청도 그대로 알린다.
-                            awaitingReviewSlotIds.contains(slot.getId())
+                            // "검토 때문에 아직 열리지 않은 칸"이라는 뜻
+                            // 이미 열린 칸이면 알릴 것이 없다
+                            !unlocked && awaitingReviewSlotIds.contains(slot.getId())
                     );
                 })
                 .toList();
