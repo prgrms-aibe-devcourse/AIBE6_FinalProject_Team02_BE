@@ -54,7 +54,7 @@ public class UserController {
     public ApiResponse<List<MyBasicDexResponseDTO>> basicDex(
             @PathVariable Long targetUserId
     ) {
-        return ApiResponse.ok(basicDexService.findMyBasicDex(targetUserId));
+        return ApiResponse.ok(basicDexService.findPublicBasicDex(targetUserId));
     }
 
     /** 다른 사람 챌린지도감 */

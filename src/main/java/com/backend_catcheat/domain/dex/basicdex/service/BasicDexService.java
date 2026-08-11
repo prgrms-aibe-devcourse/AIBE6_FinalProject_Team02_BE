@@ -1,5 +1,7 @@
 package com.backend_catcheat.domain.dex.basicdex.service;
 
+import com.backend_catcheat.domain.admin.entity.RegistrationRequestStatus;
+import com.backend_catcheat.domain.admin.repository.FoodRegistrationRequestRepository;
 import com.backend_catcheat.domain.dex.basicdex.entity.BasicDexEntity;
 import com.backend_catcheat.domain.dex.basicdex.repository.BasicDexRepository;
 import com.backend_catcheat.domain.dex.collection.dto.CollectionCardResponseDTO;
@@ -21,20 +23,29 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.text.Normalizer;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class BasicDexService {
+
+    // New 스티커가 붙어 있는 기간
+    private static final Duration RECENT_UNLOCK_WINDOW = Duration.ofHours(24);
+
     private final BasicDexRepository basicDexRepository;
     private final UserCollectionRepository userCollectionRepository;
     private final CollectionCardRepository collectionCardRepository;
     private final CardPhotoRepository cardPhotoRepository;
     private final PhotoRepository photoRepository;
+    private final FoodRegistrationRequestRepository foodRegistrationRequestRepository;
     private final S3PresignedUrlService s3PresignedUrlService;
 
     private String resolveIllustrationLocation(BasicDexEntity entity) {
@@ -45,8 +56,31 @@ public class BasicDexService {
         return Normalizer.normalize(key, Normalizer.Form.NFD);
     }
 
+    /** 내 도감 -> New·검토대기 스티커에 쓰는 상태가 함께 실림 */
     @Transactional(readOnly = true)
     public List<MyBasicDexResponseDTO> findMyBasicDex(Long userId) {
+        // 같은 칸에 요청이 둘 이상 걸릴 수 있어 중복이 섞여 온다
+        Set<Long> awaitingReviewSlotIds = new HashSet<>(
+                foodRegistrationRequestRepository.findSlotIdsByUserIdAndStatus(
+                        userId, RegistrationRequestStatus.PENDING));
+
+        return collectDex(userId, awaitingReviewSlotIds, LocalDateTime.now().minus(RECENT_UNLOCK_WINDOW));
+    }
+
+    /**
+     * 남의 도감(공개 프로필)
+     * 해금 여부와 별 랭크까지만 보여 줌
+     */
+    @Transactional(readOnly = true)
+    public List<MyBasicDexResponseDTO> findPublicBasicDex(Long targetUserId) {
+        return collectDex(targetUserId, Set.of(), null);
+    }
+
+    private List<MyBasicDexResponseDTO> collectDex(
+            Long userId,
+            Set<Long> awaitingReviewSlotIds,
+            LocalDateTime recentSince
+    ) {
         List<BasicDexEntity> slots = basicDexRepository.findAllByOrderByIdAsc();
 
         Map<Long, UserCollection> collectionBySlotId =  userCollectionRepository.findByUserId(userId).stream()
@@ -65,7 +99,15 @@ public class BasicDexService {
                             unlocked,
                             unlocked ? collection.getRank() : 0,
                             unlocked ? collection.getFirstCollectedAt() : null,
-                            unlocked ? collectionCardRepository.countByUserCollectionId(collection.getId()) : 0
+                            unlocked ? collectionCardRepository.countByUserCollectionId(collection.getId()) : 0,
+                            // 먹은 날이 아니라 칸이 열린 날로 잰다 — 수동 폴백 승인 건이 New를 놓치지 않게
+                            // 상세를 열어 확인한 칸은 24시간이 남았어도 뗀다
+                            unlocked && recentSince != null
+                                    && collection.getCreatedAt().isAfter(recentSince)
+                                    && collection.isNewBadgeUnseen(),
+                            // "검토 때문에 아직 열리지 않은 칸"이라는 뜻
+                            // 이미 열린 칸이면 알릴 것이 없다
+                            !unlocked && awaitingReviewSlotIds.contains(slot.getId())
                     );
                 })
                 .toList();
@@ -100,6 +142,13 @@ public class BasicDexService {
                         null,
                         List.of()
                 ));
+    }
+
+    /** New 스티커를 봤다고 표시 */
+    @Transactional
+    public void markNewBadgeSeen(Long userId, Long slotId) {
+        userCollectionRepository.findByUserIdAndSlotId(userId, slotId)
+                .ifPresent(collection -> collection.markNewBadgeSeen(LocalDateTime.now()));
     }
 
     private List<CollectionCardResponseDTO> findCards(Long userCollectionId) {
