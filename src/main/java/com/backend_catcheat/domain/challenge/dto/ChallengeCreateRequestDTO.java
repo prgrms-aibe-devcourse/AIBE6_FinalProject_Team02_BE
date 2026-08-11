@@ -8,6 +8,7 @@ import java.util.List;
 public record ChallengeCreateRequestDTO(
         String name,
         String description,
+        String imageKey,           // 대표 이미지(S3 key, 선택)
         PeriodType periodType,
         LocalDateTime startsAt,      // null이면 지금부터
         LocalDateTime endsAt,        // LIMITED면 필수
