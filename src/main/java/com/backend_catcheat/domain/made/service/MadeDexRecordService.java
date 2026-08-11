@@ -25,6 +25,7 @@ import com.backend_catcheat.global.exception.ErrorCode;
 import com.backend_catcheat.global.s3.S3PresignedUrlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,6 +61,9 @@ public class MadeDexRecordService {
     private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
 
+    /** V2608111800이 건 부분 유니크 인덱스. 이 위반만 409로 바꾼다 */
+    private static final String SLOT_UNIQUE_INDEX = "uq_made_dex_record_slot_author_day";
+
     @Transactional
     public MadeDexRecordCreateResponseDTO create(Long userId, Long madeDexId,
                                                  MadeDexRecordCreateRequestDTO request) {
@@ -93,14 +97,21 @@ public class MadeDexRecordService {
         List<PhotoInput> newPhotos = validPhotos(userId, request.newPhotos(), false);
         requirePhotoCount(kept.size() + newPhotos.size());
 
+        boolean movingSlot = !past && !slot.getId().equals(record.getSlotId());
         if (past) {
             requireCaptionOnly(record, slot, current, kept, newPhotos, request.loggedTime());
-        } else if (!slot.getId().equals(record.getSlotId())) {
+        } else if (movingSlot) {
             // 끼니를 옮기면 그쪽이 이미 차 있을 수 있다. 자기 자신은 셈에서 뺀다
             requireSlotFree(madeDexId, slot.getId(), userId, loggedOn, recordId);
         }
 
         record.update(slot.getId(), loggedOn, loggedAt(loggedOn, request.loggedTime()));
+
+        // 여기까지는 더티 체킹이라 UPDATE가 아직 안 나갔다. 선검사를 함께 통과한
+        // 동시 이동은 커밋 시점에야 걸려 서비스 밖에서 500이 된다 — 옮길 때만 앞당겨 잡는다
+        if (movingSlot) {
+            flushOrSlotTaken();
+        }
 
         Set<Long> keptIds = kept.stream().map(MadeDexRecordPhoto::getId).collect(Collectors.toSet());
         List<MadeDexRecordPhoto> dropped = current.stream()
@@ -124,7 +135,7 @@ public class MadeDexRecordService {
                 // 지난 기록은 위치 조정도 잠근다. requireCaptionOnly가 이미 걸러 주지만
                 // 값이 흘러들지 않게 여기서도 오늘일 때만 쓴다
                 if (!past) {
-                    photo.writeCrop(clampCrop(keep.cropX()), clampCrop(keep.cropY()));
+                    photo.writeCrop(cropOrCenter(keep.cropX()), cropOrCenter(keep.cropY()));
                 }
             }
         }
@@ -255,7 +266,7 @@ public class MadeDexRecordService {
             PhotoInput input = inputs.get(i);
             photos.add(MadeDexRecordPhoto.of(
                     recordId, input.imageKey(), validCaption(input.caption()), startOrder + i,
-                    clampCrop(input.cropX()), clampCrop(input.cropY())));
+                    cropOrCenter(input.cropX()), cropOrCenter(input.cropY())));
         }
         madeDexRecordPhotoRepository.saveAll(photos);
     }
@@ -307,8 +318,39 @@ public class MadeDexRecordService {
         try {
             return madeDexRecordRepository.saveAndFlush(record);
         } catch (DataIntegrityViolationException collision) {
-            throw new CustomException(ErrorCode.MADE_DEX_RECORD_SLOT_TAKEN);
+            throw slotTakenOrRethrow(collision);
         }
+    }
+
+    /** 끼니를 옮길 때 쓴다. 더티 체킹으로 미뤄진 UPDATE를 지금 내보내 제약 위반을 잡는다 */
+    private void flushOrSlotTaken() {
+        try {
+            madeDexRecordRepository.flush();
+        } catch (DataIntegrityViolationException collision) {
+            throw slotTakenOrRethrow(collision);
+        }
+    }
+
+    /**
+     * 유니크 인덱스 위반만 "이미 기록한 끼니"로 바꾼다.
+     * 무차별로 바꾸면 복합 FK 위반(검사 직후 슬롯이 지워진 경우)까지 같은 답이 나가
+     * 사용자는 엉뚱한 안내를 받고 로그에도 원인이 남지 않는다.
+     */
+    private RuntimeException slotTakenOrRethrow(DataIntegrityViolationException collision) {
+        if (violates(collision, SLOT_UNIQUE_INDEX)) {
+            return new CustomException(ErrorCode.MADE_DEX_RECORD_SLOT_TAKEN);
+        }
+        return collision;
+    }
+
+    private boolean violates(DataIntegrityViolationException collision, String constraintName) {
+        if (collision.getCause() instanceof ConstraintViolationException violation
+                && constraintName.equalsIgnoreCase(violation.getConstraintName())) {
+            return true;
+        }
+        // 방언이 제약 이름을 못 뽑아 오는 경우가 있어 메시지로 한 번 더 본다
+        String message = collision.getMostSpecificCause().getMessage();
+        return message != null && message.contains(constraintName);
     }
 
     /**
@@ -383,9 +425,9 @@ public class MadeDexRecordService {
         return caption;
     }
 
-    private double clampCrop(Double value) {
-        if (value == null) return 50;
-        return Math.max(0, Math.min(100, value));
+    /** 안 보내면 가운데. 범위를 좁히는 건 엔티티가 한다 */
+    private double cropOrCenter(Double value) {
+        return value == null ? MadeDexRecordPhoto.CROP_DEFAULT : value;
     }
 
     private String blankToNull(String value) {

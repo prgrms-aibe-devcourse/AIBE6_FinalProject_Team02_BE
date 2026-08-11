@@ -28,10 +28,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -44,6 +46,7 @@ import java.util.stream.IntStream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -167,7 +170,7 @@ class MadeDexRecordServiceTest {
                 request(TODAY_SEOUL.plusDays(1), List.of("key1"))))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.MADE_DEX_RECORD_FUTURE_DATE);
-        verify(madeDexRecordRepository, never()).save(any());
+        verify(madeDexRecordRepository, never()).saveAndFlush(any(MadeDexRecord.class));
     }
 
     @Test
@@ -395,8 +398,7 @@ class MadeDexRecordServiceTest {
     @Test
     @DisplayName("선검사를 함께 통과한 동시 요청은 DB 제약이 막고, 같은 답으로 바뀐다")
     void 동시_등록은_제약이_막는다() {
-        when(madeDexRecordRepository.saveAndFlush(any(MadeDexRecord.class)))
-                .thenThrow(new DataIntegrityViolationException("uq_made_dex_record_slot_author_day"));
+        when(madeDexRecordRepository.saveAndFlush(any(MadeDexRecord.class))).thenThrow(slotCollision());
 
         assertThatThrownBy(() -> service.create(AUTHOR_ID, MADE_DEX_ID,
                 request(TODAY_SEOUL, List.of("key1"))))
@@ -524,6 +526,167 @@ class MadeDexRecordServiceTest {
                 MADE_DEX_ID, SLOT_ID, AUTHOR_ID, TODAY_SEOUL.minusDays(1), null);
         ReflectionTestUtils.setField(record, "id", RECORD_ID);
         return record;
+    }
+
+    // ── 유니크 위반을 어디까지 변환하나 ──────────────────
+
+    @Test
+    @DisplayName("끼니를 옮길 때도 동시 요청은 DB 제약이 막고, 같은 답으로 바뀐다")
+    void 끼니_이동도_제약이_막는다() {
+        when(madeDexRecordRepository.findActiveByIdForUpdate(RECORD_ID))
+                .thenReturn(Optional.of(record(AUTHOR_ID, MADE_DEX_ID)));
+        when(madeDexSlotRepository.findById(OTHER_SLOT_ID))
+                .thenReturn(Optional.of(slot(OTHER_SLOT_ID, MADE_DEX_ID)));
+        when(madeDexRecordPhotoRepository.findByRecordIdOrderBySortOrderAsc(RECORD_ID))
+                .thenReturn(List.of(photo(1L, "keep", 0)));
+        // 선검사는 통과시키고, 앞당긴 flush에서 걸리게 한다
+        doThrow(slotCollision()).when(madeDexRecordRepository).flush();
+
+        assertThatThrownBy(() -> service.update(AUTHOR_ID, MADE_DEX_ID, RECORD_ID,
+                new MadeDexRecordUpdateRequestDTO(
+                        OTHER_SLOT_ID, null, List.of(keptPhoto(1L, null)), List.of())))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.MADE_DEX_RECORD_SLOT_TAKEN);
+    }
+
+    @Test
+    @DisplayName("끼니를 그대로 두는 수정은 flush를 앞당기지 않는다")
+    void 끼니를_안_옮기면_flush하지_않는다() {
+        when(madeDexRecordRepository.findActiveByIdForUpdate(RECORD_ID))
+                .thenReturn(Optional.of(record(AUTHOR_ID, MADE_DEX_ID)));
+        when(madeDexRecordPhotoRepository.findByRecordIdOrderBySortOrderAsc(RECORD_ID))
+                .thenReturn(List.of(photo(1L, "keep", 0)));
+
+        service.update(AUTHOR_ID, MADE_DEX_ID, RECORD_ID,
+                updateRequest(List.of(1L), List.of()));
+
+        verify(madeDexRecordRepository, never()).flush();
+    }
+
+    @Test
+    @DisplayName("다른 제약 위반은 '이미 기록한 끼니'로 가리지 않고 그대로 올린다")
+    void 다른_제약_위반은_가리지_않는다() {
+        // 검사 직후 슬롯이 지워지면 복합 FK가 걸린다. 이걸 409로 바꾸면 원인이 사라진다
+        DataIntegrityViolationException other = new DataIntegrityViolationException(
+                "could not execute statement",
+                new ConstraintViolationException("fk violation", new SQLException(),
+                        "fk_made_dex_record_slot"));
+        when(madeDexRecordRepository.saveAndFlush(any(MadeDexRecord.class))).thenThrow(other);
+
+        assertThatThrownBy(() -> service.create(AUTHOR_ID, MADE_DEX_ID,
+                request(TODAY_SEOUL, List.of("key1"))))
+                .isSameAs(other);
+    }
+
+    // ── 시각이 남아 있는 지난 기록 ────────────────────────
+
+    @Test
+    @DisplayName("시각이 있는 지난 기록도 사진에 붙인 글은 고칠 수 있다")
+    void 시각이_있는_지난_기록의_글을_고친다() {
+        MadeDexRecordPhoto kept = photo(1L, "keep", 0);
+        MadeDexRecord past = pastRecordAt(LocalTime.of(16, 0));
+        when(madeDexRecordRepository.findActiveByIdForUpdate(RECORD_ID)).thenReturn(Optional.of(past));
+        when(madeDexRecordPhotoRepository.findByRecordIdOrderBySortOrderAsc(RECORD_ID))
+                .thenReturn(List.of(kept));
+
+        service.update(AUTHOR_ID, MADE_DEX_ID, RECORD_ID, new MadeDexRecordUpdateRequestDTO(
+                SLOT_ID, LocalTime.of(16, 0), List.of(keptPhoto(1L, "어제 저녁")), List.of()));
+
+        assertThat(kept.getCaption()).isEqualTo("어제 저녁");
+        // 시각은 그대로 남는다
+        assertThat(past.getLoggedAt()).isEqualTo(TODAY_SEOUL.minusDays(1).atTime(16, 0));
+    }
+
+    @Test
+    @DisplayName("지난 기록의 시각을 지우려 하면 거절한다 — 시각도 잠긴다")
+    void 지난_기록의_시각은_못_지운다() {
+        MadeDexRecord past = pastRecordAt(LocalTime.of(16, 0));
+        when(madeDexRecordRepository.findActiveByIdForUpdate(RECORD_ID)).thenReturn(Optional.of(past));
+        when(madeDexRecordPhotoRepository.findByRecordIdOrderBySortOrderAsc(RECORD_ID))
+                .thenReturn(List.of(photo(1L, "keep", 0)));
+
+        assertThatThrownBy(() -> service.update(AUTHOR_ID, MADE_DEX_ID, RECORD_ID,
+                new MadeDexRecordUpdateRequestDTO(
+                        SLOT_ID, null, List.of(keptPhoto(1L, "글만")), List.of())))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.MADE_DEX_RECORD_PAST_LOCKED);
+    }
+
+    @Test
+    @DisplayName("지난 기록의 시각을 다른 값으로 바꾸려 해도 거절한다")
+    void 지난_기록의_시각은_못_바꾼다() {
+        MadeDexRecord past = pastRecordAt(LocalTime.of(16, 0));
+        when(madeDexRecordRepository.findActiveByIdForUpdate(RECORD_ID)).thenReturn(Optional.of(past));
+        when(madeDexRecordPhotoRepository.findByRecordIdOrderBySortOrderAsc(RECORD_ID))
+                .thenReturn(List.of(photo(1L, "keep", 0)));
+
+        assertThatThrownBy(() -> service.update(AUTHOR_ID, MADE_DEX_ID, RECORD_ID,
+                new MadeDexRecordUpdateRequestDTO(
+                        SLOT_ID, LocalTime.of(18, 0), List.of(keptPhoto(1L, null)), List.of())))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.MADE_DEX_RECORD_PAST_LOCKED);
+    }
+
+    /** 어제 그 시각에 남긴 기록 */
+    private MadeDexRecord pastRecordAt(LocalTime loggedTime) {
+        LocalDate yesterday = TODAY_SEOUL.minusDays(1);
+        MadeDexRecord record = MadeDexRecord.write(
+                MADE_DEX_ID, SLOT_ID, AUTHOR_ID, yesterday, yesterday.atTime(loggedTime));
+        ReflectionTestUtils.setField(record, "id", RECORD_ID);
+        return record;
+    }
+
+    /** 사람x끼니x날짜 유니크 인덱스에 걸린 모양 */
+    private DataIntegrityViolationException slotCollision() {
+        return new DataIntegrityViolationException(
+                "could not execute statement",
+                new ConstraintViolationException("duplicate key", new SQLException(),
+                        "uq_made_dex_record_slot_author_day"));
+    }
+
+    // ── 크롭 좌표는 엔티티가 좁힌다 ──────────────────────
+
+    @Test
+    @DisplayName("범위 밖 크롭 좌표는 0~100으로 좁혀 저장한다")
+    void 크롭_좌표를_좁힌다() {
+        service.create(AUTHOR_ID, MADE_DEX_ID, requestWithPhotos(TODAY_SEOUL,
+                List.of(new PhotoInput("key1", null, -30.0, 420.0))));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<MadeDexRecordPhoto>> captor = ArgumentCaptor.forClass(List.class);
+        verify(madeDexRecordPhotoRepository).saveAll(captor.capture());
+        MadeDexRecordPhoto saved = captor.getValue().getFirst();
+        assertThat(saved.getCropX()).isEqualTo(0);
+        assertThat(saved.getCropY()).isEqualTo(100);
+    }
+
+    @Test
+    @DisplayName("크롭 좌표를 안 보내면 가운데로 둔다")
+    void 크롭을_안_보내면_가운데다() {
+        service.create(AUTHOR_ID, MADE_DEX_ID, request(TODAY_SEOUL, List.of("key1")));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<MadeDexRecordPhoto>> captor = ArgumentCaptor.forClass(List.class);
+        verify(madeDexRecordPhotoRepository).saveAll(captor.capture());
+        MadeDexRecordPhoto saved = captor.getValue().getFirst();
+        assertThat(saved.getCropX()).isEqualTo(MadeDexRecordPhoto.CROP_DEFAULT);
+        assertThat(saved.getCropY()).isEqualTo(MadeDexRecordPhoto.CROP_DEFAULT);
+    }
+
+    @Test
+    @DisplayName("오늘 기록을 고칠 때도 범위 밖 좌표는 좁혀진다")
+    void 수정할_때도_크롭을_좁힌다() {
+        MadeDexRecordPhoto kept = photo(1L, "keep", 0);
+        when(madeDexRecordRepository.findActiveByIdForUpdate(RECORD_ID))
+                .thenReturn(Optional.of(record(AUTHOR_ID, MADE_DEX_ID)));
+        when(madeDexRecordPhotoRepository.findByRecordIdOrderBySortOrderAsc(RECORD_ID))
+                .thenReturn(List.of(kept));
+
+        service.update(AUTHOR_ID, MADE_DEX_ID, RECORD_ID, new MadeDexRecordUpdateRequestDTO(
+                SLOT_ID, null, List.of(new KeptPhoto(1L, null, 999.0, -1.0)), List.of()));
+
+        assertThat(kept.getCropX()).isEqualTo(100);
+        assertThat(kept.getCropY()).isEqualTo(0);
     }
 
     private MadeDexRecordCreateRequestDTO request(LocalDate loggedOn, List<String> keys) {
