@@ -4,5 +4,7 @@ package com.backend_catcheat.domain.made.dto;
 public record MadeDexRecordPhotoDTO(
         Long photoId,
         String url,
-        String caption
+        String caption,
+        double cropX,
+        double cropY
 ) {}

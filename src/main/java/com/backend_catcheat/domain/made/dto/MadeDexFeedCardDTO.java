@@ -15,7 +15,8 @@ public record MadeDexFeedCardDTO(
         boolean me,
         int recordCount,
         String thumbnailUrl,
-        List<String> foodNames,
+        double thumbnailCropX,
+        double thumbnailCropY,
         List<Long> recordIds,
         // 대표 사진을 낸 기록의 올린 시각. 빈 카드는 null
         LocalDateTime loggedAt

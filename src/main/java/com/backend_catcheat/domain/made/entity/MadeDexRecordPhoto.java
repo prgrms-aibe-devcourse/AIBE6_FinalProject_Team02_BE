@@ -38,15 +38,29 @@ public class MadeDexRecordPhoto {
     @Column(name = "caption", length = CAPTION_MAX)
     private String caption;
 
-    private MadeDexRecordPhoto(Long recordId, String imageKey, String caption, int sortOrder) {
+    @Column(name = "crop_x", nullable = false)
+    private double cropX = 50;
+
+    @Column(name = "crop_y", nullable = false)
+    private double cropY = 50;
+
+    private MadeDexRecordPhoto(Long recordId, String imageKey, String caption, int sortOrder,
+                               double cropX, double cropY) {
         this.recordId = recordId;
         this.imageKey = imageKey;
         this.caption = caption;
         this.sortOrder = sortOrder;
+        this.cropX = cropX;
+        this.cropY = cropY;
     }
 
     public static MadeDexRecordPhoto of(Long recordId, String imageKey, String caption, int sortOrder) {
-        return new MadeDexRecordPhoto(recordId, imageKey, caption, sortOrder);
+        return new MadeDexRecordPhoto(recordId, imageKey, caption, sortOrder, 50, 50);
+    }
+
+    public static MadeDexRecordPhoto of(Long recordId, String imageKey, String caption, int sortOrder,
+                                        double cropX, double cropY) {
+        return new MadeDexRecordPhoto(recordId, imageKey, caption, sortOrder, cropX, cropY);
     }
 
     public void moveTo(int sortOrder) {
@@ -56,5 +70,10 @@ public class MadeDexRecordPhoto {
     /** 남겨 두는 사진도 글은 고칠 수 있다 */
     public void writeCaption(String caption) {
         this.caption = caption;
+    }
+
+    public void writeCrop(double cropX, double cropY) {
+        this.cropX = cropX;
+        this.cropY = cropY;
     }
 }

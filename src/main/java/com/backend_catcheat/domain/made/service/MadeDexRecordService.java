@@ -10,11 +10,9 @@ import com.backend_catcheat.domain.made.dto.MadeDexRecordDetailDTO;
 import com.backend_catcheat.domain.made.dto.MadeDexRecordPhotoDTO;
 import com.backend_catcheat.domain.made.dto.MadeDexRecordUpdateRequestDTO;
 import com.backend_catcheat.domain.made.entity.MadeDexRecord;
-import com.backend_catcheat.domain.made.entity.MadeDexRecordFood;
 import com.backend_catcheat.domain.made.entity.MadeDexRecordPhoto;
 import com.backend_catcheat.domain.made.entity.MadeDexSlot;
 import com.backend_catcheat.domain.made.repository.MadeDexMemberRepository;
-import com.backend_catcheat.domain.made.repository.MadeDexRecordFoodRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexRecordPhotoRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexRecordRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexSlotRepository;
@@ -27,6 +25,7 @@ import com.backend_catcheat.global.exception.ErrorCode;
 import com.backend_catcheat.global.s3.S3PresignedUrlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -52,7 +51,6 @@ public class MadeDexRecordService {
 
     private final MadeDexRecordRepository madeDexRecordRepository;
     private final MadeDexRecordPhotoRepository madeDexRecordPhotoRepository;
-    private final MadeDexRecordFoodRepository madeDexRecordFoodRepository;
     private final MadeDexSlotRepository madeDexSlotRepository;
     private final MadeDexMemberRepository madeDexMemberRepository;
     private final MadeDexFinder madeDexFinder;
@@ -67,16 +65,14 @@ public class MadeDexRecordService {
                                                  MadeDexRecordCreateRequestDTO request) {
         requireMember(madeDexId, userId);
         MadeDexSlot slot = writableSlot(madeDexId, request.slotId());
-        LocalDate loggedOn = validLoggedOn(request.loggedOn());
+        LocalDate loggedOn = requireToday(request.loggedOn());
         List<PhotoInput> photos = validPhotos(userId, request.photos(), true);
-        List<String> foodNames = validFoodNames(request.foodNames());
+        requireSlotFree(madeDexId, slot.getId(), userId, loggedOn, null);
 
-        MadeDexRecord record = madeDexRecordRepository.save(MadeDexRecord.write(
-                madeDexId, slot.getId(), userId, loggedOn, loggedAt(loggedOn, request.loggedTime()),
-                validLocationName(request.locationName()), request.lat(), request.lng()));
+        MadeDexRecord record = saveRecord(MadeDexRecord.write(
+                madeDexId, slot.getId(), userId, loggedOn, loggedAt(loggedOn, request.loggedTime())));
 
         savePhotos(record.getId(), photos, 0);
-        saveFoods(record.getId(), foodNames);
 
         return new MadeDexRecordCreateResponseDTO(record.getId());
     }
@@ -86,8 +82,9 @@ public class MadeDexRecordService {
                        MadeDexRecordUpdateRequestDTO request) {
         MadeDexRecord record = authoredRecord(userId, madeDexId, recordId);
         MadeDexSlot slot = writableSlot(madeDexId, request.slotId());
-        LocalDate loggedOn = validLoggedOn(request.loggedOn());
-        List<String> foodNames = validFoodNames(request.foodNames());
+        // 날짜는 만든 뒤 바뀌지 않는다. 요청에 담기지 않아 옮길 방법 자체가 없다
+        LocalDate loggedOn = record.getLoggedOn();
+        boolean past = !loggedOn.equals(today());
 
         List<MadeDexRecordPhoto> current =
                 madeDexRecordPhotoRepository.findByRecordIdOrderBySortOrderAsc(recordId);
@@ -96,8 +93,14 @@ public class MadeDexRecordService {
         List<PhotoInput> newPhotos = validPhotos(userId, request.newPhotos(), false);
         requirePhotoCount(kept.size() + newPhotos.size());
 
-        record.update(slot.getId(), loggedOn, loggedAt(loggedOn, request.loggedTime()),
-                validLocationName(request.locationName()), request.lat(), request.lng());
+        if (past) {
+            requireCaptionOnly(record, slot, current, kept, newPhotos, request.loggedTime());
+        } else if (!slot.getId().equals(record.getSlotId())) {
+            // 끼니를 옮기면 그쪽이 이미 차 있을 수 있다. 자기 자신은 셈에서 뺀다
+            requireSlotFree(madeDexId, slot.getId(), userId, loggedOn, recordId);
+        }
+
+        record.update(slot.getId(), loggedOn, loggedAt(loggedOn, request.loggedTime()));
 
         Set<Long> keptIds = kept.stream().map(MadeDexRecordPhoto::getId).collect(Collectors.toSet());
         List<MadeDexRecordPhoto> dropped = current.stream()
@@ -105,29 +108,33 @@ public class MadeDexRecordService {
                 .toList();
         madeDexRecordPhotoRepository.deleteAll(dropped);
 
-        // 글이 없는 사진이 흔하고 Collectors.toMap은 null 값을 받지 않는다
-        Map<Long, String> captionById = new HashMap<>();
+        Map<Long, KeptPhoto> keepById = new HashMap<>();
         for (KeptPhoto keep : keepRequests) {
             if (keep.photoId() != null) {
-                captionById.put(keep.photoId(), validCaption(keep.caption()));
+                keepById.put(keep.photoId(), keep);
             }
         }
 
         int order = 0;
         for (MadeDexRecordPhoto photo : kept) {
             photo.moveTo(order++);
-            photo.writeCaption(captionById.get(photo.getId()));
+            KeptPhoto keep = keepById.get(photo.getId());
+            if (keep != null) {
+                photo.writeCaption(validCaption(keep.caption()));
+                // 지난 기록은 위치 조정도 잠근다. requireCaptionOnly가 이미 걸러 주지만
+                // 값이 흘러들지 않게 여기서도 오늘일 때만 쓴다
+                if (!past) {
+                    photo.writeCrop(clampCrop(keep.cropX()), clampCrop(keep.cropY()));
+                }
+            }
         }
         savePhotos(recordId, newPhotos, order);
-
-        madeDexRecordFoodRepository.deleteByRecordId(recordId);
-        saveFoods(recordId, foodNames);
 
         dropped.forEach(photo -> publishIfOrphan(recordId, photo.getImageKey()));
     }
 
     /**
-     * 기록만 소프트 삭제한다. 사진·음식명 행은 남는다.
+     * 기록만 소프트 삭제한다. 사진 행은 남는다.
      * 슬롯 삭제 판정이 지운 기록까지 세고 있어(FK가 살아 있다) 여기서 지우면 그 전제가 깨진다.
      */
     @Transactional
@@ -182,11 +189,9 @@ public class MadeDexRecordService {
                 .map(photo -> new MadeDexRecordPhotoDTO(
                         photo.getId(),
                         s3PresignedUrlService.createDownloadUrl(photo.getImageKey()),
-                        photo.getCaption()))
-                .toList();
-        List<String> foodNames = madeDexRecordFoodRepository
-                .findByRecordIdOrderBySortOrderAsc(recordId).stream()
-                .map(MadeDexRecordFood::getFoodName)
+                        photo.getCaption(),
+                        photo.getCropX(),
+                        photo.getCropY()))
                 .toList();
         String slotName = madeDexSlotRepository.findById(record.getSlotId())
                 .map(MadeDexSlot::getName)
@@ -202,10 +207,6 @@ public class MadeDexRecordService {
                 author == null ? null : author.getNickname(),
                 record.isAuthor(userId),
                 photos,
-                foodNames,
-                record.getLocationName(),
-                record.getLat(),
-                record.getLng(),
                 record.getLoggedAt());
     }
 
@@ -253,27 +254,89 @@ public class MadeDexRecordService {
         for (int i = 0; i < inputs.size(); i++) {
             PhotoInput input = inputs.get(i);
             photos.add(MadeDexRecordPhoto.of(
-                    recordId, input.imageKey(), validCaption(input.caption()), startOrder + i));
+                    recordId, input.imageKey(), validCaption(input.caption()), startOrder + i,
+                    clampCrop(input.cropX()), clampCrop(input.cropY())));
         }
         madeDexRecordPhotoRepository.saveAll(photos);
     }
 
-    private void saveFoods(Long recordId, List<String> foodNames) {
-        List<MadeDexRecordFood> foods = new ArrayList<>(foodNames.size());
-        for (int order = 0; order < foodNames.size(); order++) {
-            foods.add(MadeDexRecordFood.of(recordId, foodNames.get(order), order));
-        }
-        madeDexRecordFoodRepository.saveAll(foods);
-    }
-
-    private LocalDate validLoggedOn(LocalDate loggedOn) {
+    /**
+     * 로그잇은 오늘 먹은 것을 나누는 앱이라 등록은 오늘만 받는다.
+     * 요청의 loggedOn은 "언제 걸로 남길지 고르는 값"이 아니라
+     * "클라이언트가 지금 며칠이라 믿는지"를 확인하는 값이다.
+     * 서버 시각만 쓰면 자정을 넘긴 제출이 조용히 다음 날로 넘어가고,
+     * 그 끼니가 선점돼 정작 그날 기록이 막힌다. 그래서 받아서 대조한다.
+     */
+    private LocalDate requireToday(LocalDate loggedOn) {
         if (loggedOn == null) {
             throw new CustomException(ErrorCode.MADE_DEX_RECORD_DATE_REQUIRED);
         }
-        if (loggedOn.isAfter(LocalDate.now(clock.withZone(TimeConfig.SERVICE_ZONE)))) {
+        LocalDate today = today();
+        if (loggedOn.isAfter(today)) {
             throw new CustomException(ErrorCode.MADE_DEX_RECORD_FUTURE_DATE);
         }
+        if (loggedOn.isBefore(today)) {
+            throw new CustomException(ErrorCode.MADE_DEX_RECORD_PAST_DATE);
+        }
         return loggedOn;
+    }
+
+    private LocalDate today() {
+        return LocalDate.now(clock.withZone(TimeConfig.SERVICE_ZONE));
+    }
+
+    /** 한 사람이 한 끼니에 남기는 건 하루 한 건이다. 지운 기록은 자리를 비켜 준다 */
+    private void requireSlotFree(Long madeDexId, Long slotId, Long userId,
+                                 LocalDate loggedOn, Long exceptRecordId) {
+        boolean taken = exceptRecordId == null
+                ? madeDexRecordRepository.existsByMadeDexIdAndSlotIdAndAuthorIdAndLoggedOnAndDeletedAtIsNull(
+                        madeDexId, slotId, userId, loggedOn)
+                : madeDexRecordRepository.existsByMadeDexIdAndSlotIdAndAuthorIdAndLoggedOnAndDeletedAtIsNullAndIdNot(
+                        madeDexId, slotId, userId, loggedOn, exceptRecordId);
+        if (taken) {
+            throw new CustomException(ErrorCode.MADE_DEX_RECORD_SLOT_TAKEN);
+        }
+    }
+
+    /**
+     * 선검사를 통과한 요청 둘이 동시에 들어오면 유니크 인덱스가 마지막으로 막는다.
+     * 그대로 두면 500이 나가므로 선검사와 같은 답으로 바꾼다.
+     * saveAndFlush로 즉시 내보내야 여기서 잡힌다 — save만 쓰면 커밋 시점에 터진다.
+     */
+    private MadeDexRecord saveRecord(MadeDexRecord record) {
+        try {
+            return madeDexRecordRepository.saveAndFlush(record);
+        } catch (DataIntegrityViolationException collision) {
+            throw new CustomException(ErrorCode.MADE_DEX_RECORD_SLOT_TAKEN);
+        }
+    }
+
+    /**
+     * 지난 기록은 사진에 붙인 글만 고친다.
+     * 사진을 더하거나 빼거나 순서를 바꾸는 것, 끼니와 시각을 옮기는 것은 모두 막는다.
+     * crop도 사진 쪽으로 묶는다 — 사진의 어느 부분이 보이는지가 바뀌는 값이다.
+     */
+    private void requireCaptionOnly(MadeDexRecord record, MadeDexSlot slot,
+                                    List<MadeDexRecordPhoto> current, List<MadeDexRecordPhoto> kept,
+                                    List<PhotoInput> newPhotos, LocalTime loggedTime) {
+        if (!newPhotos.isEmpty()) {
+            throw new CustomException(ErrorCode.MADE_DEX_RECORD_PAST_LOCKED);
+        }
+        if (!slot.getId().equals(record.getSlotId())) {
+            throw new CustomException(ErrorCode.MADE_DEX_RECORD_PAST_LOCKED);
+        }
+        if (!Objects.equals(loggedAt(record.getLoggedOn(), loggedTime), record.getLoggedAt())) {
+            throw new CustomException(ErrorCode.MADE_DEX_RECORD_PAST_LOCKED);
+        }
+        // 남길 사진이 원래 집합과 순서까지 같아야 한다
+        if (kept.size() != current.size()) {
+            throw new CustomException(ErrorCode.MADE_DEX_RECORD_PAST_LOCKED);
+        }
+        for (int i = 0; i < current.size(); i++) {
+            if (!current.get(i).getId().equals(kept.get(i).getId())) {
+                throw new CustomException(ErrorCode.MADE_DEX_RECORD_PAST_LOCKED);
+            }
+        }
     }
 
     private List<PhotoInput> validPhotos(Long userId, List<PhotoInput> rawPhotos, boolean required) {
@@ -283,7 +346,7 @@ public class MadeDexRecordService {
                 .filter(Objects::nonNull)
                 .filter(photo -> blankToNull(photo.imageKey()) != null)
                 .filter(photo -> seen.add(photo.imageKey().trim()))
-                .map(photo -> new PhotoInput(photo.imageKey().trim(), photo.caption()))
+                .map(photo -> new PhotoInput(photo.imageKey().trim(), photo.caption(), photo.cropX(), photo.cropY()))
                 .toList();
         if (required) {
             requirePhotoCount(photos.size());
@@ -312,18 +375,6 @@ public class MadeDexRecordService {
         }
     }
 
-    /** 음식명은 더 이상 기록 화면에서 받지 않는다. 예전 기록과 냉장고를 위해 받기만 한다 */
-    private List<String> validFoodNames(List<String> rawFoodNames) {
-        List<String> foodNames = rawFoodNames == null ? List.of() : rawFoodNames.stream()
-                .map(this::blankToNull)
-                .filter(Objects::nonNull)
-                .toList();
-        if (foodNames.stream().anyMatch(name -> name.length() > MadeDexRecord.FOOD_NAME_MAX)) {
-            throw new CustomException(ErrorCode.MADE_DEX_RECORD_FOOD_NAME_TOO_LONG);
-        }
-        return foodNames;
-    }
-
     private String validCaption(String rawCaption) {
         String caption = blankToNull(rawCaption);
         if (caption != null && caption.length() > MadeDexRecordPhoto.CAPTION_MAX) {
@@ -332,12 +383,9 @@ public class MadeDexRecordService {
         return caption;
     }
 
-    private String validLocationName(String rawLocationName) {
-        String locationName = blankToNull(rawLocationName);
-        if (locationName != null && locationName.length() > MadeDexRecord.LOCATION_NAME_MAX) {
-            throw new CustomException(ErrorCode.MADE_DEX_RECORD_LOCATION_TOO_LONG);
-        }
-        return locationName;
+    private double clampCrop(Double value) {
+        if (value == null) return 50;
+        return Math.max(0, Math.min(100, value));
     }
 
     private String blankToNull(String value) {

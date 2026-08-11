@@ -5,8 +5,6 @@ import com.backend_catcheat.global.exception.ErrorCode;
 import com.backend_catcheat.global.jpa.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -34,10 +32,6 @@ public class MadeDex extends BaseEntity {
     @Column(name = "description", length = DESCRIPTION_MAX)
     private String description;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "visibility", nullable = false, length = 20)
-    private Visibility visibility;
-
     @Column(name = "max_members", nullable = false)
     private int maxMembers;
 
@@ -48,25 +42,21 @@ public class MadeDex extends BaseEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    private MadeDex(Long ownerId, String name, String description, Visibility visibility,
-                    String imageKey) {
+    private MadeDex(Long ownerId, String name, String description, String imageKey) {
         this.ownerId = ownerId;
         this.name = name;
         this.description = description;
-        this.visibility = visibility;
         this.imageKey = imageKey;
         this.maxMembers = MAX_MEMBERS;
     }
 
-    public static MadeDex open(Long ownerId, String name, String description, Visibility visibility,
-                               String imageKey) {
-        return new MadeDex(ownerId, name, description, visibility, imageKey);
+    public static MadeDex open(Long ownerId, String name, String description, String imageKey) {
+        return new MadeDex(ownerId, name, description, imageKey);
     }
 
-    public void update(String name, String description, Visibility visibility, String imageKey) {
+    public void update(String name, String description, String imageKey) {
         this.name = name;
         this.description = description;
-        this.visibility = visibility;
         this.imageKey = imageKey;
     }
 
