@@ -42,6 +42,7 @@ public class ReviewService {
     private final EquippedBadgeResolver equippedBadgeResolver;
     private final S3PresignedUrlService s3PresignedUrlService;
 
+
     @Transactional
     public ReviewCreateResponseDTO writeFoodReview(Long userId, Long challengeDexId, Long slotId,
                                                    ReviewWriteRequestDTO request) {
@@ -139,11 +140,10 @@ public class ReviewService {
         List<Long> reviewIds = reviews.stream().map(Review::getId).toList();
         List<Long> reviewerIds = reviews.stream().map(Review::getReviewerId).distinct().toList();
 
-
         List<User> reviewers = userRepository.findAllById(reviewerIds);
         Map<Long, User> userById = reviewers.stream()
                 .collect(Collectors.toMap(User::getId, u -> u));
-
+        // 대표 뱃지 배치 조회 (badgeId -> 표시정보)
         Map<Long, EquippedBadgeViewDTO> badgeById = equippedBadgeResolver.resolveByBadgeId(reviewers);
 
         Set<Long> likedReviewIds = reviewLikeRepository.findByReviewIdInAndUserId(reviewIds, userId).stream()
