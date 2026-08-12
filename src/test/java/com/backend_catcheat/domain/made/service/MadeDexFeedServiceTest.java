@@ -8,13 +8,10 @@ import com.backend_catcheat.domain.made.dto.MadeDexFeedSlotDTO;
 import com.backend_catcheat.domain.made.entity.MadeDex;
 import com.backend_catcheat.domain.made.entity.MadeDexMember;
 import com.backend_catcheat.domain.made.entity.MadeDexRecord;
-import com.backend_catcheat.domain.made.entity.MadeDexRecordFood;
 import com.backend_catcheat.domain.made.entity.MadeDexRecordPhoto;
 import com.backend_catcheat.domain.made.entity.MadeDexRole;
 import com.backend_catcheat.domain.made.entity.MadeDexSlot;
-import com.backend_catcheat.domain.made.entity.Visibility;
 import com.backend_catcheat.domain.made.repository.MadeDexMemberRepository;
-import com.backend_catcheat.domain.made.repository.MadeDexRecordFoodRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexRecordPhotoRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexRecordRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexSlotRepository;
@@ -63,7 +60,6 @@ class MadeDexFeedServiceTest {
     @Mock MadeDexMemberRepository madeDexMemberRepository;
     @Mock MadeDexRecordRepository madeDexRecordRepository;
     @Mock MadeDexRecordPhotoRepository madeDexRecordPhotoRepository;
-    @Mock MadeDexRecordFoodRepository madeDexRecordFoodRepository;
     @Mock MadeDexFinder madeDexFinder;
     @Mock UserRepository userRepository;
     @Mock S3PresignedUrlService s3PresignedUrlService;
@@ -74,7 +70,7 @@ class MadeDexFeedServiceTest {
     void setUp() {
         service = new MadeDexFeedService(
                 madeDexSlotRepository, madeDexMemberRepository, madeDexRecordRepository,
-                madeDexRecordPhotoRepository, madeDexRecordFoodRepository,
+                madeDexRecordPhotoRepository,
                 madeDexFinder, userRepository, s3PresignedUrlService, clock);
 
         when(madeDexFinder.readable(ME, MADE_DEX_ID))
@@ -91,8 +87,6 @@ class MadeDexFeedServiceTest {
                 .findByMadeDexIdAndLoggedOnAndDeletedAtIsNullOrderByCreatedAtAsc(any(), any()))
                 .thenReturn(List.of());
         when(madeDexRecordPhotoRepository.findByRecordIdInOrderBySortOrderAsc(anyCollection()))
-                .thenReturn(List.of());
-        when(madeDexRecordFoodRepository.findByRecordIdInOrderBySortOrderAsc(anyCollection()))
                 .thenReturn(List.of());
     }
 
@@ -130,14 +124,11 @@ class MadeDexFeedServiceTest {
         when(madeDexRecordPhotoRepository.findByRecordIdInOrderBySortOrderAsc(anyCollection()))
                 .thenReturn(List.of(MadeDexRecordPhoto.of(100L, "key1", null, 0),
                         MadeDexRecordPhoto.of(100L, "key2", null, 1)));
-        when(madeDexRecordFoodRepository.findByRecordIdInOrderBySortOrderAsc(anyCollection()))
-                .thenReturn(List.of(MadeDexRecordFood.of(100L, "계란 토스트", 0)));
 
         MadeDexFeedDTO feed = service.findFeed(ME, MADE_DEX_ID, TODAY_SEOUL);
 
         MadeDexFeedCardDTO mine = feed.slots().getFirst().cards().getFirst();
         assertThat(mine.recordCount()).isEqualTo(1);
-        assertThat(mine.foodNames()).containsExactly("계란 토스트");
         assertThat(mine.recordIds()).containsExactly(100L);
         // 친구 카드와 점심 슬롯은 비어 있어야 한다
         assertThat(feed.slots().getFirst().cards().get(1).recordCount()).isZero();
@@ -154,9 +145,6 @@ class MadeDexFeedServiceTest {
         when(madeDexRecordPhotoRepository.findByRecordIdInOrderBySortOrderAsc(anyCollection()))
                 .thenReturn(List.of(MadeDexRecordPhoto.of(100L, "first", null, 0),
                         MadeDexRecordPhoto.of(101L, "second", null, 0)));
-        when(madeDexRecordFoodRepository.findByRecordIdInOrderBySortOrderAsc(anyCollection()))
-                .thenReturn(List.of(MadeDexRecordFood.of(100L, "계란 토스트", 0),
-                        MadeDexRecordFood.of(101L, "그릭요거트 볼", 0)));
         when(s3PresignedUrlService.createDownloadUrl("first")).thenReturn("url-first");
 
         MadeDexFeedCardDTO mine = service.findFeed(ME, MADE_DEX_ID, TODAY_SEOUL)
@@ -165,7 +153,6 @@ class MadeDexFeedServiceTest {
         assertThat(mine.recordCount()).isEqualTo(2);
         // 대표 사진은 먼저 남긴 기록의 첫 장이다
         assertThat(mine.thumbnailUrl()).isEqualTo("url-first");
-        assertThat(mine.foodNames()).containsExactly("계란 토스트", "그릭요거트 볼");
         assertThat(mine.recordIds()).containsExactly(100L, 101L);
     }
 
@@ -204,7 +191,7 @@ class MadeDexFeedServiceTest {
     }
 
     private MadeDex madeDex() {
-        MadeDex madeDex = MadeDex.open(ME, "우리 식탁", null, Visibility.PRIVATE, null);
+        MadeDex madeDex = MadeDex.open(ME, "우리 식탁", null, null);
         ReflectionTestUtils.setField(madeDex, "id", MADE_DEX_ID);
         return madeDex;
     }
@@ -224,7 +211,7 @@ class MadeDexFeedServiceTest {
 
     private MadeDexRecord record(Long id, Long slotId, Long authorId, LocalDateTime loggedAt) {
         MadeDexRecord record = MadeDexRecord.write(
-                MADE_DEX_ID, slotId, authorId, TODAY_SEOUL, loggedAt, null, null, null);
+                MADE_DEX_ID, slotId, authorId, TODAY_SEOUL, loggedAt);
         ReflectionTestUtils.setField(record, "id", id);
         return record;
     }

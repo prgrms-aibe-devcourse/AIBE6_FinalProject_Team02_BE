@@ -5,7 +5,6 @@ import com.backend_catcheat.domain.made.dto.MadeDexSlotDeleteResponseDTO;
 import com.backend_catcheat.domain.made.entity.MadeDex;
 import com.backend_catcheat.domain.made.entity.MadeDexRole;
 import com.backend_catcheat.domain.made.entity.MadeDexSlot;
-import com.backend_catcheat.domain.made.entity.Visibility;
 import com.backend_catcheat.domain.made.repository.MadeDexMemberRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexSlotRepository;
 import com.backend_catcheat.global.exception.CustomException;
@@ -63,9 +62,9 @@ class MadeDexSlotServiceTest {
         service = new MadeDexSlotService(
                 madeDexSlotRepository, madeDexMemberRepository, madeDexFinder, clock);
 
-        when(madeDexFinder.locked(MADE_DEX_ID)).thenReturn(madeDex(Visibility.PRIVATE));
+        when(madeDexFinder.locked(MADE_DEX_ID)).thenReturn(madeDex());
         when(madeDexFinder.readable(MEMBER_ID, MADE_DEX_ID))
-                .thenReturn(new MadeDexFinder.MadeDexAccess(madeDex(Visibility.PRIVATE), MadeDexRole.MEMBER));
+                .thenReturn(new MadeDexFinder.MadeDexAccess(madeDex(), MadeDexRole.MEMBER));
         when(madeDexMemberRepository.existsByMadeDexIdAndUserId(MADE_DEX_ID, MEMBER_ID)).thenReturn(true);
         when(madeDexMemberRepository.existsByMadeDexIdAndUserId(MADE_DEX_ID, STRANGER_ID)).thenReturn(false);
         when(madeDexSlotRepository.findSlotIdsWithRecords(anyLong())).thenReturn(List.of());
@@ -300,19 +299,6 @@ class MadeDexSlotServiceTest {
     }
 
     @Test
-    @DisplayName("공개 그룹의 슬롯은 참여하지 않아도 볼 수 있다")
-    void 공개_그룹은_누구나_본다() {
-        when(madeDexFinder.readable(STRANGER_ID, MADE_DEX_ID))
-                .thenReturn(new MadeDexFinder.MadeDexAccess(madeDex(Visibility.PUBLIC), null));
-        when(madeDexSlotRepository.findByMadeDexIdOrderBySortOrderAscIdAsc(MADE_DEX_ID))
-                .thenReturn(List.of(slot(1L, "아침", 0)));
-
-        List<MadeDexSlotDTO> slots = service.findSlots(STRANGER_ID, MADE_DEX_ID);
-
-        assertThat(slots).hasSize(1);
-    }
-
-    @Test
     @DisplayName("숨긴 슬롯도 목록에 내려간다")
     void 숨긴_슬롯도_내려간다() {
         MadeDexSlot hidden = slot(2L, "점심", 1);
@@ -337,8 +323,8 @@ class MadeDexSlotServiceTest {
                 .containsExactly(0, 1, 2);
     }
 
-    private MadeDex madeDex(Visibility visibility) {
-        MadeDex madeDex = MadeDex.open(MEMBER_ID, "우리 식탁", null, visibility, null);
+    private MadeDex madeDex() {
+        MadeDex madeDex = MadeDex.open(MEMBER_ID, "우리 식탁", null, null);
         ReflectionTestUtils.setField(madeDex, "id", MADE_DEX_ID);
         return madeDex;
     }

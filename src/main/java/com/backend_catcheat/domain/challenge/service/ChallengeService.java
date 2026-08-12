@@ -70,6 +70,7 @@ public class ChallengeService {
                 .ownerId(ownerId)
                 .name(req.name().trim())
                 .description(req.description())
+                .imageKey(req.imageKey())
                 .periodType(req.periodType())
                 .startsAt(startsAt)
                 .endsAt(endsAt)
@@ -270,7 +271,8 @@ public class ChallengeService {
                 totalSlots,
                 unlockedCount,
                 rankScore,
-                joined
+                joined,
+                s3PresignedUrlService.createDownloadUrl(c.getImageKey())
         );
     }
 
@@ -314,6 +316,7 @@ public class ChallengeService {
                 participantRepository.countByChallengeDexId(challengeDexId),
                 participant.isPresent(),
                 participant.map(ChallengeParticipant::isCompleted).orElse(false),
+                s3PresignedUrlService.createDownloadUrl(dex.getImageKey()),
                 slots);
     }
 

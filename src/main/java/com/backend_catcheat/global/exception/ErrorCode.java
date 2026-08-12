@@ -152,12 +152,13 @@ public enum ErrorCode {
     MADE_DEX_RECORD_PHOTO_REQUIRED(HttpStatus.BAD_REQUEST, "사진을 한 장 이상 올려 주세요"),
     MADE_DEX_RECORD_PHOTO_TOO_MANY(HttpStatus.BAD_REQUEST, "사진은 8장까지 올릴 수 있어요"),
     MADE_DEX_RECORD_PHOTO_NOT_FOUND(HttpStatus.BAD_REQUEST, "이 기록의 사진이 아니에요"),
-    MADE_DEX_RECORD_FOOD_REQUIRED(HttpStatus.BAD_REQUEST, "먹은 음식을 하나 이상 적어 주세요"),
-    MADE_DEX_RECORD_FOOD_NAME_TOO_LONG(HttpStatus.BAD_REQUEST, "음식 이름은 100자까지 쓸 수 있어요"),
     MADE_DEX_RECORD_CAPTION_TOO_LONG(HttpStatus.BAD_REQUEST, "사진에 붙이는 글은 100자까지 쓸 수 있어요"),
-    MADE_DEX_RECORD_LOCATION_TOO_LONG(HttpStatus.BAD_REQUEST, "장소 이름이 너무 길어요"),
     MADE_DEX_RECORD_DATE_REQUIRED(HttpStatus.BAD_REQUEST, "날짜를 골라 주세요"),
     MADE_DEX_RECORD_FUTURE_DATE(HttpStatus.BAD_REQUEST, "아직 오지 않은 날은 기록할 수 없어요"),
+    // 로그잇은 "오늘"을 나누는 앱이다. 지난 날 등록은 막고 열람만 남긴다
+    MADE_DEX_RECORD_PAST_DATE(HttpStatus.BAD_REQUEST, "오늘 먹은 것만 기록할 수 있어요. 날짜가 바뀌었는지 확인해 주세요"),
+    MADE_DEX_RECORD_SLOT_TAKEN(HttpStatus.CONFLICT, "이미 기록한 끼니예요. 고치거나 지운 뒤에 다시 올려 주세요"),
+    MADE_DEX_RECORD_PAST_LOCKED(HttpStatus.BAD_REQUEST, "지난 기록은 사진에 붙인 글만 고칠 수 있어요"),
 
     // 뱃지
     BADGE_NOT_OWNED(HttpStatus.BAD_REQUEST, "보유하지 않은 뱃지예요"),

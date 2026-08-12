@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
 @Service
 @RequiredArgsConstructor
 public class ChallengeParticipationService {
-    private static final double LOCATION_RADIUS_M = 40; // 위치 인증 허용 반경(m)
+    private static final double LOCATION_RADIUS_M = 80; // 위치 인증 허용 반경(m)
 
     private final ChallengeDexRepository challengeDexRepository;
     private final ChallengeParticipantRepository  participantRepository;

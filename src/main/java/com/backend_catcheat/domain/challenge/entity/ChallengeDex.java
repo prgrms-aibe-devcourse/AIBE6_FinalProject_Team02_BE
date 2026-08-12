@@ -24,6 +24,9 @@ public class ChallengeDex extends BaseEntity {
     @Column(length = 500)
     private String description;
 
+    @Column(name = "image_key", length = 512)
+    private String imageKey;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "period_type", nullable = false, length = 20)
     private PeriodType periodType;
@@ -47,6 +50,7 @@ public class ChallengeDex extends BaseEntity {
     public ChallengeDex(
             Long ownerId, String name,
             String description,
+            String imageKey,
             PeriodType periodType,
             LocalDateTime startsAt,
             LocalDateTime endsAt,
@@ -57,6 +61,7 @@ public class ChallengeDex extends BaseEntity {
         this.ownerId = ownerId;
         this.name = name;
         this.description = description;
+        this.imageKey = imageKey;
         this.periodType = periodType;
         this.startsAt = startsAt;
         this.endsAt = endsAt;
@@ -66,6 +71,9 @@ public class ChallengeDex extends BaseEntity {
     }
     public void linkRewardBadge(Long badgeId){
         this.rewardBadgeId = badgeId;
+    }
+    public void changeImage(String imageKey){
+        this.imageKey = imageKey;
     }
     public void softDelete(){
         this.deletedAt = LocalDateTime.now();

@@ -152,7 +152,9 @@ public class MadeDexDayCardService {
                 .map(photo -> new MadeDexDayCardPhotoDTO(
                         photo.getId(),
                         blankToNull(photo.getCaption()),
-                        s3PresignedUrlService.createDownloadUrl(photo.getImageKey())))
+                        s3PresignedUrlService.createDownloadUrl(photo.getImageKey()),
+                        photo.getCropX(),
+                        photo.getCropY()))
                 .toList();
     }
 
@@ -169,6 +171,10 @@ public class MadeDexDayCardService {
             Long photoId
     ) {
         MadeDexRecord record = authoredRecord(userId, madeDexId, recordId);
+        // 대표를 바꾸는 건 사진 순서를 바꾸는 일이다. 지난 기록은 글만 고칠 수 있다
+        if (!record.getLoggedOn().equals(LocalDate.now(clock.withZone(TimeConfig.SERVICE_ZONE)))) {
+            throw new CustomException(ErrorCode.MADE_DEX_RECORD_PAST_LOCKED);
+        }
 
         List<MadeDexRecordPhoto> photos = madeDexRecordPhotoRepository
                 .findByRecordIdOrderBySortOrderAsc(record.getId());

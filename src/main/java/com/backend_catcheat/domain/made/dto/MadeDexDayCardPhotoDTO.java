@@ -7,5 +7,7 @@ package com.backend_catcheat.domain.made.dto;
 public record MadeDexDayCardPhotoDTO(
         Long photoId,
         String caption,
-        String imageUrl
+        String imageUrl,
+        double cropX,
+        double cropY
 ) {}
