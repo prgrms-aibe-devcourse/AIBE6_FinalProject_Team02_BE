@@ -1,7 +1,6 @@
 package com.backend_catcheat.domain.challenge.repository;
 
 import com.backend_catcheat.domain.challenge.entity.ChallengeDex;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -44,8 +43,7 @@ public interface ChallengeDexRepository extends JpaRepository<ChallengeDex, Long
           and c.name like concat('%', :keyword, '%')
         order by c.createdAt desc
         """)
-    List<ChallengeDex> searchByNameContaining(@Param("keyword") String keyword, Pageable pageable);
-
+    List<ChallengeDex> searchByNameContaining(@Param("keyword") String keyword);
 
 
 

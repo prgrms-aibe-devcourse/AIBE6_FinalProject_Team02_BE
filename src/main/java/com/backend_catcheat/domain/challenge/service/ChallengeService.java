@@ -5,18 +5,12 @@ import com.backend_catcheat.domain.auth.repository.UserRepository;
 import com.backend_catcheat.domain.challenge.dto.*;
 import com.backend_catcheat.domain.challenge.dto.ChallengeCreateRequestDTO.SlotInput;
 import com.backend_catcheat.domain.challenge.entity.*;
-import com.backend_catcheat.domain.challenge.repository.ChallengeDexRepository;
-import com.backend_catcheat.domain.challenge.repository.ChallengeDexSlotRepository;
-import com.backend_catcheat.domain.challenge.repository.ChallengeParticipantRepository;
-import com.backend_catcheat.domain.challenge.repository.ChallengeUnlockRepository;
-import com.backend_catcheat.domain.challenge.repository.ChallengeViewDailyRepository;
-import com.backend_catcheat.domain.challenge.repository.DexScore;
+import com.backend_catcheat.domain.challenge.repository.*;
 import com.backend_catcheat.global.common.PageResponse;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import com.backend_catcheat.global.s3.S3PresignedUrlService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -24,13 +18,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -161,30 +149,12 @@ public class ChallengeService {
     }
 
     @Transactional(readOnly = true)
-    public List<ChallengeSummaryDTO> search(Long userId, String keyword){
-        if(!StringUtils.hasText(keyword)){
-           return List.of(); // 빈 문자열 검색 시 빈 결과 반환
+    public PageResponse<ChallengeSummaryDTO> search(Long userId, String keyword, int page, int size){
+        if (!StringUtils.hasText(keyword)) {
+            return new PageResponse<>(List.of(), Math.max(0, page), size, 0, 0, false);
         }
-        List<ChallengeDex> found = challengeDexRepository.searchByNameContaining(
-                keyword.trim(), PageRequest.of(0, SEARCH_LIMIT));
-        if (found.isEmpty()) return List.of();
-        List<Long> ids = found.stream().map(ChallengeDex::getId).toList();
-        Map<Long, Long> participantByDex = participantRepository.countByChallengeDexIdIn(ids)
-                .stream()
-                .collect(
-                        Collectors.toMap(
-                                ChallengeParticipantRepository.ParticipantCount::getDexId,
-                                ChallengeParticipantRepository.ParticipantCount::getCnt)
-                        );
-        Set<Long> joinedDexIds = (userId == null) ? Set.of()
-                : new HashSet<>(participantRepository.findJoinedDexIds(userId, ids));
-
-        return found.stream()
-                .map(c -> toSummary(c,
-                        participantByDex.getOrDefault(c.getId(), 0L),
-                        0, 0, null,
-                        joinedDexIds.contains(c.getId())))
-                .toList();
+        List<ChallengeDex> found = challengeDexRepository.searchByNameContaining(keyword.trim());
+        return paginate(userId, found, null, page, size);   // 참여자수·참여여부·hasNext 계산까지 재사용
     }
 
     // 선택 지표의 dex별 점수 맵
