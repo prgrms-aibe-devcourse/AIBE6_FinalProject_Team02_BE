@@ -16,8 +16,10 @@ import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import com.backend_catcheat.global.s3.S3PresignedUrlService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -44,6 +46,7 @@ public class ChallengeService {
     private final ChallengeParticipantRepository participantRepository;
     private final ChallengeViewDailyRepository viewDailyRepository;
     private final S3PresignedUrlService s3PresignedUrlService;
+    private static final int SEARCH_LIMIT = 20;
 
     //개설권 조회
     @Transactional
@@ -106,7 +109,7 @@ public class ChallengeService {
         if (req.name() == null || req.name().trim().isEmpty()) {
             throw new CustomException(ErrorCode.CHALLENGE_NAME_REQUIRED);
         }
-        if (req.periodType() == null || req.periodType() == null) {
+        if (req.periodType() == null) {
             throw new CustomException(ErrorCode.CHALLENGE_TYPE_REQUIRED);
         }
         if (req.slots() == null || req.slots().size() < MIN_SLOTS
@@ -155,6 +158,33 @@ public class ChallengeService {
                         (ChallengeDex c) -> scoreByDex.getOrDefault(c.getId(), 0L)).reversed())
                 .toList();
         return paginate(userId, ranked, scoreByDex, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ChallengeSummaryDTO> search(Long userId, String keyword){
+        if(!StringUtils.hasText(keyword)){
+           return List.of(); // 빈 문자열 검색 시 빈 결과 반환
+        }
+        List<ChallengeDex> found = challengeDexRepository.searchByNameContaining(
+                keyword.trim(), PageRequest.of(0, SEARCH_LIMIT));
+        if (found.isEmpty()) return List.of();
+        List<Long> ids = found.stream().map(ChallengeDex::getId).toList();
+        Map<Long, Long> participantByDex = participantRepository.countByChallengeDexIdIn(ids)
+                .stream()
+                .collect(
+                        Collectors.toMap(
+                                ChallengeParticipantRepository.ParticipantCount::getDexId,
+                                ChallengeParticipantRepository.ParticipantCount::getCnt)
+                        );
+        Set<Long> joinedDexIds = (userId == null) ? Set.of()
+                : new HashSet<>(participantRepository.findJoinedDexIds(userId, ids));
+
+        return found.stream()
+                .map(c -> toSummary(c,
+                        participantByDex.getOrDefault(c.getId(), 0L),
+                        0, 0, null,
+                        joinedDexIds.contains(c.getId())))
+                .toList();
     }
 
     // 선택 지표의 dex별 점수 맵

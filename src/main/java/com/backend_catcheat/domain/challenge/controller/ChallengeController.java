@@ -93,5 +93,13 @@ public class ChallengeController {
         return ApiResponse.ok();
     }
 
+    //챌린지 이름 검색 (챌린지명에 검색어가 포함되면 모두 반환)
+    @GetMapping("/search")
+    public ApiResponse<List<ChallengeSummaryDTO>> search(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam String keyword
+    ){
+        return ApiResponse.ok(challengeService.search(userId, keyword));
+    }
 
 }
