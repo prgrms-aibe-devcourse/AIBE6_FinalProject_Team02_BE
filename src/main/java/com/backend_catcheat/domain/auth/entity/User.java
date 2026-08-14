@@ -61,10 +61,6 @@ public class User extends BaseEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    /** 온보딩 튜토리얼 완료 여부 */
-    @Column(name = "onboarding_completed", nullable = false)
-    private boolean onboardingCompleted;
-
     /**
      * 닉네임 최종 변경 시각
      */
@@ -132,11 +128,6 @@ public class User extends BaseEntity {
     /** 유예 기간 내 재로그인 → 탈퇴를 취소하고 계정을 되살림 */
     public void reactivate() {
         this.deletedAt = null;
-    }
-
-    /** 온보딩 튜토리얼 완료 처리 */
-    public void completeOnboarding() {
-        this.onboardingCompleted = true;
     }
 
     /**
