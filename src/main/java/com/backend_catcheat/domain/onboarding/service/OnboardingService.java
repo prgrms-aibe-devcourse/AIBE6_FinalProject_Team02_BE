@@ -1,8 +1,6 @@
 package com.backend_catcheat.domain.onboarding.service;
 
 import com.backend_catcheat.domain.onboarding.dto.GuideSeenResponseDTO;
-import com.backend_catcheat.domain.onboarding.entity.UserGuideSeen;
-import com.backend_catcheat.domain.onboarding.entity.UserGuideSeenId;
 import com.backend_catcheat.domain.onboarding.repository.UserGuideSeenRepository;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
@@ -43,9 +41,7 @@ public class OnboardingService {
         if (!GUIDE_KEYS.contains(guideKey)) {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
-        if (!guideSeenRepository.existsById(new UserGuideSeenId(userId, guideKey))) {
-            guideSeenRepository.save(new UserGuideSeen(userId, guideKey));
-        }
+        guideSeenRepository.insertIfAbsent(userId, guideKey);
         return getSeenGuides(userId);
     }
 

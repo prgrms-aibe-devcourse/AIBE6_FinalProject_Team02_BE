@@ -34,10 +34,4 @@ public class UserGuideSeen {
     /** 본 시각. 가이드 문구를 개편했을 때 다시 보여줄 대상을 가르는 근거 */
     @Column(name = "seen_at", nullable = false)
     private LocalDateTime seenAt;
-
-    public UserGuideSeen(Long userId, String guideKey) {
-        this.userId = userId;
-        this.guideKey = guideKey;
-        this.seenAt = LocalDateTime.now();
-    }
 }
