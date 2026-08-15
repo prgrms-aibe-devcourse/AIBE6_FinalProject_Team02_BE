@@ -59,22 +59,29 @@ public class AuthService {
         //    동시 재발급이 들어와도 승자는 단 하나 → Redis와 쿠키가 어긋나지 않는다.
         //    실패면: 이미 회전됨(동시성 패자) / 저장값 불일치(탈취 의심) / 만료·로그아웃 → 거부.
         String newRefresh = jwtTokenProvider.createRefreshToken(userId);
-        boolean rotated = refreshTokenStore.rotate(userId, refreshToken, newRefresh);
-        if (!rotated) {
+        int rotateResult = refreshTokenStore.rotate(userId, refreshToken, newRefresh);
+
+        if (rotateResult == 1 || rotateResult == 2) {
+            // 1(정상 승자), 2(선의의 패자) 모두 새 액세스 토큰과 리프레시 토큰 발급 허용
+            User user = userRepository.findById(userId).orElseThrow(this::unauthorized);
+            String newAccess = jwtTokenProvider.createAccessToken(userId, user.getRole());
+
+            addCookie(response, ACCESS_TOKEN_COOKIE, newAccess, jwtTokenProvider.getAccessTokenExpireMs());
+            addCookie(response, REFRESH_TOKEN_COOKIE, newRefresh, jwtTokenProvider.getRefreshTokenExpireMs());
+
+            meterRegistry.counter("auth.reissue", "result", "success").increment();
+            log.info("[reissue] success (status={}) userId={}", rotateResult, userId);
+
+        } else if (rotateResult == -1) {
+            // 보안 경고 (탈취 의심)
+            meterRegistry.counter("auth.reissue", "result", "theft_detected").increment();
+            log.warn("[SECURITY] Refresh Token Reuse Detected! All sessions cleared for userId={}", userId);
+            throw unauthorized();
+        } else {
+            // 0 (만료 또는 로그아웃됨)
             meterRegistry.counter("auth.reissue", "result", "reject").increment();
-            log.warn("[reissue] reject userId={}", userId);
             throw unauthorized();
         }
-
-        // 3) 회전 승자만 새 access 발급(role은 refresh에 없어 DB 조회).
-        User user = userRepository.findById(userId).orElseThrow(this::unauthorized);
-        String newAccess = jwtTokenProvider.createAccessToken(userId, user.getRole());
-
-        addCookie(response, ACCESS_TOKEN_COOKIE, newAccess, jwtTokenProvider.getAccessTokenExpireMs());
-        addCookie(response, REFRESH_TOKEN_COOKIE, newRefresh, jwtTokenProvider.getRefreshTokenExpireMs());
-
-        meterRegistry.counter("auth.reissue", "result", "success").increment();
-        log.info("[reissue] success userId={}", userId);
     }
 
     /**

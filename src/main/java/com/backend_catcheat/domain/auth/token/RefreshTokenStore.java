@@ -28,24 +28,56 @@ public class RefreshTokenStore {
     }
     // 원자적 회전(CAS): 저장값이 oldRefresh와 같을 때만 newRefresh로 교체(+TTL).
     // GET→비교→SET을 한 번에 처리 → 동시 재발급 경쟁(비원자적 회전)으로 인한 세션 드롭 방지.
+    // 1: 정상 승자, 2: 유예창 내 허용, -1: 탈취 감지(모두 삭제), 0: 만료 또는 기타 실패
     private static final RedisScript<Long> ROTATE_SCRIPT = RedisScript.of(
-            "if redis.call('get', KEYS[1]) == ARGV[1] then " +
-                    "redis.call('set', KEYS[1], ARGV[2], 'PX', ARGV[3]); return 1 " +
-                    "else return 0 end",
+            "local rt_key = KEYS[1]; local prev_key = KEYS[2]; " +
+                    "local old_rt = ARGV[1]; local new_rt = ARGV[2]; " +
+                    "local ttl = ARGV[3]; local prev_ttl = ARGV[4]; " +
+                    "local current_rt = redis.call('get', rt_key); " +
+
+                    "if current_rt == old_rt then " +
+                    // 정상 회전: prev 갱신(5초), rt 갱신
+                    "redis.call('set', prev_key, old_rt, 'PX', prev_ttl); " +
+                    "redis.call('set', rt_key, new_rt, 'PX', ttl); " +
+                    "return 1; " +
+                    "elseif current_rt ~= false then " +
+                    // 현재값과 다름. prev 확인
+                    "local prev_rt = redis.call('get', prev_key); " +
+                    "if prev_rt == old_rt then " +
+                    // 유예창 내 동시 요청(선의의 패자)
+                    "return 2; " +
+                    "else " +
+                    // 둘 다 다름 = 탈취 의심 (모든 토큰 파기)
+                    "redis.call('del', rt_key); " +
+                    "redis.call('del', prev_key); " +
+                    "return -1; " +
+                    "end " +
+                    "else " +
+                    // 토큰 없음(만료)
+                    "return 0; " +
+                    "end",
             Long.class);
 
     /**
      * refresh 회전(CAS). 저장값이 oldRefresh와 일치할 때만 newRefresh로 원자적으로 교체한다.
      * @return 교체 성공(= 이 요청이 회전의 승자) 여부. 저장값이 다르거나(탈취/이미 회전) 없으면 false.
      */
-    public boolean rotate(Long userId, String oldRefresh, String newRefresh) {
+    public int rotate(Long userId, String oldRefresh, String newRefresh) {
+        String rtKey = key(userId);
+        String prevKey = "RT:prev:" + userId; // 이전 토큰 저장 키
+        long ttl = jwtTokenProvider.getRefreshTokenExpireMs();
+        long prevTtl = 5000L; // 5초(5000ms) 유예 시간
+
         Long result = redisTemplate.execute(
                 ROTATE_SCRIPT,
-                List.of(key(userId)),
+                List.of(rtKey, prevKey),
                 oldRefresh,
                 newRefresh,
-                String.valueOf(jwtTokenProvider.getRefreshTokenExpireMs()));
-        return result != null && result == 1L;
+                String.valueOf(ttl),
+                String.valueOf(prevTtl)
+        );
+
+        return result != null ? result.intValue() : 0;
     }
 
 
