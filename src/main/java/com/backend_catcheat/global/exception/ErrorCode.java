@@ -176,7 +176,12 @@ public enum ErrorCode {
     FRIEND_REQUEST_ALREADY_SENT(HttpStatus.CONFLICT, "이미 친구 요청을 보냈어요"),
     FRIEND_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "친구 요청을 찾을 수 없어요"),
     FRIEND_NOT_FOUND(HttpStatus.NOT_FOUND, "친구 관계가 아니에요"),
-    FRIEND_FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없어요");
+    FRIEND_FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없어요"),
+
+    // 댓글
+    MADE_DEX_COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "댓글을 찾을 수 없습니다."),
+    MADE_DEX_COMMENT_NOT_AUTHOR(HttpStatus.FORBIDDEN, "본인이 작성한 댓글만 수정/삭제 할 수 있습니다."),
+    MADE_DEX_COMMENT_CONTENT_REQUIRED(HttpStatus.BAD_REQUEST, "댓글을 입력해주세요");
 
 
 
