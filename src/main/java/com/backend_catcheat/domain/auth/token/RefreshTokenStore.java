@@ -3,10 +3,11 @@ package com.backend_catcheat.domain.auth.token;
 import com.backend_catcheat.global.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Repository;
 
 import java.time.Duration;
-import java.util.Optional;
+import java.util.List;
 
 @Repository
 @RequiredArgsConstructor
@@ -25,11 +26,28 @@ public class RefreshTokenStore {
                 Duration.ofMillis(jwtTokenProvider.getRefreshTokenExpireMs())
         );
     }
+    // 원자적 회전(CAS): 저장값이 oldRefresh와 같을 때만 newRefresh로 교체(+TTL).
+    // GET→비교→SET을 한 번에 처리 → 동시 재발급 경쟁(비원자적 회전)으로 인한 세션 드롭 방지.
+    private static final RedisScript<Long> ROTATE_SCRIPT = RedisScript.of(
+            "if redis.call('get', KEYS[1]) == ARGV[1] then " +
+                    "redis.call('set', KEYS[1], ARGV[2], 'PX', ARGV[3]); return 1 " +
+                    "else return 0 end",
+            Long.class);
 
-    /** 재발급 시: 저장된 refresh token을 꺼낸다. 없으면(만료/로그아웃) empty. */
-    public Optional<String> find(Long userId) {
-        return Optional.ofNullable(redisTemplate.opsForValue().get(key(userId)));
+    /**
+     * refresh 회전(CAS). 저장값이 oldRefresh와 일치할 때만 newRefresh로 원자적으로 교체한다.
+     * @return 교체 성공(= 이 요청이 회전의 승자) 여부. 저장값이 다르거나(탈취/이미 회전) 없으면 false.
+     */
+    public boolean rotate(Long userId, String oldRefresh, String newRefresh) {
+        Long result = redisTemplate.execute(
+                ROTATE_SCRIPT,
+                List.of(key(userId)),
+                oldRefresh,
+                newRefresh,
+                String.valueOf(jwtTokenProvider.getRefreshTokenExpireMs()));
+        return result != null && result == 1L;
     }
+
 
     /** 로그아웃/탈퇴 시: 해당 유저의 refresh token을 삭제해 즉시 무효화한다. */
     public void delete(Long userId) {

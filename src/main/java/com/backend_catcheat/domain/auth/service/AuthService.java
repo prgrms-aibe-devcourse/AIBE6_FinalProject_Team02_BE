@@ -13,6 +13,8 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import io.micrometer.core.instrument.MeterRegistry;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.Duration;
 
@@ -21,6 +23,7 @@ import java.time.Duration;
  * - 재발급: refresh token을 검증하고 Redis 저장값과 대조한 뒤 새 토큰을 발급(회전).
  * - 로그아웃: Redis의 refresh token을 지우고 쿠키를 만료시킨다.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -31,6 +34,7 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenStore refreshTokenStore;
     private final UserRepository userRepository;
+    private final MeterRegistry meterRegistry;
 
     /** 로그인 때 구운 쿠키와 같은 값이어야 한다. 다르면 재발급이 Secure를 벗겨 덮어쓴다 */
     @Value("${app.auth.cookie-secure}")
@@ -51,23 +55,26 @@ public class AuthService {
 
         Long userId = jwtTokenProvider.getUserId(refreshToken);
 
-        // 2) Redis에 저장된 값과 대조. 없으면(만료/로그아웃) 또는 다르면(탈취 의심) 거부.
-        String stored = refreshTokenStore.find(userId).orElseThrow(this::unauthorized);
-        if (!stored.equals(refreshToken)) {
+        // 2) 새 refresh 준비 후, "저장값이 지금 이 refresh와 같을 때만" 원자적으로 회전(CAS).
+        //    동시 재발급이 들어와도 승자는 단 하나 → Redis와 쿠키가 어긋나지 않는다.
+        //    실패면: 이미 회전됨(동시성 패자) / 저장값 불일치(탈취 의심) / 만료·로그아웃 → 거부.
+        String newRefresh = jwtTokenProvider.createRefreshToken(userId);
+        boolean rotated = refreshTokenStore.rotate(userId, refreshToken, newRefresh);
+        if (!rotated) {
+            meterRegistry.counter("auth.reissue", "result", "reject").increment();
+            log.warn("[reissue] reject userId={}", userId);
             throw unauthorized();
         }
 
-        // 3) role은 refresh token에 없으므로 DB에서 사용자 조회로 가져온다.
+        // 3) 회전 승자만 새 access 발급(role은 refresh에 없어 DB 조회).
         User user = userRepository.findById(userId).orElseThrow(this::unauthorized);
-
-        // 4) 새 access + refresh 발급(refresh 회전) 후 Redis 갱신.
-        //    회전: 재발급 때마다 refresh도 새로 발급해 탈취된 옛 토큰을 무효화한다.
         String newAccess = jwtTokenProvider.createAccessToken(userId, user.getRole());
-        String newRefresh = jwtTokenProvider.createRefreshToken(userId);
-        refreshTokenStore.save(userId, newRefresh);
 
         addCookie(response, ACCESS_TOKEN_COOKIE, newAccess, jwtTokenProvider.getAccessTokenExpireMs());
         addCookie(response, REFRESH_TOKEN_COOKIE, newRefresh, jwtTokenProvider.getRefreshTokenExpireMs());
+
+        meterRegistry.counter("auth.reissue", "result", "success").increment();
+        log.info("[reissue] success userId={}", userId);
     }
 
     /**
