@@ -4,6 +4,7 @@ import com.backend_catcheat.domain.auth.oauth.CustomOAuth2UserService;
 import com.backend_catcheat.global.jwt.JwtAuthenticationFilter;
 import com.backend_catcheat.global.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -35,10 +36,22 @@ public class SecurityConfig {
     private final OAuth2FailureHandler oAuth2FailureHandler;
     private final JwtTokenProvider jwtTokenProvider;
 
+    @Value("${app.auth.cookie-secure}")
+    private boolean cookieSecure;
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         // SPA(React/Next.js) 환경을 위한 CSRF 설정
         CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        
+        // [핵심 방어] 서브도메인 쿠키 주입 방어를 위한 Prefix 및 Secure 옵션 적용
+        // 단, __Host- 접두사는 무조건 Secure(HTTPS) 속성이 필요하므로 로컬(HTTP) 환경과 분기 처리합니다.
+        if (cookieSecure) {
+            csrfTokenRepository.setCookieName("__Host-XSRF-TOKEN");
+        } else {
+            csrfTokenRepository.setCookieName("XSRF-TOKEN"); // 로컬 개발(http://localhost)용
+        }
+        csrfTokenRepository.setSecure(cookieSecure); 
 
         // Spring Security 6.x 이상에서 CSRF 토큰을 매 요청마다 지연 없이 해석하기 위한 핸들러
         CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();
