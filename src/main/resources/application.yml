@@ -92,6 +92,9 @@ app:
   auth:
     # 인증 쿠키에 Secure를 붙일지. 로컬은 http라 false, 운영은 application-prod.yml에서 true
     cookie-secure: ${AUTH_COOKIE_SECURE:false}
+    test-login:
+      enabled: ${TEST_LOGIN_ENABLED:false}   # 운영 false, 심사 배포에서만 true
+      secret: ${TEST_LOGIN_SECRET:}          # 비워두면 시크릿 검사 없음(버튼 원클릭용)
 
 catcheat:
   vision:
