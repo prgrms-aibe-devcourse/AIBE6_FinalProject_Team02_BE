@@ -83,7 +83,8 @@ public class SecurityConfig {
                                 "/oauth2/**",
                                 "/login/**",
                                 "/api/v1/auth/reissue",
-                                "/api/v1/auth/logout"
+                                "/api/v1/auth/logout",
+                                "/api/v1/auth/test-login"
                         ).permitAll()
                         // 관리자 전용
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
