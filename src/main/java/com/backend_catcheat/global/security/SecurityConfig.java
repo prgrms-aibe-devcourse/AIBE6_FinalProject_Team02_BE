@@ -51,7 +51,7 @@ public class SecurityConfig {
         } else {
             csrfTokenRepository.setCookieName("XSRF-TOKEN"); // 로컬 개발(http://localhost)용
         }
-        csrfTokenRepository.setSecure(cookieSecure); 
+        csrfTokenRepository.setCookieCustomizer(cookie -> cookie.secure(cookieSecure));
 
         // Spring Security 6.x 이상에서 CSRF 토큰을 매 요청마다 지연 없이 해석하기 위한 핸들러
         CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();

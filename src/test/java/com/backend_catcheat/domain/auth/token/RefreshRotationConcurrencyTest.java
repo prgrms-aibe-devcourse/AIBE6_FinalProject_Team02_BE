@@ -96,8 +96,8 @@ class RefreshRotationConcurrencyTest {
                 pool.submit(() -> {
                     ready.countDown();
                     try { go.await(); } catch (InterruptedException ignored) {}
-                    boolean ok = useCas ? store.rotate(UID, R0, newRt)
-                                        : nonAtomicRotate(R0, newRt);
+                    boolean ok = useCas ? (store.rotate(UID, R0, newRt) == 1) // int 반환: 1=정상 회전 승자
+                            : nonAtomicRotate(R0, newRt);
                     if (ok) winners.incrementAndGet();
                 });
             }

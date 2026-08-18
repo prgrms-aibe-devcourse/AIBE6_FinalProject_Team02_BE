@@ -61,8 +61,8 @@ public class AuthService {
         String newRefresh = jwtTokenProvider.createRefreshToken(userId);
         int rotateResult = refreshTokenStore.rotate(userId, refreshToken, newRefresh);
 
-        if (rotateResult == 1 || rotateResult == 2) {
-            // 1(정상 승자), 2(선의의 패자) 모두 새 액세스 토큰과 리프레시 토큰 발급 허용
+        if (rotateResult == 1) {
+            // 정상 승자: access + refresh(new) 모두 갱신
             User user = userRepository.findById(userId).orElseThrow(this::unauthorized);
             String newAccess = jwtTokenProvider.createAccessToken(userId, user.getRole());
 
@@ -70,7 +70,20 @@ public class AuthService {
             addCookie(response, REFRESH_TOKEN_COOKIE, newRefresh, jwtTokenProvider.getRefreshTokenExpireMs());
 
             meterRegistry.counter("auth.reissue", "result", "success").increment();
-            log.info("[reissue] success (status={}) userId={}", rotateResult, userId);
+            log.info("[reissue] success userId={}", userId);
+
+        } else if (rotateResult == 2) {
+            // 유예창 내 '선의의 패자': Redis엔 승자의 refresh만 존재한다.
+            // 여기서 refresh 쿠키를 새로 심으면 쿠키≠Redis 불일치 → 다음 재발급에서 탈취 오탐(-1) → 전체 로그아웃.
+            // 따라서 access 만 새로 발급해 원요청 재시도가 되게 하고, refresh 쿠키는 승자값 그대로 둔다.
+            User user = userRepository.findById(userId).orElseThrow(this::unauthorized);
+            String newAccess = jwtTokenProvider.createAccessToken(userId, user.getRole());
+
+            addCookie(response, ACCESS_TOKEN_COOKIE, newAccess, jwtTokenProvider.getAccessTokenExpireMs());
+            // ⚠️ REFRESH_TOKEN_COOKIE 는 갱신하지 않는다 (정합성 유지).
+
+            meterRegistry.counter("auth.reissue", "result", "grace").increment();
+            log.info("[reissue] grace-accept userId={}", userId);
 
         } else if (rotateResult == -1) {
             // 보안 경고 (탈취 의심)
