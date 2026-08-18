@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 
 @Repository
 @RequiredArgsConstructor
@@ -18,10 +19,10 @@ public class RefreshTokenStore {
     private final StringRedisTemplate redisTemplate;   // Spring Boot data-redis가 자동 등록
     private final JwtTokenProvider jwtTokenProvider;   // TTL 값을 가져오기 위함
 
-    /** 로그인 시: userId에 refresh token을 저장한다(기존 값이 있으면 덮어씀 = 마지막 로그인만 유효). */
-    public void save(Long userId, String refreshToken) {
+    // save: 세션별 슬롯에 저장
+    public void save(Long userId, String sessionId, String refreshToken) {
         redisTemplate.opsForValue().set(
-                key(userId),
+                key(userId, sessionId),
                 refreshToken,
                 Duration.ofMillis(jwtTokenProvider.getRefreshTokenExpireMs())
         );
@@ -58,35 +59,40 @@ public class RefreshTokenStore {
                     "end",
             Long.class);
 
-    /**
-     * refresh 회전(CAS). 저장값이 oldRefresh와 일치할 때만 newRefresh로 원자적으로 교체한다.
-     * @return 교체 성공(= 이 요청이 회전의 승자) 여부. 저장값이 다르거나(탈취/이미 회전) 없으면 false.
-     */
-    public int rotate(Long userId, String oldRefresh, String newRefresh) {
-        String rtKey = key(userId);
-        String prevKey = "RT:prev:" + userId; // 이전 토큰 저장 키
+    // rotate: 이 세션의 슬롯만 원자 회전 (Lua 동일, 키만 세션 스코프)
+    public int rotate(Long userId, String sessionId, String oldRefresh, String newRefresh) {
+        String rtKey   = key(userId, sessionId);
+        String prevKey = prevKey(userId, sessionId);
         long ttl = jwtTokenProvider.getRefreshTokenExpireMs();
-        long prevTtl = 5000L; // 5초(5000ms) 유예 시간
+        long prevTtl = 5000L;
 
         Long result = redisTemplate.execute(
                 ROTATE_SCRIPT,
                 List.of(rtKey, prevKey),
-                oldRefresh,
-                newRefresh,
-                String.valueOf(ttl),
-                String.valueOf(prevTtl)
+                oldRefresh, newRefresh,
+                String.valueOf(ttl), String.valueOf(prevTtl)
         );
-
         return result != null ? result.intValue() : 0;
     }
 
 
-    /** 로그아웃/탈퇴 시: 해당 유저의 refresh token을 삭제해 즉시 무효화한다. */
-    public void delete(Long userId) {
-        redisTemplate.delete(key(userId));
+    /** 이 기기(세션)만 로그아웃/무효화. */
+    public void delete(Long userId, String sessionId) {
+        redisTemplate.delete(key(userId, sessionId));
+        redisTemplate.delete(prevKey(userId, sessionId));
+    }
+    /** 유저의 모든 기기 세션 파기(회원탈퇴/전체 로그아웃/강제 차단용). */
+    public void deleteAll(Long userId) {
+        Set<String> rtKeys   = redisTemplate.keys("RT:" + userId + ":*");
+        Set<String> prevKeys = redisTemplate.keys("RT:prev:" + userId + ":*");
+        if (rtKeys != null && !rtKeys.isEmpty()) redisTemplate.delete(rtKeys);
+        if (prevKeys != null && !prevKeys.isEmpty()) redisTemplate.delete(prevKeys);
     }
 
-    private String key(Long userId) {
-        return KEY_PREFIX + userId;
+    private String key(Long userId, String sessionId) {
+        return "RT:" + userId + ":" + sessionId;
+    }
+    private String prevKey(Long userId, String sessionId) {
+        return "RT:prev:" + userId + ":" + sessionId;
     }
 }

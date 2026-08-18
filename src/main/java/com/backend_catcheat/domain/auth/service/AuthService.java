@@ -58,8 +58,13 @@ public class AuthService {
         // 2) 새 refresh 준비 후, "저장값이 지금 이 refresh와 같을 때만" 원자적으로 회전(CAS).
         //    동시 재발급이 들어와도 승자는 단 하나 → Redis와 쿠키가 어긋나지 않는다.
         //    실패면: 이미 회전됨(동시성 패자) / 저장값 불일치(탈취 의심) / 만료·로그아웃 → 거부.
-        String newRefresh = jwtTokenProvider.createRefreshToken(userId);
-        int rotateResult = refreshTokenStore.rotate(userId, refreshToken, newRefresh);
+
+        String sessionId = jwtTokenProvider.getSessionId(refreshToken);
+        if (sessionId == null) {            // 구버전(sid 없는) 토큰 → 재로그인 유도
+            throw unauthorized();
+        }
+        String newRefresh = jwtTokenProvider.createRefreshToken(userId, sessionId); // 같은 sid 유지
+        int rotateResult = refreshTokenStore.rotate(userId, sessionId, refreshToken, newRefresh);
 
         if (rotateResult == 1) {
             // 정상 승자: access + refresh(new) 모두 갱신
@@ -102,10 +107,11 @@ public class AuthService {
      * access가 만료된 상태에서도 로그아웃할 수 있도록 refresh 기반으로 처리한다.
      */
     public void logout(String refreshToken, HttpServletResponse response) {
-        if (refreshToken != null
-                && jwtTokenProvider.validate(refreshToken)
+        if (refreshToken != null && jwtTokenProvider.validate(refreshToken)
                 && jwtTokenProvider.isRefreshToken(refreshToken)) {
-            refreshTokenStore.delete(jwtTokenProvider.getUserId(refreshToken));
+            refreshTokenStore.delete(
+                    jwtTokenProvider.getUserId(refreshToken),
+                    jwtTokenProvider.getSessionId(refreshToken));   // 이 세션만
         }
         // 토큰이 이미 무효여도 쿠키는 확실히 지운다.
         expireCookie(response, ACCESS_TOKEN_COOKIE);
