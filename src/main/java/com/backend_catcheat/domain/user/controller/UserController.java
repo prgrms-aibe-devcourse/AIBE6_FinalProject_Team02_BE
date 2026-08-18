@@ -2,7 +2,10 @@ package com.backend_catcheat.domain.user.controller;
 
 import com.backend_catcheat.domain.challenge.entity.MyChallengeRelation;
 import com.backend_catcheat.domain.challenge.dto.ChallengeSummaryDTO;
+import com.backend_catcheat.domain.challenge.dto.LikedReviewResponseDTO;
+import com.backend_catcheat.domain.challenge.dto.MyReviewResponseDTO;
 import com.backend_catcheat.domain.challenge.service.ChallengeService;
+import com.backend_catcheat.domain.challenge.service.ReviewService;
 import com.backend_catcheat.domain.dex.basicdex.service.BasicDexService;
 import com.backend_catcheat.domain.my.dto.MyBasicDexResponseDTO;
 import com.backend_catcheat.domain.user.dto.PublicProfileDTO;
@@ -22,6 +25,7 @@ public class UserController {
     private final UserProfileService userProfileService;
     private final BasicDexService basicDexService;
     private final ChallengeService challengeService;
+    private final ReviewService reviewService;
 
     /** 닉네임 검색 */
     @GetMapping("/search")
@@ -30,6 +34,22 @@ public class UserController {
             @RequestParam String nickname
     ) {
         return ApiResponse.ok(userProfileService.search(userId, nickname));
+    }
+
+    /** 내가 쓴 리뷰-최신순, 삭제된 챌린짓 것은 제외 */
+    @GetMapping("/me/reviews")
+    public ApiResponse<List<MyReviewResponseDTO>> myReviews(
+            @AuthenticationPrincipal Long userId
+    ) {
+        return ApiResponse.ok(reviewService.getMyReviews(userId));
+    }
+
+    /** 내가 좋아요한 리뷰-내가 누른 순, 챌린짓·음식 리뷰 모두 */
+    @GetMapping("/me/liked-reviews")
+    public ApiResponse<List<LikedReviewResponseDTO>> likedReviews(
+            @AuthenticationPrincipal Long userId
+    ) {
+        return ApiResponse.ok(reviewService.getLikedReviews(userId));
     }
 
     /** 내 공개 프로필 미리보기 */
