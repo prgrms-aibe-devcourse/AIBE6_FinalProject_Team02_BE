@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.UUID;
 
 /**
  * 소셜 로그인 성공 순간 실행된다.
@@ -49,11 +50,11 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         Long userId = principal.getUserId();
 
         // 1) 토큰 발급
+        String sessionId = UUID.randomUUID().toString();   // 이 기기 세션 식별자
         String accessToken = jwtTokenProvider.createAccessToken(userId, principal.getRole());
-        String refreshToken = jwtTokenProvider.createRefreshToken(userId);
+        String refreshToken = jwtTokenProvider.createRefreshToken(userId, sessionId);
 
-        // 2) refresh token은 서버(Redis)에도 저장
-        refreshTokenStore.save(userId, refreshToken);
+        refreshTokenStore.save(userId, sessionId, refreshToken);
         // 3) 두 토큰을 httpOnly 쿠키로 심는다
         addCookie(response, ACCESS_TOKEN_COOKIE, accessToken,
                 jwtTokenProvider.getAccessTokenExpireMs());
