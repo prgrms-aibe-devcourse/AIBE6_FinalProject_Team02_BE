@@ -93,7 +93,7 @@ public class AuthService {
         } else if (rotateResult == -1) {
             // 보안 경고 (탈취 의심)
             meterRegistry.counter("auth.reissue", "result", "theft_detected").increment();
-            log.warn("[SECURITY] Refresh Token Reuse Detected! All sessions cleared for userId={}", userId);
+            log.warn("[SECURITY] Refresh Token Reuse Detected! Session cleared. userId={}, sid={}", userId, sessionId);
             throw unauthorized();
         } else {
             // 0 (만료 또는 로그아웃됨)
