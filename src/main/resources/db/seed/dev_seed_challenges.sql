@@ -30,11 +30,11 @@ DELETE FROM challenge_dex
 DELETE FROM users WHERE provider = 'KAKAO' AND provider_id LIKE 'seedcc_%';
 
 -- 1) seed 유저: 개설자 1 + 참여자 30 ----------------------------------------
-INSERT INTO users (provider, provider_id, nickname, email, role, onboarding_completed)
-VALUES ('KAKAO', 'seedcc_owner', '김맛집', 'seed_owner@catcheat.dev', 'USER', true);
+INSERT INTO users (provider, provider_id, nickname, email, role)
+VALUES ('KAKAO', 'seedcc_owner', '김맛집', 'seed_owner@catcheat.dev', 'USER');
 
-INSERT INTO users (provider, provider_id, nickname, email, role, onboarding_completed)
-SELECT 'KAKAO', 'seedcc_p' || lpad(g::text, 2, '0'), nk, 'seed_p' || g || '@catcheat.dev', 'USER', true
+INSERT INTO users (provider, provider_id, nickname, email, role)
+SELECT 'KAKAO', 'seedcc_p' || lpad(g::text, 2, '0'), nk, 'seed_p' || g || '@catcheat.dev', 'USER'
 FROM (VALUES
     (1, '푸드러버'), (2, '미식가공주'), (3, '먹깨비'), (4, '배부른하마'), (5, '든든한끼'),
     (6, '야식요정'), (7, '맛동산러'), (8, '서울촌놈'), (9, '냉면광'), (10, '국밥형'),

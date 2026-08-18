@@ -4,6 +4,7 @@ import com.backend_catcheat.domain.auth.dto.UserResponseDTO;
 import com.backend_catcheat.domain.auth.entity.User;
 import com.backend_catcheat.domain.auth.repository.UserRepository;
 import com.backend_catcheat.domain.auth.token.RefreshTokenStore;
+import com.backend_catcheat.domain.onboarding.service.OnboardingService;
 import com.backend_catcheat.global.jwt.JwtTokenProvider;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenStore refreshTokenStore;
     private final UserRepository userRepository;
+    private final OnboardingService onboardingService;
     private final MeterRegistry meterRegistry;
 
     /** 로그인 때 구운 쿠키와 같은 값이어야 한다. 다르면 재발급이 Secure를 벗겨 덮어쓴다 */
@@ -150,6 +152,6 @@ public class AuthService {
     @Transactional(readOnly = true)
     public UserResponseDTO getMyInfo(Long userId) {
         User user = userRepository.findById(userId).orElseThrow(this::unauthorized);
-        return UserResponseDTO.from(user);
+        return UserResponseDTO.from(user, onboardingService.seenGuideKeys(userId));
     }
 }
