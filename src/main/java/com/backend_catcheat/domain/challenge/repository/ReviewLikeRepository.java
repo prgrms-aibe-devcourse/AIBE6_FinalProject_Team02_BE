@@ -10,4 +10,7 @@ public interface ReviewLikeRepository extends JpaRepository<ReviewLike, Long> {
     Optional<ReviewLike> findByReviewIdAndUserId(Long reviewId, Long userId);
     void deleteByReviewId(Long reviewId);
     List<ReviewLike> findByReviewIdInAndUserId(List<Long> reviewIds, Long userId);
+
+    // 내가 좋아요한 리뷰
+    List<ReviewLike> findByUserIdOrderByCreatedAtDesc(Long userId);
 }

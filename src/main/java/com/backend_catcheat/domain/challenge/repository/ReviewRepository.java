@@ -14,4 +14,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     List<Review> findBySlotIdOrderByLikeCountDescCreatedAtDesc(Long slotId);
     List<Review> findByChallengeDexIdAndReviewTypeOrderByLikeCountDescCreatedAtDesc(
             Long challengeDexId, ReviewType type);
+
+    // 내가 쓴 리뷰
+    List<Review> findByReviewerIdOrderByCreatedAtDesc(Long reviewerId);
 }
