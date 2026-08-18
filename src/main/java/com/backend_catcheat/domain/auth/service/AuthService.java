@@ -1,21 +1,23 @@
 package com.backend_catcheat.domain.auth.service;
 
 import com.backend_catcheat.domain.auth.dto.UserResponseDTO;
+import com.backend_catcheat.domain.auth.entity.Provider;
+import com.backend_catcheat.domain.auth.entity.Role;
 import com.backend_catcheat.domain.auth.entity.User;
 import com.backend_catcheat.domain.auth.repository.UserRepository;
 import com.backend_catcheat.domain.auth.token.RefreshTokenStore;
 import com.backend_catcheat.domain.onboarding.service.OnboardingService;
 import com.backend_catcheat.global.jwt.JwtTokenProvider;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-import io.micrometer.core.instrument.MeterRegistry;
-import lombok.extern.slf4j.Slf4j;
 
 import java.time.Duration;
 
@@ -42,10 +44,19 @@ public class AuthService {
     @Value("${app.auth.cookie-secure}")
     private boolean cookieSecure;
 
-    /**
-     * access token 재발급.
-     * 실패 사유는 보안상 뭉뚱그려 401로만 응답한다(비기능 요구사항).
-     */
+
+
+    @Value("${app.auth.test-login.enabled:false}")
+    private boolean testLoginEnabled;
+
+    @Value("${app.auth.test-login.secret:}")
+    private String testLoginSecret;
+
+    private static final Provider REVIEWER_PROVIDER = Provider.GOOGLE;
+    private static final String REVIEWER_PROVIDER_ID = "reviewer-demo";
+
+        /** 로그인 때 구운 쿠키와 같은 값이어야 한다. differently면 재발급이 Secure를 벗겨 덮어쓴다 */
+
     public void reissue(String refreshToken, HttpServletResponse response) {
         // 1) refresh token 자체가 유효한지 + 정말 refresh 타입인지 확인
         //    (access token으로 재발급 시도하는 것을 막는다)
@@ -119,6 +130,52 @@ public class AuthService {
         expireCookie(response, ACCESS_TOKEN_COOKIE);
         expireCookie(response, REFRESH_TOKEN_COOKIE);
     }
+
+
+
+    /**
+     * 심사/제출용 리뷰어 로그인. OAuth를 건너뛰고 고정 리뷰어 유저로 토큰을 발급한다.
+     * 반드시 app.auth.test-login.enabled=true 인 환경에서만 동작한다(운영 기본 false).
+     */
+    @Transactional
+    public void testLogin(String key, HttpServletResponse response) {
+        // 1) 꺼져 있으면 존재 자체를 숨긴다(404).
+        if (!testLoginEnabled) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        // 2) 시크릿이 설정돼 있으면 일치해야 한다(선택적 2차 방어).
+        if (testLoginSecret != null && !testLoginSecret.isBlank()
+                && !testLoginSecret.equals(key)) {
+            throw unauthorized();
+        }
+        // 3) 리뷰어 유저 find-or-create. 온보딩을 건너뛰도록 닉네임을 미리 세팅한다.
+        User reviewer = userRepository
+                .findByProviderAndProviderId(REVIEWER_PROVIDER, REVIEWER_PROVIDER_ID)
+                .orElseGet(() -> userRepository.save(
+                        User.builder()
+                                .provider(REVIEWER_PROVIDER)
+                                .providerId(REVIEWER_PROVIDER_ID)
+                                .nickname("심사리뷰어")
+                                .email("reviewer@catcheat.test")
+                                .role(Role.ADMIN)
+                                .build()));
+        Long userId = reviewer.getId();
+
+        // 4) 소셜 로그인과 동일하게 sid 세션으로 토큰 발급 → 다기기도 그대로 동작.
+        String sessionId = java.util.UUID.randomUUID().toString();
+        String access = jwtTokenProvider.createAccessToken(userId, reviewer.getRole());
+        String refresh = jwtTokenProvider.createRefreshToken(userId, sessionId);
+        refreshTokenStore.save(userId, sessionId, refresh);
+
+        addCookie(response, ACCESS_TOKEN_COOKIE, access, jwtTokenProvider.getAccessTokenExpireMs());
+        addCookie(response, REFRESH_TOKEN_COOKIE, refresh, jwtTokenProvider.getRefreshTokenExpireMs());
+
+        meterRegistry.counter("auth.test_login").increment();
+        log.info("[test-login] reviewer login userId={}, sid={}", userId, sessionId);
+    }
+
+
+
 
     private ResponseStatusException unauthorized() {
         return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "인증에 실패했습니다.");

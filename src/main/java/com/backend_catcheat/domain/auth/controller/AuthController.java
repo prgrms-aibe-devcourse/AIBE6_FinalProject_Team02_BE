@@ -48,4 +48,14 @@ public class AuthController {
     public ApiResponse<UserResponseDTO> me(@AuthenticationPrincipal Long userId) {
         return ApiResponse.ok(authService.getMyInfo(userId));
     }
+
+    /** 심사/제출용 리뷰어 로그인(플래그 on일 때만 동작). */
+    @PostMapping("/test-login")
+    public ApiResponse<Void> testLogin(
+            @RequestParam(value = "key", required = false) String key,
+            HttpServletResponse response
+    ) {
+        authService.testLogin(key, response);
+        return ApiResponse.ok();
+    }
 }
