@@ -23,7 +23,7 @@ variable "instance_type" {
   # 백엔드 서버로 사용할 EC2 인스턴스 크기다.
   description = "백엔드 서버 EC2 인스턴스 타입"
   type        = string
-  default     = "t3.micro"
+  default     = "t3.small"
 }
 
 variable "key_pair_name" {

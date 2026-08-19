@@ -43,9 +43,6 @@ public class ChallengeDex extends BaseEntity {
     @Column(name = "is_event", nullable = false)
     private boolean event;
 
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
-
     @Builder
     public ChallengeDex(
             Long ownerId, String name,
@@ -55,8 +52,7 @@ public class ChallengeDex extends BaseEntity {
             LocalDateTime startsAt,
             LocalDateTime endsAt,
             Long rewardBadgeId,
-            boolean event,
-            LocalDateTime deletedAt
+            boolean event
     ) {
         this.ownerId = ownerId;
         this.name = name;
@@ -67,7 +63,6 @@ public class ChallengeDex extends BaseEntity {
         this.endsAt = endsAt;
         this.rewardBadgeId = rewardBadgeId;
         this.event = event;
-        this.deletedAt = deletedAt;
     }
     public void linkRewardBadge(Long badgeId){
         this.rewardBadgeId = badgeId;
@@ -75,8 +70,10 @@ public class ChallengeDex extends BaseEntity {
     public void changeImage(String imageKey){
         this.imageKey = imageKey;
     }
-    public void softDelete(){
-        this.deletedAt = LocalDateTime.now();
+    // 수동 종료: 지금 시각으로 마감(상시도 종료 상태가 되어 참여 차단·종료 탭 이동)
+    public void close(LocalDateTime now){
+        this.periodType = PeriodType.LIMITED;
+        this.endsAt = now;
     }
 
 }

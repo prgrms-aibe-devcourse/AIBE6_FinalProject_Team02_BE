@@ -50,8 +50,26 @@ public enum ErrorCode {
     // 등록 — 사진 처리
     PHOTO_NOT_UPLOADED(HttpStatus.BAD_REQUEST, "사진 업로드가 끝나지 않았어요"),
     PHOTO_TOO_LARGE(HttpStatus.BAD_REQUEST, "사진 한 장은 10MB까지예요"),
+    // 업로드는 되지만 서버가 열지 못하는 형식. 원인을 짚어 줘야 유저가 다시 올릴 방법을 안다
+    PHOTO_FORMAT_NOT_ANALYZABLE(HttpStatus.BAD_REQUEST,
+            "아이폰 원본(HEIC) 사진은 확인할 수 없어요. JPG나 PNG로 올려 주세요"),
     IMAGE_DECODE_FAILED(HttpStatus.BAD_REQUEST, "사진을 읽을 수 없어요"),
     IMAGE_ENCODE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "사진을 변환할 수 없어요"),
+    IMAGE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "사진을 저장하지 못했어요"),
+
+    // AI 일러스트 (CATCHEAT-87)
+    ILLUSTRATION_SOURCE_REQUIRED(HttpStatus.BAD_REQUEST, "변환할 사진이 필요해요"),
+    ILLUSTRATION_DESCRIPTION_REQUIRED(HttpStatus.BAD_REQUEST, "어떤 뱃지를 만들지 적어 주세요"),
+    ILLUSTRATION_MODE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "이 자리에는 사진이 있어야 해요"),
+    ILLUSTRATION_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 일러스트를 찾을 수 없어요"),
+    ILLUSTRATION_FORBIDDEN(HttpStatus.FORBIDDEN, "내가 만든 일러스트만 볼 수 있어요"),
+    ILLUSTRATION_NOT_READY(HttpStatus.CONFLICT, "아직 만들고 있어요"),
+    // 모더레이션 거절을 포함한 4xx 전체. 재시도해도 같은 사진이면 같은 결과다
+    ILLUSTRATION_REJECTED(HttpStatus.BAD_REQUEST, "이 사진으로는 만들 수 없어요"),
+    ILLUSTRATION_REVISION_LIMIT(HttpStatus.TOO_MANY_REQUESTS, "수정은 3번까지 할 수 있어요"),
+    ILLUSTRATION_LIMIT(HttpStatus.TOO_MANY_REQUESTS, "오늘은 더 만들 수 없어요"),
+    ILLUSTRATION_BUSY(HttpStatus.SERVICE_UNAVAILABLE, "지금은 만드는 중인 그림이 많아요. 잠시 뒤 다시 시도해 주세요"),
+    ILLUSTRATION_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "만들지 못했어요. 잠시 뒤 다시 시도해 주세요"),
 
     // 등록 — AI
     AI_KEY_MISSING(HttpStatus.INTERNAL_SERVER_ERROR, "AI 설정이 준비되지 않았어요"),
@@ -94,10 +112,12 @@ public enum ErrorCode {
     //개설 검증 코드
     CHALLENGE_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "챌린지 이름을 입력해 주세요"),
     CHALLENGE_TYPE_REQUIRED(HttpStatus.BAD_REQUEST, "챌린지 유형과 기한 방식을 선택해 주세요"),
-    CHALLENGE_SLOT_MIN_REQUIRED(HttpStatus.BAD_REQUEST, "목표 음식을 최소 5개 등록해 주세요"),
+    CHALLENGE_SLOT_MIN_REQUIRED(HttpStatus.BAD_REQUEST, "목표 음식을 최소 2개 등록해 주세요"),
     CHALLENGE_PERIOD_INVALID(HttpStatus.BAD_REQUEST, "기간 한정은 종료 시각이 시작 이후여야 해요"),
     //참여 관련
     CHALLENGE_NOT_FOUND(HttpStatus.NOT_FOUND, "챌린지를 찾을 수 없어요"),
+    CHALLENGE_NOT_OWNER(HttpStatus.FORBIDDEN, "개설자만 수정하거나 삭제할 수 있어요"),
+    CONCURRENT_MODIFICATION(HttpStatus.CONFLICT, "다른 사용자가 방금 변경했어요. 다시 시도해 주세요"),
     CHALLENGE_ENDED(HttpStatus.CONFLICT, "이미 종료된 챌린지예요"),
     CHALLENGE_ALREADY_JOINED(HttpStatus.CONFLICT, "이미 참여한 챌린지예요"),
     //해금 관련
@@ -176,7 +196,20 @@ public enum ErrorCode {
     FRIEND_REQUEST_ALREADY_SENT(HttpStatus.CONFLICT, "이미 친구 요청을 보냈어요"),
     FRIEND_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "친구 요청을 찾을 수 없어요"),
     FRIEND_NOT_FOUND(HttpStatus.NOT_FOUND, "친구 관계가 아니에요"),
-    FRIEND_FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없어요");
+    FRIEND_FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없어요"),
+
+    // 댓글
+    MADE_DEX_COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "댓글을 찾을 수 없습니다."),
+    MADE_DEX_COMMENT_NOT_AUTHOR(HttpStatus.FORBIDDEN, "본인이 작성한 댓글만 수정/삭제 할 수 있습니다."),
+    MADE_DEX_COMMENT_CONTENT_REQUIRED(HttpStatus.BAD_REQUEST, "댓글을 입력해주세요"),
+
+    //알림
+
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다."),
+    NOTIFICATION_NOT_RECIPIENT(HttpStatus.FORBIDDEN, "본인에게 온 알림만 처리할 수 있습니다.");
+
+
+
 
 
 

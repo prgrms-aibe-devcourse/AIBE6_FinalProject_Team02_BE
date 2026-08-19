@@ -22,11 +22,16 @@ import com.backend_catcheat.domain.challenge.repository.ChallengeParticipantRepo
 import com.backend_catcheat.domain.challenge.repository.ChallengeUnlockRepository;
 import com.backend_catcheat.domain.challenge.repository.ReviewLikeRepository;
 import com.backend_catcheat.domain.challenge.repository.ReviewRepository;
+import com.backend_catcheat.domain.challenge.entity.*;
+import com.backend_catcheat.domain.challenge.repository.*;
+import com.backend_catcheat.global.event.ReviewCreatedEvent;
+import com.backend_catcheat.global.event.ReviewLikedEvent;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import com.backend_catcheat.global.s3.S3PresignedUrlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,6 +56,9 @@ public class ReviewService {
     private final UserRepository userRepository;
     private final EquippedBadgeResolver equippedBadgeResolver;
     private final S3PresignedUrlService s3PresignedUrlService;
+    // 알림 관련
+    private final ApplicationEventPublisher eventPublisher;
+    private final ChallengeDexRepository challengeDexRepository;
 
 
     @Transactional
@@ -65,7 +73,25 @@ public class ReviewService {
         if (reviewRepository.existsByReviewerIdAndSlotId(userId, slotId))
             throw new CustomException(ErrorCode.REVIEW_ALREADY_EXISTS);
 
-        return saveOrDuplicate(Review.food(userId, challengeDexId, slotId, request.content(), request.rating()));
+        Review saved = reviewRepository.save(
+                Review.food(userId, challengeDexId, slotId, request.content(), request.rating()));
+
+        Long ownerId = challengeDexRepository.findById(challengeDexId)
+                .map(ChallengeDex::getOwnerId)
+                .orElse(null);
+
+        if(ownerId != null && !ownerId.equals(userId)) {
+            eventPublisher.publishEvent(new ReviewCreatedEvent(
+                    saved.getId(),
+                    challengeDexId,
+                    slotId,
+                    userId,
+                    ownerId,
+                    true
+            ));
+        }
+
+        return new ReviewCreateResponseDTO(saved.getId());
     }
 
     @Transactional
@@ -75,25 +101,33 @@ public class ReviewService {
         ChallengeParticipant participant = participantRepository
                 .findByChallengeDexIdAndUserId(challengeDexId, userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CHALLENGE_NOT_JOINED));
+
         if (!participant.isCompleted())
             throw new CustomException(ErrorCode.REVIEW_REQUIRES_COMPLETION);
+
         if (reviewRepository.existsByReviewerIdAndChallengeDexIdAndReviewType(
                 userId, challengeDexId, ReviewType.CHALLENGE))
             throw new CustomException(ErrorCode.REVIEW_ALREADY_EXISTS);
 
-        return saveOrDuplicate(Review.challenge(userId, challengeDexId, request.content(), request.rating()));
-    }
+        Review saved = reviewRepository.save(
+                Review.challenge(userId, challengeDexId, request.content(), request.rating()));
 
-    /**
-     * 리뷰 저장
-     * 유니크 위반은 중복 작성으로 바꿔 던짐
-     */
-    private ReviewCreateResponseDTO saveOrDuplicate(Review review) {
-        try {
-            return new ReviewCreateResponseDTO(reviewRepository.saveAndFlush(review).getId());
-        } catch (DataIntegrityViolationException e) {
-            throw new CustomException(ErrorCode.REVIEW_ALREADY_EXISTS);
+        Long ownerId = challengeDexRepository.findById(challengeDexId)
+                .map(ChallengeDex::getOwnerId)
+                .orElse(null);
+
+        if(ownerId != null && !ownerId.equals(userId)) {
+            eventPublisher.publishEvent(new ReviewCreatedEvent(
+                    saved.getId(),
+                    challengeDexId,
+                    null,
+                    userId,
+                    ownerId,
+                    false
+            ));
         }
+
+        return new ReviewCreateResponseDTO(saved.getId());
     }
 
     @Transactional(readOnly = true)
@@ -235,7 +269,9 @@ public class ReviewService {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> new CustomException(ErrorCode.REVIEW_NOT_FOUND));
         var existing = reviewLikeRepository.findByReviewIdAndUserId(reviewId, userId);
+
         boolean liked;
+
         if (existing.isPresent()) {
             reviewLikeRepository.delete(existing.get());
             review.decreaseLike();
@@ -245,6 +281,17 @@ public class ReviewService {
             review.increaseLike();
             liked = true;
         }
+
+        if(liked && !review.getReviewerId().equals(userId)) {
+            eventPublisher.publishEvent(new ReviewLikedEvent(
+                    reviewId,
+                    review.getChallengeDexId(),
+                    review.getSlotId(),
+                    userId,
+                    review.getReviewerId()
+            ));
+        }
+
         return new ReviewLikeResponseDTO(liked, review.getLikeCount());
     }
 

@@ -35,12 +35,12 @@ public class RegistrationPhotoLoader {
     private final S3Properties s3Properties;
 
     public byte[] loadForAnalysis(String key) {
-        return load(key, DECODABLE_CONTENT_TYPES);
+        return load(key, DECODABLE_CONTENT_TYPES, ErrorCode.PHOTO_FORMAT_NOT_ANALYZABLE);
     }
 
     // 해시만 계산하므로 디코딩되지 않는 형식도 통과시킨다
     public byte[] loadForStorage(String key) {
-        return load(key, STORABLE_CONTENT_TYPES);
+        return load(key, STORABLE_CONTENT_TYPES, ErrorCode.INVALID_UPLOAD_FILE);
     }
 
     public String hash(byte[] content) {
@@ -51,7 +51,7 @@ public class RegistrationPhotoLoader {
         }
     }
 
-    private byte[] load(String key, Set<String> allowedContentTypes) {
+    private byte[] load(String key, Set<String> allowedContentTypes, ErrorCode formatError) {
         // presigned PUT은 바이트가 서버를 거치지 않아 업로드 시점에 형식·크기를 막을 수 없다
         HeadObjectResponse head = head(key);
 
@@ -61,7 +61,7 @@ public class RegistrationPhotoLoader {
         }
         if (head.contentType() == null || !allowedContentTypes.contains(head.contentType().toLowerCase())) {
             log.warn("[등록] 사진 형식 미지원 key={} contentType={}", key, head.contentType());
-            throw new CustomException(ErrorCode.INVALID_UPLOAD_FILE);
+            throw new CustomException(formatError);
         }
 
         long startedAt = System.nanoTime();

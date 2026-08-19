@@ -17,6 +17,7 @@ public record ChallengeDetailResponseDTO(
         long participantCount,
         boolean joined,       // 내가 참여했는지
         boolean completed,    // 내가 완료했는지
+        boolean owner,        // 내가 개설자인지(삭제/종료 노출용)
         String imageUrl,      // 대표 이미지(프리사인 URL)
         List<SlotDetail> slots
 ) {
