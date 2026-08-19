@@ -67,14 +67,13 @@ public class ChallengeDex extends BaseEntity {
     public void linkRewardBadge(Long badgeId){
         this.rewardBadgeId = badgeId;
     }
-    public void rename(String name){
-        this.name = name;
-    }
-    public void changeDescription(String description){
-        this.description = description;
-    }
     public void changeImage(String imageKey){
         this.imageKey = imageKey;
+    }
+    // 수동 종료: 지금 시각으로 마감(상시도 종료 상태가 되어 참여 차단·종료 탭 이동)
+    public void close(LocalDateTime now){
+        this.periodType = PeriodType.LIMITED;
+        this.endsAt = now;
     }
 
 }

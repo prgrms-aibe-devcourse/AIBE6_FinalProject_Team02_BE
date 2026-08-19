@@ -102,13 +102,12 @@ public class ChallengeController {
         return ApiResponse.ok();
     }
 
-    //챌린지 수정 (개설자만) — 이름·소개·대표 이미지
-    @PatchMapping("/{challengeId}")
-    public ApiResponse<Void> update(
+    //챌린지 수동 종료 (개설자만)
+    @PostMapping("/{challengeId}/close")
+    public ApiResponse<Void> close(
             @AuthenticationPrincipal Long userId,
-            @PathVariable Long challengeId,
-            @RequestBody ChallengeUpdateRequestDTO request) {
-        challengeService.update(userId, challengeId, request);
+            @PathVariable Long challengeId) {
+        challengeService.close(userId, challengeId);
         return ApiResponse.ok();
     }
 
