@@ -51,7 +51,7 @@ public interface ChallengeDexRepository extends JpaRepository<ChallengeDex, Long
     @Query(nativeQuery = true, value = """
             select count(*)
             from challenge_dex c
-            where c.deleted_at is null and c.is_event = false
+            where c.is_event = false
               and c.starts_at <= :now and (c.ends_at is null or c.ends_at > :now)
             """)
     long countOngoing(@Param("now") LocalDateTime now);
@@ -60,7 +60,7 @@ public interface ChallengeDexRepository extends JpaRepository<ChallengeDex, Long
     @Query(nativeQuery = true, value = """
             select c.id
             from challenge_dex c
-            where c.deleted_at is null and c.is_event = false
+            where c.is_event = false
               and c.starts_at <= :now and (c.ends_at is null or c.ends_at > :now)
             order by c.created_at desc, c.id desc
             limit :size offset :offset
@@ -79,7 +79,7 @@ public interface ChallengeDexRepository extends JpaRepository<ChallengeDex, Long
                 where v.view_date >= :sinceDate
                 group by v.challenge_dex_id
             ) s on s.dex_id = c.id
-            where c.deleted_at is null and c.is_event = false
+            where c.is_event = false
               and c.starts_at <= :now and (c.ends_at is null or c.ends_at > :now)
             order by score desc, c.created_at desc, c.id desc
             limit :size offset :offset
@@ -99,7 +99,7 @@ public interface ChallengeDexRepository extends JpaRepository<ChallengeDex, Long
                 where p.joined_at >= :since
                 group by p.challenge_dex_id
             ) s on s.dex_id = c.id
-            where c.deleted_at is null and c.is_event = false
+            where c.is_event = false
               and c.starts_at <= :now and (c.ends_at is null or c.ends_at > :now)
             order by score desc, c.created_at desc, c.id desc
             limit :size offset :offset
@@ -120,7 +120,7 @@ public interface ChallengeDexRepository extends JpaRepository<ChallengeDex, Long
                 where u.unlocked_at >= :since
                 group by p.challenge_dex_id
             ) s on s.dex_id = c.id
-            where c.deleted_at is null and c.is_event = false
+            where c.is_event = false
               and c.starts_at <= :now and (c.ends_at is null or c.ends_at > :now)
             order by score desc, c.created_at desc, c.id desc
             limit :size offset :offset

@@ -1,6 +1,6 @@
 -- 시딩한 더미 챌린지만 골라서 제거 (⚠️ 로컬 전용)
 --
---   docker exec -i catcheat-postgres psql -U catcheat -d catcheat_dev < load-test/seed/clean-challenges.sql
+--   docker exec -i catcheat-postgres psql -U catcheat -d catcheat_dev < load-test/challenge-ranking/seed/clean-challenges.sql
 --
 -- 이름이 'LOADTEST-'로 시작하는 것만 지운다. 진짜 데이터는 건드리지 않는다.
 -- 자식 → 부모 순서로 지워야 FK에 안 걸린다.

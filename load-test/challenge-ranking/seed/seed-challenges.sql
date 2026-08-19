@@ -1,6 +1,6 @@
 -- 부하테스트용 더미 챌린지 시딩 (⚠️ 로컬 전용 — 운영 DB에서 절대 실행 금지)
 --
---   docker exec -i catcheat-postgres psql -U catcheat -d catcheat_dev -v n=500 < load-test/seed/seed-challenges.sql
+--   docker exec -i catcheat-postgres psql -U catcheat -d catcheat_dev -v n=500 < load-test/challenge-ranking/seed/seed-challenges.sql
 --
 -- 여러 번 실행하면 그만큼 **누적**된다 (500 → 다시 4500 = 5000).
 --
@@ -78,7 +78,7 @@ commit;
 -- 결과 확인
 select 'challenge_dex(진행중)' as 항목, count(*) as 건수
 from challenge_dex
-where deleted_at is null and is_event = false
+where is_event = false
   and starts_at <= now() and (ends_at is null or ends_at > now())
 union all
 select 'challenge_view_daily', count(*) from challenge_view_daily

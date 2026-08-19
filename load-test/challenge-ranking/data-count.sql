@@ -7,7 +7,6 @@
 -- 이 파일이 없으면 run.ps1은 데이터량 점검을 건너뛴다.
 select count(*)
 from challenge_dex
-where deleted_at is null
-  and is_event = false
+where is_event = false
   and starts_at <= now()
   and (ends_at is null or ends_at > now());
