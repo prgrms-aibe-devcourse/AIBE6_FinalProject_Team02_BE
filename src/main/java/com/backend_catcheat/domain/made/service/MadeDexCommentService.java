@@ -8,13 +8,17 @@ import com.backend_catcheat.domain.badge.service.EquippedBadgeResolver;
 import com.backend_catcheat.domain.made.dto.*;
 import com.backend_catcheat.domain.made.entity.MadeDexComment;
 import com.backend_catcheat.domain.made.entity.MadeDexCommentLike;
+import com.backend_catcheat.domain.made.entity.MadeDexRecord;
 import com.backend_catcheat.domain.made.repository.MadeDexCommentLikeRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexCommentRepository;
+import com.backend_catcheat.domain.made.repository.MadeDexRecordRepository;
 import com.backend_catcheat.domain.user.dto.UserBriefDTO;
+import com.backend_catcheat.global.event.CommentCreatedEvent;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import com.backend_catcheat.global.s3.S3PresignedUrlService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,10 +34,12 @@ import java.util.stream.Collectors;
 public class MadeDexCommentService {
 
     private final MadeDexCommentRepository madeDexCommentRepository;
+    private final MadeDexRecordRepository madeDexRecordRepository;
     private final MadeDexCommentLikeRepository madeDexCommentLikeRepository;
     private final UserRepository userRepository;
     private final EquippedBadgeResolver equippedBadgeResolver;
     private final S3PresignedUrlService s3PresignedUrlService;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     @Transactional
     // 댓글 생성 메서드
@@ -46,6 +52,14 @@ public class MadeDexCommentService {
         MadeDexComment comment = MadeDexComment.write(recordId, userId, dto.content());
 
         madeDexCommentRepository.save(comment);
+
+        MadeDexRecord record = madeDexRecordRepository.findById(recordId).orElse(null);
+        Long recordOwnerId = record == null ? null : record.getAuthorId();
+
+        if(recordOwnerId != null && !recordOwnerId.equals(userId)) {
+            applicationEventPublisher.publishEvent(
+                    new CommentCreatedEvent(comment.getId(), recordId, record.getMadeDexId(), userId, recordOwnerId));
+        }
 
         return new MadeDexCommentCreateResponseDTO(comment.getId());
     }

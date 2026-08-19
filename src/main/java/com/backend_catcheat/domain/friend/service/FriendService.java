@@ -7,13 +7,17 @@ import com.backend_catcheat.domain.badge.service.EquippedBadgeResolver;
 import com.backend_catcheat.domain.friend.dto.ReceivedRequestDTO;
 import com.backend_catcheat.domain.friend.entity.Friendship;
 import com.backend_catcheat.domain.friend.entity.type.FriendshipStatus;
-import com.backend_catcheat.domain.friend.repository.FriendshipRepository;
 import com.backend_catcheat.domain.friend.entity.type.RelationStatus;
+import com.backend_catcheat.domain.friend.repository.FriendshipRepository;
 import com.backend_catcheat.domain.user.dto.UserBriefDTO;
+import com.backend_catcheat.global.event.FriendRequestAcceptedEvent;
+import com.backend_catcheat.global.event.FriendRequestRejectedEvent;
+import com.backend_catcheat.global.event.FriendRequestSentEvent;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import com.backend_catcheat.global.s3.S3PresignedUrlService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,10 +33,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class FriendService {
+
     private final FriendshipRepository friendshipRepository;
     private final UserRepository userRepository;
     private final EquippedBadgeResolver equippedBadgeResolver;
     private final S3PresignedUrlService s3PresignedUrlService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /** 나와 상대의 관계 판정 */
     public RelationStatus relationOf(Long meId, Long otherId) {
@@ -86,9 +92,25 @@ public class FriendService {
             }
             // 상대가 이미 나에게 보낸 PENDING → 자동 수락
             existing.accept(LocalDateTime.now());
+
+            // 알림을 eventPublisher 로 처리 -> 이미 상대가 나에게 pending을 보내면 자동수락하며 알림도 수락으로 전송
+            eventPublisher.publishEvent(new FriendRequestAcceptedEvent(
+                    existing.getId(),
+                    meId,
+                    existing.getRequesterId()
+            ));
+
         }, () -> {
             try {
-                friendshipRepository.saveAndFlush(Friendship.request(meId, targetUserId));
+                Friendship saved = friendshipRepository.saveAndFlush(Friendship.request(meId, targetUserId));
+
+                // 새로운 요청에 대한 알림 전송
+                eventPublisher.publishEvent(new FriendRequestSentEvent(
+                        saved.getId(),
+                        meId,
+                        targetUserId
+                ));
+
             } catch (DataIntegrityViolationException e) {
                 // 유일 인덱스 위반 = 동시 요청 경쟁에서 상대가 먼저 만든 경우
                 throw new CustomException(ErrorCode.FRIEND_REQUEST_ALREADY_SENT);
@@ -104,16 +126,34 @@ public class FriendService {
             throw new CustomException(ErrorCode.FRIEND_FORBIDDEN);
         }
         f.accept(LocalDateTime.now());
+
+        eventPublisher.publishEvent(new FriendRequestAcceptedEvent(
+                f.getId(),
+                meId,
+                f.getRequesterId()
+        ));
     }
 
     /** 요청 삭제 */
     @Transactional
     public void deleteRequest(Long meId, Long requestId) {
+
         Friendship f = getPendingOr404(requestId);
+
         if (!f.getAddresseeId().equals(meId) && !f.getRequesterId().equals(meId)) {
             throw new CustomException(ErrorCode.FRIEND_FORBIDDEN);
         }
+
         friendshipRepository.delete(f);
+
+        if(f.getAddresseeId().equals(meId)) {
+            eventPublisher.publishEvent(new FriendRequestRejectedEvent(
+                    f.getId(),
+                    meId,
+                    f.getRequesterId()
+            ));
+        }
+
     }
 
     /** 친구 삭제 */
@@ -185,4 +225,8 @@ public class FriendService {
         }
         return f;
     }
+
+
+
+
 }

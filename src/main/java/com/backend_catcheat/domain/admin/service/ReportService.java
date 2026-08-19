@@ -5,9 +5,12 @@ import com.backend_catcheat.domain.admin.entity.ReportStatus;
 import com.backend_catcheat.domain.admin.entity.UnidentifiedFoodReport;
 import com.backend_catcheat.domain.admin.repository.UnidentifiedFoodReportRepository;
 import com.backend_catcheat.domain.auth.repository.UserRepository;
+import com.backend_catcheat.global.event.FoodReportApprovedEvent;
+import com.backend_catcheat.global.event.FoodReportRejectedEvent;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +29,7 @@ public class ReportService {
 
     private final UnidentifiedFoodReportRepository reportRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /** 사용자 제보 생성 — 도감에 없는 음식 이름을 PENDING으로 쌓는다. */
     @Transactional
@@ -53,14 +57,26 @@ public class ReportService {
 
     /** 제보 채택 (→ 신규 도감 칸 생성 대상). */
     @Transactional
-    public void acceptReport(Long reportId) {
-        loadPending(reportId).accept();   // 더티 체킹 → 자동 UPDATE
+    public void acceptReport(Long adminId, Long reportId) {
+        UnidentifiedFoodReport report = loadPending(reportId);
+        report.accept();   // 더티 체킹 → 자동 UPDATE
+
+        Long reporterId = report.getReporterId();
+        if (reporterId != null && !reporterId.equals(adminId)) {
+            eventPublisher.publishEvent(new FoodReportApprovedEvent(reportId, adminId, reporterId));
+        }
     }
 
     /** 제보 반려 (사유 포함). */
     @Transactional
-    public void rejectReport(Long reportId, String reason) {
-        loadPending(reportId).reject(reason);
+    public void rejectReport(Long adminId, Long reportId, String reason) {
+        UnidentifiedFoodReport report = loadPending(reportId);
+        report.reject(reason);
+
+        Long reporterId = report.getReporterId();
+        if (reporterId != null && !reporterId.equals(adminId)) {
+            eventPublisher.publishEvent(new FoodReportRejectedEvent(reportId, adminId, reporterId));
+        }
     }
 
     private UnidentifiedFoodReport loadPending(Long reportId) {

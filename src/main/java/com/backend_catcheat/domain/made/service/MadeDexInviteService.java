@@ -8,9 +8,11 @@ import com.backend_catcheat.domain.made.entity.MadeDexInvite;
 import com.backend_catcheat.domain.made.entity.MadeDexMember;
 import com.backend_catcheat.domain.made.repository.MadeDexInviteRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexMemberRepository;
+import com.backend_catcheat.global.event.MadeDexMemberJoinedEvent;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +42,8 @@ public class MadeDexInviteService {
     private final MadeDexInviteRepository madeDexInviteRepository;
     private final InviteCodeGenerator inviteCodeGenerator;
     private final Clock clock;
+
+    private final ApplicationEventPublisher eventPublisher;
 
     /** 그룹장이 코드를 새로 뽑는다. 살아 있던 코드는 무효화된다 */
     @Transactional
@@ -110,6 +114,19 @@ public class MadeDexInviteService {
             // uk_made_dex_member — 같은 사람이 두 번 눌렀을 때의 마지막 방어선
             throw new CustomException(ErrorCode.MADE_DEX_ALREADY_JOINED);
         }
+
+        madeDexMemberRepository.findByMadeDexIdOrderByJoinedAtAscIdAsc(madeDexId)
+                .stream()
+                .map(MadeDexMember::getUserId)
+                .filter(memberId -> !memberId.equals(userId))
+                .forEach(memberId -> eventPublisher.publishEvent(
+                        new MadeDexMemberJoinedEvent(
+                                madeDexId,
+                                userId,
+                                memberId
+                        )
+                ));
+
 
         return new MadeDexJoinResponseDTO(madeDexId);
     }

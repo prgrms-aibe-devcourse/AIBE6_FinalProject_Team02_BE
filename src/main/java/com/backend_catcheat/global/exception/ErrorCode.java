@@ -181,7 +181,15 @@ public enum ErrorCode {
     // 댓글
     MADE_DEX_COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "댓글을 찾을 수 없습니다."),
     MADE_DEX_COMMENT_NOT_AUTHOR(HttpStatus.FORBIDDEN, "본인이 작성한 댓글만 수정/삭제 할 수 있습니다."),
-    MADE_DEX_COMMENT_CONTENT_REQUIRED(HttpStatus.BAD_REQUEST, "댓글을 입력해주세요");
+    MADE_DEX_COMMENT_CONTENT_REQUIRED(HttpStatus.BAD_REQUEST, "댓글을 입력해주세요"),
+
+    //알림
+
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다."),
+    NOTIFICATION_NOT_RECIPIENT(HttpStatus.FORBIDDEN, "본인에게 온 알림만 처리할 수 있습니다.");
+
+
+
 
 
 
