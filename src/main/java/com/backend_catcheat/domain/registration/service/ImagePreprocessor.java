@@ -32,8 +32,13 @@ public class ImagePreprocessor {
     private final VisionProperties properties;
 
     public PreparedImage prepare(byte[] source, String name) {
+        return prepare(source, name, properties.maxLongEdgePx());
+    }
+
+    // 일러스트 변환은 형태가 뭉개지면 안 되어 음식 판정보다 큰 값을 쓴다
+    public PreparedImage prepare(byte[] source, String name, int maxLongEdgePx) {
         BufferedImage decoded = decode(source);
-        BufferedImage resized = resize(decoded, properties.maxLongEdgePx());
+        BufferedImage resized = resize(decoded, maxLongEdgePx);
         byte[] encoded = encodeWithinLimit(resized, name);
 
         PreparedImage prepared = new PreparedImage(
