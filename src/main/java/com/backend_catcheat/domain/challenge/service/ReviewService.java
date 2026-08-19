@@ -58,7 +58,7 @@ public class ReviewService {
         Review saved = reviewRepository.save(
                 Review.food(userId, challengeDexId, slotId, request.content(), request.rating()));
 
-        Long ownerId = challengeDexRepository.findByIdAndDeletedAtIsNull(challengeDexId)
+        Long ownerId = challengeDexRepository.findById(challengeDexId)
                 .map(ChallengeDex::getOwnerId)
                 .orElse(null);
 
@@ -94,7 +94,7 @@ public class ReviewService {
         Review saved = reviewRepository.save(
                 Review.challenge(userId, challengeDexId, request.content(), request.rating()));
 
-        Long ownerId = challengeDexRepository.findByIdAndDeletedAtIsNull(challengeDexId)
+        Long ownerId = challengeDexRepository.findById(challengeDexId)
                 .map(ChallengeDex::getOwnerId)
                 .orElse(null);
 
