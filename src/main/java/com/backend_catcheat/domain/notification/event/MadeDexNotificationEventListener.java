@@ -4,7 +4,9 @@ import com.backend_catcheat.domain.notification.dto.NotificationDTO;
 import com.backend_catcheat.domain.notification.entity.NotificationType;
 import com.backend_catcheat.domain.notification.service.NotificationService;
 import com.backend_catcheat.global.event.CommentCreatedEvent;
+import com.backend_catcheat.global.event.CommentLikedEvent;
 import com.backend_catcheat.global.event.MadeDexMemberJoinedEvent;
+import com.backend_catcheat.global.event.MadeDexRecordLikedEvent;
 import com.backend_catcheat.global.event.MadeDexRecordUploadedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -44,11 +46,33 @@ public class MadeDexNotificationEventListener {
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onCommentLiked(CommentLikedEvent event) {
+        push(
+                event.recipientId(),
+                event.actorId(),
+                NotificationType.MADE_DEX_COMMENT_LIKED, event.commentId(),
+                Map.of("madeDexId", event.madeDexId(), "recordId", event.madeDexRecordId())
+        );
+    }
+
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onRecordUpload(MadeDexRecordUploadedEvent event) {
         push(
                 event.recipientId(),
                 event.actorId(),
                 NotificationType.FRIEND_CARD_REGISTERED, event.recordId(),
+                Map.of("madeDexId", event.madeDexId(), "recordId", event.recordId())
+        );
+    }
+
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onRecordLiked(MadeDexRecordLikedEvent event) {
+        push(
+                event.recipientId(),
+                event.actorId(),
+                NotificationType.MADE_DEX_RECORD_LIKED, event.recordId(),
                 Map.of("madeDexId", event.madeDexId(), "recordId", event.recordId())
         );
     }

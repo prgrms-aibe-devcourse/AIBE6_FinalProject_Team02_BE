@@ -40,6 +40,9 @@ public class MadeDexRecord extends BaseEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    @Column(name = "like_count", nullable = false)
+    private int likeCount = 0;
+
     private MadeDexRecord(Long madeDexId, Long slotId, Long authorId, LocalDate loggedOn, LocalDateTime loggedAt) {
         this.madeDexId = madeDexId;
         this.slotId = slotId;
@@ -66,6 +69,16 @@ public class MadeDexRecord extends BaseEntity {
 
     public boolean isDeleted() {
         return deletedAt != null;
+    }
+
+    public void increaseLike() {
+        this.likeCount++;
+    }
+
+    public void decreaseLike() {
+        if (this.likeCount > 0) {
+            this.likeCount--;
+        }
     }
 
     public boolean isAuthor(Long userId) {

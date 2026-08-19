@@ -14,6 +14,7 @@ import com.backend_catcheat.domain.made.repository.MadeDexCommentRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexRecordRepository;
 import com.backend_catcheat.domain.user.dto.UserBriefDTO;
 import com.backend_catcheat.global.event.CommentCreatedEvent;
+import com.backend_catcheat.global.event.CommentLikedEvent;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import com.backend_catcheat.global.s3.S3PresignedUrlService;
@@ -157,6 +158,15 @@ public class MadeDexCommentService {
                 .orElseGet(() -> {
                     madeDexCommentLikeRepository.save(MadeDexCommentLike.of(commentId, userId));
                     comment.increaseLike();
+
+                    if (!comment.isAuthor(userId)) {
+                        Long madeDexId = madeDexRecordRepository.findById(comment.getMadeDexRecordId())
+                                .map(MadeDexRecord::getMadeDexId)
+                                .orElse(null);
+                        applicationEventPublisher.publishEvent(new CommentLikedEvent(
+                                commentId, comment.getMadeDexRecordId(), madeDexId, userId, comment.getAuthorId()));
+                    }
+
                     return new MadeDexCommentLikeResponseDTO(true, comment.getLikeCount());
                 });
 

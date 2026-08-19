@@ -16,6 +16,9 @@ public enum NotificationType {
     // 댓글 좋아요 시
     MADE_DEX_COMMENT_LIKED,
 
+    // 기록 좋아요 시
+    MADE_DEX_RECORD_LIKED,
+
 
     /* 챌린짓 */
 

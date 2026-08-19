@@ -32,11 +32,20 @@ public class NotificationService {
     @Transactional
     public NotificationDTO create(Long recipientId, Long actorId, NotificationType type, Long targetId, Map<String, Object> payload) {
 
-        String payloadJson = payload == null ? null : toJson(payload);
+        // 같은 조합(수신자·행위자·타입·대상)의 안 읽은 알림이 이미 있으면 새로 쌓지 않는다.
+        // 좋아요/취소를 반복해도 알림함엔 한 건만 남고, 한 번 읽고 나면 다음 좋아요부터 다시 쌓인다.
+        Notification existing = notificationRepository
+                .findByRecipientIdAndActorIdAndTypeAndTargetIdAndReadAtIsNull(recipientId, actorId, type, targetId)
+                .orElse(null);
 
-        Notification notification = Notification.create(recipientId, actorId, type, targetId, payloadJson);
-
-        notificationRepository.save(notification);
+        Notification notification;
+        if (existing != null) {
+            notification = existing;
+        } else {
+            String payloadJson = payload == null ? null : toJson(payload);
+            notification = Notification.create(recipientId, actorId, type, targetId, payloadJson);
+            notificationRepository.save(notification);
+        }
 
         String actorNickname = userRepository.findById(actorId).map(User::getNickname).orElse(null);
 

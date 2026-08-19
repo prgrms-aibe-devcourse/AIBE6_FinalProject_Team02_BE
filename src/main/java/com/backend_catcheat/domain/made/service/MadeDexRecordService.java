@@ -7,15 +7,18 @@ import com.backend_catcheat.domain.made.dto.MadeDexRecordCreateRequestDTO.PhotoI
 import com.backend_catcheat.domain.made.dto.MadeDexRecordUpdateRequestDTO.KeptPhoto;
 import com.backend_catcheat.domain.made.entity.MadeDexMember;
 import com.backend_catcheat.domain.made.entity.MadeDexRecord;
+import com.backend_catcheat.domain.made.entity.MadeDexRecordLike;
 import com.backend_catcheat.domain.made.entity.MadeDexRecordPhoto;
 import com.backend_catcheat.domain.made.entity.MadeDexSlot;
 import com.backend_catcheat.domain.made.repository.MadeDexMemberRepository;
+import com.backend_catcheat.domain.made.repository.MadeDexRecordLikeRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexRecordPhotoRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexRecordRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexSlotRepository;
 import com.backend_catcheat.domain.upload.dto.UploadPurpose;
 import com.backend_catcheat.domain.upload.service.UploadObjectService;
 import com.backend_catcheat.global.config.TimeConfig;
+import com.backend_catcheat.global.event.MadeDexRecordLikedEvent;
 import com.backend_catcheat.global.event.MadeDexRecordUploadedEvent;
 import com.backend_catcheat.global.event.S3ObjectUnusedEvent;
 import com.backend_catcheat.global.exception.CustomException;
@@ -44,6 +47,7 @@ public class MadeDexRecordService {
 
     private final MadeDexRecordRepository madeDexRecordRepository;
     private final MadeDexRecordPhotoRepository madeDexRecordPhotoRepository;
+    private final MadeDexRecordLikeRepository madeDexRecordLikeRepository;
     private final MadeDexSlotRepository madeDexSlotRepository;
     private final MadeDexMemberRepository madeDexMemberRepository;
     private final MadeDexFinder madeDexFinder;
@@ -208,6 +212,7 @@ public class MadeDexRecordService {
                 .map(MadeDexSlot::getName)
                 .orElse(null);
         User author = userRepository.findById(record.getAuthorId()).orElse(null);
+        boolean likedByMe = madeDexRecordLikeRepository.findByRecordIdAndUserId(recordId, userId).isPresent();
 
         return new MadeDexRecordDetailDTO(
                 record.getId(),
@@ -218,7 +223,38 @@ public class MadeDexRecordService {
                 author == null ? null : author.getNickname(),
                 record.isAuthor(userId),
                 photos,
-                record.getLoggedAt());
+                record.getLoggedAt(),
+                record.getLikeCount(),
+                likedByMe);
+    }
+
+    @Transactional
+    public MadeDexRecordLikeResponseDTO toggleLike(Long userId, Long madeDexId, Long recordId) {
+        madeDexFinder.readable(userId, madeDexId);
+
+        MadeDexRecord record = madeDexRecordRepository.findByIdAndDeletedAtIsNull(recordId)
+                .orElseThrow(() -> new CustomException(ErrorCode.MADE_DEX_RECORD_NOT_FOUND));
+        if (!record.belongsTo(madeDexId)) {
+            throw new CustomException(ErrorCode.MADE_DEX_RECORD_NOT_FOUND);
+        }
+
+        return madeDexRecordLikeRepository.findByRecordIdAndUserId(recordId, userId)
+                .map(like -> {
+                    madeDexRecordLikeRepository.delete(like);
+                    record.decreaseLike();
+                    return new MadeDexRecordLikeResponseDTO(false, record.getLikeCount());
+                })
+                .orElseGet(() -> {
+                    madeDexRecordLikeRepository.save(MadeDexRecordLike.of(recordId, userId));
+                    record.increaseLike();
+
+                    if (!record.isAuthor(userId)) {
+                        eventPublisher.publishEvent(
+                                new MadeDexRecordLikedEvent(recordId, madeDexId, userId, record.getAuthorId()));
+                    }
+
+                    return new MadeDexRecordLikeResponseDTO(true, record.getLikeCount());
+                });
     }
 
     private MadeDexRecord authoredRecord(Long userId, Long madeDexId, Long recordId) {
