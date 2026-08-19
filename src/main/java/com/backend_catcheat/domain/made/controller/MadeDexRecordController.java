@@ -3,6 +3,7 @@ package com.backend_catcheat.domain.made.controller;
 import com.backend_catcheat.domain.made.dto.MadeDexRecordCreateRequestDTO;
 import com.backend_catcheat.domain.made.dto.MadeDexRecordCreateResponseDTO;
 import com.backend_catcheat.domain.made.dto.MadeDexRecordDetailDTO;
+import com.backend_catcheat.domain.made.dto.MadeDexRecordLikeResponseDTO;
 import com.backend_catcheat.domain.made.dto.MadeDexRecordUpdateRequestDTO;
 import com.backend_catcheat.domain.made.service.MadeDexRecordService;
 import com.backend_catcheat.global.common.ApiResponse;
@@ -60,5 +61,13 @@ public class MadeDexRecordController {
             @PathVariable Long madeDexId,
             @PathVariable Long recordId) {
         return ApiResponse.ok(madeDexRecordService.findDetail(userId, madeDexId, recordId));
+    }
+
+    @PostMapping("/{recordId}/like")
+    public ApiResponse<MadeDexRecordLikeResponseDTO> toggleLike(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long madeDexId,
+            @PathVariable Long recordId) {
+        return ApiResponse.ok(madeDexRecordService.toggleLike(userId, madeDexId, recordId));
     }
 }
