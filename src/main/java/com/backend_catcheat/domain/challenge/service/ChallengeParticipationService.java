@@ -30,7 +30,7 @@ public class ChallengeParticipationService {
     @Transactional
     public Long join(Long userId, Long challengeDexId){
 
-        ChallengeDex dex = challengeDexRepository.findByIdAndDeletedAtIsNull(challengeDexId)
+        ChallengeDex dex = challengeDexRepository.findById(challengeDexId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CHALLENGE_NOT_FOUND));
 
         //기간 한정인데 이미 종료시 참여 불가
@@ -72,7 +72,7 @@ public class ChallengeParticipationService {
             throw new CustomException(ErrorCode.CHALLENGE_SLOT_ALREADY_UNLOCKED);
         }
 
-        ChallengeDex dex = challengeDexRepository.findByIdAndDeletedAtIsNull(challengeDexId)
+        ChallengeDex dex = challengeDexRepository.findById(challengeDexId)
                 .orElseThrow(()-> new CustomException(ErrorCode.CHALLENGE_NOT_FOUND));
             if (lat == null || lng == null || slot.getLat() == null || slot.getLng() == null) {
                 throw new CustomException(ErrorCode.CHALLENGE_LOCATION_REQUIRED);
@@ -97,7 +97,7 @@ public class ChallengeParticipationService {
             participant.complete();
 
             //개설자가 지정한 보상 뱃지가 있으면 완료자에게 지급
-            challengeDexRepository.findByIdAndDeletedAtIsNull(challengeDexId)
+            challengeDexRepository.findById(challengeDexId)
                     .map(ChallengeDex::getRewardBadgeId)
                     .ifPresent(rewardBadgeId -> eventPublisher.publishEvent(
                             new ChallengeCompletedEvent(userId, rewardBadgeId)

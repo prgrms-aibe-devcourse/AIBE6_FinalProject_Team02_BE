@@ -8,6 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 /**
@@ -57,6 +58,14 @@ public class GlobalExceptionHandler {
         String message = String.format("%s 값을 확인해 주세요", e.getName());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
             .body(ApiResponse.fail(ErrorCode.INVALID_INPUT.name(), message));
+    }
+
+    // 동시성: 방금 삭제된 챌린지를 참조하는 등 무결성 위반 → 친절한 409로 변환
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIntegrity(DataIntegrityViolationException e) {
+        log.warn("무결성 위반(동시성 등)", e);
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(ApiResponse.fail(ErrorCode.CONCURRENT_MODIFICATION.name(), ErrorCode.CONCURRENT_MODIFICATION.getMessage()));
     }
 
     // 예상 못한 예외 — 원인은 서버 로그에만 남김

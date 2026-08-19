@@ -16,6 +16,12 @@ public interface ChallengeUnlockRepository extends JpaRepository<ChallengeUnlock
     // 챌린지 포기 시 내 인증 기록 일괄 삭제
     void deleteByChallengeParticipantId(Long participantId);
 
+    // 챌린지 삭제 전 S3 정리용 — 이 챌린지의 모든 인증사진 key
+    @Query("select u.imageKey from ChallengeUnlock u where u.imageKey is not null "
+            + "and u.challengeParticipantId in "
+            + "(select p.id from ChallengeParticipant p where p.challengeDexId = :dexId)")
+    List<String> findImageKeysByChallengeDexId(@Param("dexId") Long dexId);
+
     // 최근 7일 해금 수(랭킹)
     @Query(nativeQuery = true, value = """
             select p.challenge_dex_id as dexId, count(*) as score

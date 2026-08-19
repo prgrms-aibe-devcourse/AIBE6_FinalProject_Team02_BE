@@ -10,6 +10,8 @@ import com.backend_catcheat.global.common.PageResponse;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import com.backend_catcheat.global.s3.S3PresignedUrlService;
+import com.backend_catcheat.global.event.S3ObjectUnusedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +36,7 @@ public class ChallengeService {
     private final ChallengeParticipantRepository participantRepository;
     private final ChallengeViewDailyRepository viewDailyRepository;
     private final S3PresignedUrlService s3PresignedUrlService;
+    private final ApplicationEventPublisher eventPublisher;
     private static final int SEARCH_LIMIT = 20;
 
     //개설권 조회
@@ -42,6 +45,30 @@ public class ChallengeService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
         return new CreationTicketResponseDTO(user.remainingChallengeTickets(currentYearMonth()));
+    }
+
+    //챌린지 삭제 (개설자만). FK CASCADE로 슬롯·참여자·해금·조회수·리뷰·좋아요 자동 정리
+    @Transactional
+    public void delete(Long userId, Long challengeDexId){
+        ChallengeDex dex = challengeDexRepository.findById(challengeDexId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CHALLENGE_NOT_FOUND));
+        if (!dex.getOwnerId().equals(userId)) {
+            throw new CustomException(ErrorCode.CHALLENGE_NOT_OWNER);
+        }
+
+        // 삭제 전에 S3 key 수집 — CASCADE로 자식이 사라지면 key를 못 읽는다
+        List<String> imageKeys = new ArrayList<>();
+        if (dex.getImageKey() != null) {
+            imageKeys.add(dex.getImageKey());
+        }
+        imageKeys.addAll(slotRepository.findImageKeysByChallengeDexId(challengeDexId));
+        imageKeys.addAll(unlockRepository.findImageKeysByChallengeDexId(challengeDexId));
+
+        // DB 삭제 — 나머지는 FK ON DELETE CASCADE가 정리
+        challengeDexRepository.delete(dex);
+
+        // 커밋 이후 S3 객체 + 업로드 발급기록 정리(S3ObjectCleanupListener)
+        imageKeys.forEach(key -> eventPublisher.publishEvent(new S3ObjectUnusedEvent(key)));
     }
 
     @Transactional
@@ -221,7 +248,7 @@ public class ChallengeService {
     @Transactional(readOnly = true)
     public List<ChallengeSummaryDTO> getMyChallenges(Long userId, MyChallengeRelation relation){
         List<ChallengeDex> list = switch (relation) {
-            case CREATED -> challengeDexRepository.findByOwnerIdAndDeletedAtIsNullOrderByCreatedAtDesc(userId);
+            case CREATED -> challengeDexRepository.findByOwnerIdOrderByCreatedAtDesc(userId);
             case JOINED -> loadByParticipants(participantRepository.findByUserIdAndCompletedAtIsNull(userId));
             case COMPLETED -> loadByParticipants(participantRepository.findByUserIdAndCompletedAtIsNotNull(userId));
         };
@@ -248,7 +275,7 @@ public class ChallengeService {
 
     private List<ChallengeDex> loadByParticipants(List<ChallengeParticipant> participants){
         List<Long> ids = participants.stream().map(ChallengeParticipant::getChallengeDexId).toList();
-        return ids.isEmpty() ? List.of() : challengeDexRepository.findByIdInAndDeletedAtIsNull(ids);
+        return ids.isEmpty() ? List.of() : challengeDexRepository.findByIdIn(ids);
     }
 
     // 챌린지 요약 DTO — 진행도(내 챌린지) + 랭킹/참여여부(탐색) 모두 지원
@@ -278,7 +305,7 @@ public class ChallengeService {
 
     @Transactional
     public ChallengeDetailResponseDTO getDetail(Long userId, Long challengeDexId){
-        ChallengeDex dex = challengeDexRepository.findByIdAndDeletedAtIsNull(challengeDexId)
+        ChallengeDex dex = challengeDexRepository.findById(challengeDexId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CHALLENGE_NOT_FOUND));
         viewDailyRepository.increment(challengeDexId);   // 상세 진입 조회수 +1(새로고침 포함)
         Optional<ChallengeParticipant> participant = participantRepository.findByChallengeDexIdAndUserId(challengeDexId, userId);
