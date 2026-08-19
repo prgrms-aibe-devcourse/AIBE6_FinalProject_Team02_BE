@@ -20,6 +20,7 @@ public class JwtTokenProvider {
     // 토큰 안에 담는 정보(claim)의 키 이름들
     private static final String CLAIM_ROLE = "role";
     private static final String CLAIM_TYPE = "type";
+    private static final String CLAIM_SID  = "sid";
     private static final String TYPE_ACCESS = "access";
     private static final String TYPE_REFRESH = "refresh";
 
@@ -50,15 +51,20 @@ public class JwtTokenProvider {
                 .compact();
     }
     /** refresh token: userId(subject) + type=refresh, 14일 만료. access 재발급에만 쓴다. */
-    public String createRefreshToken(Long userId) {
+    public String createRefreshToken(Long userId, String sessionId) {
         Date now = new Date();
         return Jwts.builder()
                 .subject(String.valueOf(userId))
                 .claim(CLAIM_TYPE, TYPE_REFRESH)
+                .claim(CLAIM_SID, sessionId)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + refreshTokenExpireMs))
                 .signWith(key) //key로 서명
                 .compact(); //최종 문자열로 완성
+    }
+    /** refresh 토큰에서 세션(기기) 식별자 sid를 꺼낸다. 구버전 토큰이면 null. */
+    public String getSessionId(String token) {
+        return parse(token).get(CLAIM_SID, String.class);
     }
     /**
      * 토큰의 서명·만료를 검증한다.

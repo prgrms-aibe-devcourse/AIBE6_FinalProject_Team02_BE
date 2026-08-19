@@ -5,36 +5,28 @@ import com.backend_catcheat.domain.auth.repository.UserRepository;
 import com.backend_catcheat.domain.challenge.dto.*;
 import com.backend_catcheat.domain.challenge.dto.ChallengeCreateRequestDTO.SlotInput;
 import com.backend_catcheat.domain.challenge.entity.*;
-import com.backend_catcheat.domain.challenge.repository.ChallengeDexRepository;
-import com.backend_catcheat.domain.challenge.repository.ChallengeDexSlotRepository;
-import com.backend_catcheat.domain.challenge.repository.ChallengeParticipantRepository;
-import com.backend_catcheat.domain.challenge.repository.ChallengeUnlockRepository;
-import com.backend_catcheat.domain.challenge.repository.ChallengeViewDailyRepository;
-import com.backend_catcheat.domain.challenge.repository.DexScore;
+import com.backend_catcheat.domain.challenge.repository.*;
 import com.backend_catcheat.global.common.PageResponse;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import com.backend_catcheat.global.s3.S3PresignedUrlService;
+import com.backend_catcheat.global.event.S3ObjectUnusedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class ChallengeService {
-    private static final int MIN_SLOTS = 5;
+    private static final int MIN_SLOTS = 2;
     private static final int MAX_PAGE_SIZE = 50;   // 탐색 페이지 크기 상한(과대 요청 방어)
 
     private final UserRepository userRepository;
@@ -44,6 +36,8 @@ public class ChallengeService {
     private final ChallengeParticipantRepository participantRepository;
     private final ChallengeViewDailyRepository viewDailyRepository;
     private final S3PresignedUrlService s3PresignedUrlService;
+    private final ApplicationEventPublisher eventPublisher;
+    private static final int SEARCH_LIMIT = 20;
 
     //개설권 조회
     @Transactional
@@ -51,6 +45,45 @@ public class ChallengeService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
         return new CreationTicketResponseDTO(user.remainingChallengeTickets(currentYearMonth()));
+    }
+
+    //챌린지 삭제 (개설자만). FK CASCADE로 슬롯·참여자·해금·조회수·리뷰·좋아요 자동 정리
+    @Transactional
+    public void delete(Long userId, Long challengeDexId){
+        ChallengeDex dex = challengeDexRepository.findById(challengeDexId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CHALLENGE_NOT_FOUND));
+        if (!dex.getOwnerId().equals(userId)) {
+            throw new CustomException(ErrorCode.CHALLENGE_NOT_OWNER);
+        }
+
+        // 삭제 전에 S3 key 수집 — CASCADE로 자식이 사라지면 key를 못 읽는다
+        List<String> imageKeys = new ArrayList<>();
+        if (dex.getImageKey() != null) {
+            imageKeys.add(dex.getImageKey());
+        }
+        imageKeys.addAll(slotRepository.findImageKeysByChallengeDexId(challengeDexId));
+        imageKeys.addAll(unlockRepository.findImageKeysByChallengeDexId(challengeDexId));
+
+        // DB 삭제 — 나머지는 FK ON DELETE CASCADE가 정리
+        challengeDexRepository.delete(dex);
+
+        // 커밋 이후 S3 객체 + 업로드 발급기록 정리(S3ObjectCleanupListener)
+        imageKeys.forEach(key -> eventPublisher.publishEvent(new S3ObjectUnusedEvent(key)));
+    }
+
+    //챌린지 수동 종료 (개설자만). 상시/진행중을 지금 시각으로 마감
+    @Transactional
+    public void close(Long userId, Long challengeDexId){
+        ChallengeDex dex = challengeDexRepository.findById(challengeDexId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CHALLENGE_NOT_FOUND));
+        if (!dex.getOwnerId().equals(userId)) {
+            throw new CustomException(ErrorCode.CHALLENGE_NOT_OWNER);
+        }
+        LocalDateTime now = LocalDateTime.now();
+        if (dex.getEndsAt() != null && !dex.getEndsAt().isAfter(now)) {
+            throw new CustomException(ErrorCode.CHALLENGE_ENDED);
+        }
+        dex.close(now);
     }
 
     @Transactional
@@ -106,7 +139,7 @@ public class ChallengeService {
         if (req.name() == null || req.name().trim().isEmpty()) {
             throw new CustomException(ErrorCode.CHALLENGE_NAME_REQUIRED);
         }
-        if (req.periodType() == null || req.periodType() == null) {
+        if (req.periodType() == null) {
             throw new CustomException(ErrorCode.CHALLENGE_TYPE_REQUIRED);
         }
         if (req.slots() == null || req.slots().size() < MIN_SLOTS
@@ -155,6 +188,15 @@ public class ChallengeService {
                         (ChallengeDex c) -> scoreByDex.getOrDefault(c.getId(), 0L)).reversed())
                 .toList();
         return paginate(userId, ranked, scoreByDex, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<ChallengeSummaryDTO> search(Long userId, String keyword, int page, int size){
+        if (!StringUtils.hasText(keyword)) {
+            return new PageResponse<>(List.of(), Math.max(0, page), size, 0, 0, false);
+        }
+        List<ChallengeDex> found = challengeDexRepository.searchByNameContaining(keyword.trim());
+        return paginate(userId, found, null, page, size);   // 참여자수·참여여부·hasNext 계산까지 재사용
     }
 
     // 선택 지표의 dex별 점수 맵
@@ -221,7 +263,7 @@ public class ChallengeService {
     @Transactional(readOnly = true)
     public List<ChallengeSummaryDTO> getMyChallenges(Long userId, MyChallengeRelation relation){
         List<ChallengeDex> list = switch (relation) {
-            case CREATED -> challengeDexRepository.findByOwnerIdAndDeletedAtIsNullOrderByCreatedAtDesc(userId);
+            case CREATED -> challengeDexRepository.findByOwnerIdOrderByCreatedAtDesc(userId);
             case JOINED -> loadByParticipants(participantRepository.findByUserIdAndCompletedAtIsNull(userId));
             case COMPLETED -> loadByParticipants(participantRepository.findByUserIdAndCompletedAtIsNotNull(userId));
         };
@@ -248,7 +290,7 @@ public class ChallengeService {
 
     private List<ChallengeDex> loadByParticipants(List<ChallengeParticipant> participants){
         List<Long> ids = participants.stream().map(ChallengeParticipant::getChallengeDexId).toList();
-        return ids.isEmpty() ? List.of() : challengeDexRepository.findByIdInAndDeletedAtIsNull(ids);
+        return ids.isEmpty() ? List.of() : challengeDexRepository.findByIdIn(ids);
     }
 
     // 챌린지 요약 DTO — 진행도(내 챌린지) + 랭킹/참여여부(탐색) 모두 지원
@@ -278,7 +320,7 @@ public class ChallengeService {
 
     @Transactional
     public ChallengeDetailResponseDTO getDetail(Long userId, Long challengeDexId){
-        ChallengeDex dex = challengeDexRepository.findByIdAndDeletedAtIsNull(challengeDexId)
+        ChallengeDex dex = challengeDexRepository.findById(challengeDexId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CHALLENGE_NOT_FOUND));
         viewDailyRepository.increment(challengeDexId);   // 상세 진입 조회수 +1(새로고침 포함)
         Optional<ChallengeParticipant> participant = participantRepository.findByChallengeDexIdAndUserId(challengeDexId, userId);
@@ -316,6 +358,7 @@ public class ChallengeService {
                 participantRepository.countByChallengeDexId(challengeDexId),
                 participant.isPresent(),
                 participant.map(ChallengeParticipant::isCompleted).orElse(false),
+                dex.getOwnerId().equals(userId),
                 s3PresignedUrlService.createDownloadUrl(dex.getImageKey()),
                 slots);
     }

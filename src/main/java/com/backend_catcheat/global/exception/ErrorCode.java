@@ -94,10 +94,12 @@ public enum ErrorCode {
     //개설 검증 코드
     CHALLENGE_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "챌린지 이름을 입력해 주세요"),
     CHALLENGE_TYPE_REQUIRED(HttpStatus.BAD_REQUEST, "챌린지 유형과 기한 방식을 선택해 주세요"),
-    CHALLENGE_SLOT_MIN_REQUIRED(HttpStatus.BAD_REQUEST, "목표 음식을 최소 5개 등록해 주세요"),
+    CHALLENGE_SLOT_MIN_REQUIRED(HttpStatus.BAD_REQUEST, "목표 음식을 최소 2개 등록해 주세요"),
     CHALLENGE_PERIOD_INVALID(HttpStatus.BAD_REQUEST, "기간 한정은 종료 시각이 시작 이후여야 해요"),
     //참여 관련
     CHALLENGE_NOT_FOUND(HttpStatus.NOT_FOUND, "챌린지를 찾을 수 없어요"),
+    CHALLENGE_NOT_OWNER(HttpStatus.FORBIDDEN, "개설자만 수정하거나 삭제할 수 있어요"),
+    CONCURRENT_MODIFICATION(HttpStatus.CONFLICT, "다른 사용자가 방금 변경했어요. 다시 시도해 주세요"),
     CHALLENGE_ENDED(HttpStatus.CONFLICT, "이미 종료된 챌린지예요"),
     CHALLENGE_ALREADY_JOINED(HttpStatus.CONFLICT, "이미 참여한 챌린지예요"),
     //해금 관련
@@ -176,7 +178,20 @@ public enum ErrorCode {
     FRIEND_REQUEST_ALREADY_SENT(HttpStatus.CONFLICT, "이미 친구 요청을 보냈어요"),
     FRIEND_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "친구 요청을 찾을 수 없어요"),
     FRIEND_NOT_FOUND(HttpStatus.NOT_FOUND, "친구 관계가 아니에요"),
-    FRIEND_FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없어요");
+    FRIEND_FORBIDDEN(HttpStatus.FORBIDDEN, "권한이 없어요"),
+
+    // 댓글
+    MADE_DEX_COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "댓글을 찾을 수 없습니다."),
+    MADE_DEX_COMMENT_NOT_AUTHOR(HttpStatus.FORBIDDEN, "본인이 작성한 댓글만 수정/삭제 할 수 있습니다."),
+    MADE_DEX_COMMENT_CONTENT_REQUIRED(HttpStatus.BAD_REQUEST, "댓글을 입력해주세요"),
+
+    //알림
+
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다."),
+    NOTIFICATION_NOT_RECIPIENT(HttpStatus.FORBIDDEN, "본인에게 온 알림만 처리할 수 있습니다.");
+
+
+
 
 
 

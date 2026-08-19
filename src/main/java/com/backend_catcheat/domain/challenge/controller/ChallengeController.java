@@ -93,5 +93,33 @@ public class ChallengeController {
         return ApiResponse.ok();
     }
 
+    //챌린지 삭제 (개설자만)
+    @DeleteMapping("/{challengeId}")
+    public ApiResponse<Void> delete(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long challengeId) {
+        challengeService.delete(userId, challengeId);
+        return ApiResponse.ok();
+    }
+
+    //챌린지 수동 종료 (개설자만)
+    @PostMapping("/{challengeId}/close")
+    public ApiResponse<Void> close(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long challengeId) {
+        challengeService.close(userId, challengeId);
+        return ApiResponse.ok();
+    }
+
+    //챌린지 이름 검색 (무한스크롤)
+    @GetMapping("/search")
+    public ApiResponse<PageResponse<ChallengeSummaryDTO>> search(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size //스크롤 개수 단위
+    ){
+        return ApiResponse.ok(challengeService.search(userId, keyword, page, size));
+    }
 
 }
