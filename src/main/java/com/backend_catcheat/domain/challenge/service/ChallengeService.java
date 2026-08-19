@@ -71,6 +71,31 @@ public class ChallengeService {
         imageKeys.forEach(key -> eventPublisher.publishEvent(new S3ObjectUnusedEvent(key)));
     }
 
+    //챌린지 수정 (개설자만) — 이름·소개·대표 이미지. 기간/슬롯은 제외
+    @Transactional
+    public void update(Long userId, Long challengeDexId, ChallengeUpdateRequestDTO req){
+        ChallengeDex dex = challengeDexRepository.findById(challengeDexId)
+                .orElseThrow(() -> new CustomException(ErrorCode.CHALLENGE_NOT_FOUND));
+        if (!dex.getOwnerId().equals(userId)) {
+            throw new CustomException(ErrorCode.CHALLENGE_NOT_OWNER);
+        }
+
+        if (StringUtils.hasText(req.name())) {
+            dex.rename(req.name().trim());
+        }
+        if (req.description() != null) {
+            dex.changeDescription(req.description());
+        }
+        // 대표 이미지 교체 — 옛 이미지는 커밋 후 S3에서 정리
+        if (req.imageKey() != null && !req.imageKey().equals(dex.getImageKey())) {
+            String oldKey = dex.getImageKey();
+            dex.changeImage(req.imageKey());
+            if (oldKey != null) {
+                eventPublisher.publishEvent(new S3ObjectUnusedEvent(oldKey));
+            }
+        }
+    }
+
     @Transactional
     public ChallengeCreateResponseDTO create(
             Long ownerId,

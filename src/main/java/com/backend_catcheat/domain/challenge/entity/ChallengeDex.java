@@ -67,6 +67,12 @@ public class ChallengeDex extends BaseEntity {
     public void linkRewardBadge(Long badgeId){
         this.rewardBadgeId = badgeId;
     }
+    public void rename(String name){
+        this.name = name;
+    }
+    public void changeDescription(String description){
+        this.description = description;
+    }
     public void changeImage(String imageKey){
         this.imageKey = imageKey;
     }

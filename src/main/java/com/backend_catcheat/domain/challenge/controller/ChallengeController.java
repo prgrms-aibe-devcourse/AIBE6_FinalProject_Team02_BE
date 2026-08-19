@@ -102,6 +102,16 @@ public class ChallengeController {
         return ApiResponse.ok();
     }
 
+    //챌린지 수정 (개설자만) — 이름·소개·대표 이미지
+    @PatchMapping("/{challengeId}")
+    public ApiResponse<Void> update(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long challengeId,
+            @RequestBody ChallengeUpdateRequestDTO request) {
+        challengeService.update(userId, challengeId, request);
+        return ApiResponse.ok();
+    }
+
     //챌린지 이름 검색 (무한스크롤)
     @GetMapping("/search")
     public ApiResponse<PageResponse<ChallengeSummaryDTO>> search(
