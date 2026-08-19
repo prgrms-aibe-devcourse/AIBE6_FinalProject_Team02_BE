@@ -358,6 +358,7 @@ public class ChallengeService {
                 participantRepository.countByChallengeDexId(challengeDexId),
                 participant.isPresent(),
                 participant.map(ChallengeParticipant::isCompleted).orElse(false),
+                dex.getOwnerId().equals(userId),
                 s3PresignedUrlService.createDownloadUrl(dex.getImageKey()),
                 slots);
     }
