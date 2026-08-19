@@ -36,7 +36,14 @@ public interface ChallengeDexRepository extends JpaRepository<ChallengeDex, Long
             order by c.endsAt desc
             """)
     List<ChallengeDex> findFinished(@Param("now") LocalDateTime now);
-
+    //챌린지 검색
+    @Query("""
+        select c from ChallengeDex c
+        where c.deletedAt is null and c.event = false
+          and c.name like concat('%', :keyword, '%')
+        order by c.createdAt desc
+        """)
+    List<ChallengeDex> searchByNameContaining(@Param("keyword") String keyword);
 
 
 

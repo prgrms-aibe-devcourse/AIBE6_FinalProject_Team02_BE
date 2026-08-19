@@ -5,12 +5,7 @@ import com.backend_catcheat.domain.auth.repository.UserRepository;
 import com.backend_catcheat.domain.challenge.dto.*;
 import com.backend_catcheat.domain.challenge.dto.ChallengeCreateRequestDTO.SlotInput;
 import com.backend_catcheat.domain.challenge.entity.*;
-import com.backend_catcheat.domain.challenge.repository.ChallengeDexRepository;
-import com.backend_catcheat.domain.challenge.repository.ChallengeDexSlotRepository;
-import com.backend_catcheat.domain.challenge.repository.ChallengeParticipantRepository;
-import com.backend_catcheat.domain.challenge.repository.ChallengeUnlockRepository;
-import com.backend_catcheat.domain.challenge.repository.ChallengeViewDailyRepository;
-import com.backend_catcheat.domain.challenge.repository.DexScore;
+import com.backend_catcheat.domain.challenge.repository.*;
 import com.backend_catcheat.global.common.PageResponse;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
@@ -18,17 +13,12 @@ import com.backend_catcheat.global.s3.S3PresignedUrlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -44,6 +34,7 @@ public class ChallengeService {
     private final ChallengeParticipantRepository participantRepository;
     private final ChallengeViewDailyRepository viewDailyRepository;
     private final S3PresignedUrlService s3PresignedUrlService;
+    private static final int SEARCH_LIMIT = 20;
 
     //개설권 조회
     @Transactional
@@ -106,7 +97,7 @@ public class ChallengeService {
         if (req.name() == null || req.name().trim().isEmpty()) {
             throw new CustomException(ErrorCode.CHALLENGE_NAME_REQUIRED);
         }
-        if (req.periodType() == null || req.periodType() == null) {
+        if (req.periodType() == null) {
             throw new CustomException(ErrorCode.CHALLENGE_TYPE_REQUIRED);
         }
         if (req.slots() == null || req.slots().size() < MIN_SLOTS
@@ -155,6 +146,15 @@ public class ChallengeService {
                         (ChallengeDex c) -> scoreByDex.getOrDefault(c.getId(), 0L)).reversed())
                 .toList();
         return paginate(userId, ranked, scoreByDex, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<ChallengeSummaryDTO> search(Long userId, String keyword, int page, int size){
+        if (!StringUtils.hasText(keyword)) {
+            return new PageResponse<>(List.of(), Math.max(0, page), size, 0, 0, false);
+        }
+        List<ChallengeDex> found = challengeDexRepository.searchByNameContaining(keyword.trim());
+        return paginate(userId, found, null, page, size);   // 참여자수·참여여부·hasNext 계산까지 재사용
     }
 
     // 선택 지표의 dex별 점수 맵

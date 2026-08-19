@@ -93,5 +93,15 @@ public class ChallengeController {
         return ApiResponse.ok();
     }
 
+    //챌린지 이름 검색 (무한스크롤)
+    @GetMapping("/search")
+    public ApiResponse<PageResponse<ChallengeSummaryDTO>> search(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size //스크롤 개수 단위
+    ){
+        return ApiResponse.ok(challengeService.search(userId, keyword, page, size));
+    }
 
 }
