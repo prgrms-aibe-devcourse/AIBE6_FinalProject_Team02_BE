@@ -8,6 +8,7 @@ import com.backend_catcheat.domain.admin.service.RegistrationRequestService;
 import com.backend_catcheat.domain.admin.service.ReportService;
 import com.backend_catcheat.global.common.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -33,17 +34,21 @@ public class AdminController {
     }
 
     @PatchMapping("/reports/{reportId}/accept")
-    public ApiResponse<Void> acceptReport(@PathVariable Long reportId) {
-        reportService.acceptReport(reportId);
+    public ApiResponse<Void> acceptReport(
+            @AuthenticationPrincipal Long adminId,
+            @PathVariable Long reportId
+    ) {
+        reportService.acceptReport(adminId, reportId);
         return ApiResponse.ok();
     }
 
     @PatchMapping("/reports/{reportId}/reject")
     public ApiResponse<Void> rejectReport(
+            @AuthenticationPrincipal Long adminId,
             @PathVariable Long reportId,
             @RequestBody RejectRequestDTO request
     ) {
-        reportService.rejectReport(reportId, request.reason());
+        reportService.rejectReport(adminId, reportId, request.reason());
         return ApiResponse.ok();
     }
 

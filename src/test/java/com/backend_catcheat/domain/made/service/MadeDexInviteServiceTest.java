@@ -19,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
@@ -63,11 +64,13 @@ class MadeDexInviteServiceTest {
     MadeDexInviteRepository madeDexInviteRepository;
     @Mock
     InviteCodeGenerator inviteCodeGenerator;
+    @Mock
+    ApplicationEventPublisher eventPublisher;
 
     private MadeDexInviteService service() {
         return new MadeDexInviteService(
                 new MadeDexFinder(madeDexRepository, madeDexMemberRepository), madeDexMemberRepository,
-                madeDexInviteRepository, inviteCodeGenerator, clock);
+                madeDexInviteRepository, inviteCodeGenerator, clock, eventPublisher);
     }
 
     private MadeDex madeDex(Long ownerId) {

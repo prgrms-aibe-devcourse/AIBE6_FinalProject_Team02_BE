@@ -10,6 +10,7 @@ import com.backend_catcheat.domain.made.entity.MadeDexRecord;
 import com.backend_catcheat.domain.made.entity.MadeDexRecordPhoto;
 import com.backend_catcheat.domain.made.entity.MadeDexSlot;
 import com.backend_catcheat.domain.made.repository.MadeDexMemberRepository;
+import com.backend_catcheat.domain.made.repository.MadeDexRecordLikeRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexRecordPhotoRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexRecordRepository;
 import com.backend_catcheat.domain.made.repository.MadeDexSlotRepository;
@@ -75,6 +76,7 @@ class MadeDexRecordServiceTest {
 
     @Mock MadeDexRecordRepository madeDexRecordRepository;
     @Mock MadeDexRecordPhotoRepository madeDexRecordPhotoRepository;
+    @Mock MadeDexRecordLikeRepository madeDexRecordLikeRepository;
     @Mock MadeDexSlotRepository madeDexSlotRepository;
     @Mock MadeDexMemberRepository madeDexMemberRepository;
     @Mock MadeDexFinder madeDexFinder;
@@ -88,7 +90,7 @@ class MadeDexRecordServiceTest {
     @BeforeEach
     void setUp() {
         service = new MadeDexRecordService(
-                madeDexRecordRepository, madeDexRecordPhotoRepository,
+                madeDexRecordRepository, madeDexRecordPhotoRepository, madeDexRecordLikeRepository,
                 madeDexSlotRepository, madeDexMemberRepository, madeDexFinder,
                 userRepository, s3PresignedUrlService, uploadObjectService, eventPublisher, clock);
 
