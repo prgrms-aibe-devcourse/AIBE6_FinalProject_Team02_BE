@@ -13,6 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 import java.util.Optional;
@@ -34,6 +35,8 @@ class ReportServiceTest {
     UnidentifiedFoodReportRepository reportRepository;
     @Mock
     UserRepository userRepository;
+    @Mock
+    ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     ReportService reportService;
@@ -82,7 +85,7 @@ class ReportServiceTest {
         UnidentifiedFoodReport report = UnidentifiedFoodReport.builder().description("x").build();
         when(reportRepository.findById(1L)).thenReturn(Optional.of(report));
 
-        reportService.acceptReport(1L);
+        reportService.acceptReport(100L, 1L);
 
         assertThat(report.getStatus()).isEqualTo(ReportStatus.ACCEPTED);
     }
@@ -93,7 +96,7 @@ class ReportServiceTest {
         UnidentifiedFoodReport report = UnidentifiedFoodReport.builder().description("x").build();
         when(reportRepository.findById(1L)).thenReturn(Optional.of(report));
 
-        reportService.rejectReport(1L, "부적절한 제보");
+        reportService.rejectReport(100L, 1L, "부적절한 제보");
 
         assertThat(report.getStatus()).isEqualTo(ReportStatus.REJECTED);
         assertThat(report.getRejectReason()).isEqualTo("부적절한 제보");
@@ -104,7 +107,7 @@ class ReportServiceTest {
     void acceptReport_notFound() {
         when(reportRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> reportService.acceptReport(99L))
+        assertThatThrownBy(() -> reportService.acceptReport(100L, 99L))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.REPORT_NOT_FOUND));
     }
@@ -116,7 +119,7 @@ class ReportServiceTest {
         report.accept();
         when(reportRepository.findById(1L)).thenReturn(Optional.of(report));
 
-        assertThatThrownBy(() -> reportService.acceptReport(1L))
+        assertThatThrownBy(() -> reportService.acceptReport(100L, 1L))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ADMIN_ITEM_ALREADY_HANDLED));
     }
