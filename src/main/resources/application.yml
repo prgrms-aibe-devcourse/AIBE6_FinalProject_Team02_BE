@@ -153,6 +153,26 @@ catcheat:
     min-query-length: 2
     timeout-ms: 3000
 
+  illustration:
+    # 이미지 생성만 Spring AI가 아니라 RestClient로 직접 부른다.
+    # /v1/images/edits(i2i)를 감싼 추상화가 없고, background·output_format도 실을 수 없다.
+    api-key: ${OPENAI_API_KEY:}
+    # 스파이크에서 확정. 상위 모델과 품질 차이가 크지 않은데 비용은 1/4이다
+    model: ${OPENAI_IMAGE_MODEL:gpt-image-1-mini}
+    # low는 크레파스 질감이 뭉개지고 high는 비용만 오른다
+    quality: medium
+    # 이 값이 없으면 12MP 스마트폰 원본이 "Invalid image file or mode"로 거절된다.
+    # 스파이크 테스트 사진 34장 중 8장이 4032x3024였다
+    source-max-edge-px: 1024
+    # 이미지 API가 받는 크기여야 한다
+    result-size-px: 1024
+    # 표시 최대가 240px이라 512면 레티나까지 충분하다. 1024 원본은 2.4MB로 너무 크다
+    stored-max-edge-px: 512
+    # 건당 약 $0.0115. 20회면 유저당 하루 최대 $0.23이다
+    daily-limit: 20
+    # 평균 17초, 길면 25초 걸린다
+    timeout-ms: 60000
+
 
 cloud:
   aws:

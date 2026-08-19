@@ -19,6 +19,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
+
+import com.backend_catcheat.global.event.SlotsUnlockedEvent;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -48,6 +51,9 @@ class RegistrationRequestServiceTest {
     PhotoRepository photoRepository;
     @Mock
     S3PresignedUrlService presignedUrlService;
+    // 빠뜨리면 @InjectMocks가 null을 넣어 해금 시점에 NPE가 난다
+    @Mock
+    ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     RegistrationRequestService service;
@@ -79,6 +85,8 @@ class RegistrationRequestServiceTest {
         assertThat(request.getStatus()).isEqualTo(RegistrationRequestStatus.COMPLETED);
         assertThat(card.isAwaitingReview()).isFalse();   // 칸에 붙음 = 해금
         verify(userCollectionRepository).save(any());
+        // 해금이 뱃지 평가로 이어지지 않으면 수집 뱃지가 영영 안 나간다
+        verify(eventPublisher).publishEvent(new SlotsUnlockedEvent(10L));
     }
 
     @Test

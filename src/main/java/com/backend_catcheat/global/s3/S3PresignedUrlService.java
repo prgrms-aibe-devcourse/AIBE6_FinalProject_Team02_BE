@@ -25,7 +25,6 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.text.Normalizer;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -35,12 +34,6 @@ public class S3PresignedUrlService {
 
     private static final Duration SIGNATURE_DURATION = Duration.ofMinutes(10);
     private static final DateTimeFormatter DATE_PATH_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
-    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
-            "image/jpeg",
-            "image/png",
-            "image/heic",
-            "image/heif"
-    );
 
     private final S3Presigner s3Presigner;
     private final S3Client s3Client;
@@ -105,7 +98,7 @@ public class S3PresignedUrlService {
 
         // 파일 별 presigned PUT URL을 발급
         List<PresignedUploadResponseDTO.UploadTarget> uploads = request.files().stream()
-                .map(this::createUploadTarget)
+                .map(file -> createUploadTarget(file, purpose))
                 .toList();
 
         // 발급받은 사람을 남겨야 나중에 이 key를 쓸 자격을 볼 수 있다
@@ -117,8 +110,9 @@ public class S3PresignedUrlService {
         return new PresignedUploadResponseDTO(uploads);
     }
 
-    private PresignedUploadResponseDTO.UploadTarget createUploadTarget(PresignedUploadRequestDTO.FileInfo file) {
-        validateFile(file);
+    private PresignedUploadResponseDTO.UploadTarget createUploadTarget(PresignedUploadRequestDTO.FileInfo file,
+                                                                      UploadPurpose purpose) {
+        validateFile(file, purpose);
 
         // 원본 파일명을 UUID 기반 key로 변경 후 사용
         String key = generateKey(file.contentType());
@@ -144,7 +138,7 @@ public class S3PresignedUrlService {
         );
     }
 
-    private void validateFile(PresignedUploadRequestDTO.FileInfo file) {
+    private void validateFile(PresignedUploadRequestDTO.FileInfo file, UploadPurpose purpose) {
         // 클라이언트 검증은 우회될 수 있으므로 서버에서도 파일 정보를 다시 확인한다.
         if (file == null) {
             throw new CustomException(ErrorCode.UPLOAD_FILE_INFO_REQUIRED);
@@ -154,7 +148,8 @@ public class S3PresignedUrlService {
             throw new CustomException(ErrorCode.UPLOAD_FILE_NAME_REQUIRED);
         }
 
-        if (file.contentType() == null || !ALLOWED_CONTENT_TYPES.contains(file.contentType())) {
+        // 허용 형식은 용도가 정한다. 서버가 읽어야 하는 용도는 디코딩되는 형식만 받는다
+        if (!purpose.allows(file.contentType())) {
             throw new CustomException(ErrorCode.INVALID_UPLOAD_FILE);
         }
     }
