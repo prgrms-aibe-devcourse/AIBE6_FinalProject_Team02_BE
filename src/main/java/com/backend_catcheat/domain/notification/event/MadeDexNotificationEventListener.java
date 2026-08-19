@@ -85,7 +85,7 @@ public class MadeDexNotificationEventListener {
                 event.actorId(),
                 NotificationType.MADE_DEX_JOINED,
                 event.madeDexId(),
-                null
+                Map.of("madeDexId", event.madeDexId(), "madeDexName", event.madeDexName())
         );
     }
 

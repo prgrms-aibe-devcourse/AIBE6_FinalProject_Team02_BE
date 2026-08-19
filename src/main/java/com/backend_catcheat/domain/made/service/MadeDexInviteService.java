@@ -122,6 +122,7 @@ public class MadeDexInviteService {
                 .forEach(memberId -> eventPublisher.publishEvent(
                         new MadeDexMemberJoinedEvent(
                                 madeDexId,
+                                locked.getName(),
                                 userId,
                                 memberId
                         )

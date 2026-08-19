@@ -36,6 +36,9 @@ public class Notification extends BaseEntity {
     @Column(name="read_at")
     private LocalDateTime readAt;
 
+    @Column(name="deleted_at")
+    private LocalDateTime deletedAt;
+
 
     private Notification(Long recipientId, Long actorId, NotificationType type, Long targetId, String payload) {
         this.recipientId = recipientId;
@@ -57,5 +60,12 @@ public class Notification extends BaseEntity {
         this.readAt = now;
     }
 
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
+
+    public void delete(LocalDateTime now) {
+        this.deletedAt = now;
+    }
 
 }

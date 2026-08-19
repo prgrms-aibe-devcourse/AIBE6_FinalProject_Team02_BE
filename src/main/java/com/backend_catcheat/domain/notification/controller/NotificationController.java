@@ -41,4 +41,13 @@ public class NotificationController {
         return ApiResponse.ok();
     }
 
+    @DeleteMapping("/{notificationId}")
+    public ApiResponse<Void> delete(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long notificationId
+    ) {
+        notificationService.delete(userId, notificationId);
+        return ApiResponse.ok();
+    }
+
 }

@@ -35,7 +35,7 @@ public class NotificationService {
         // 같은 조합(수신자·행위자·타입·대상)의 안 읽은 알림이 이미 있으면 새로 쌓지 않는다.
         // 좋아요/취소를 반복해도 알림함엔 한 건만 남고, 한 번 읽고 나면 다음 좋아요부터 다시 쌓인다.
         Notification existing = notificationRepository
-                .findByRecipientIdAndActorIdAndTypeAndTargetIdAndReadAtIsNull(recipientId, actorId, type, targetId)
+                .findByRecipientIdAndActorIdAndTypeAndTargetIdAndReadAtIsNullAndDeletedAtIsNull(recipientId, actorId, type, targetId)
                 .orElse(null);
 
         Notification notification;
@@ -54,7 +54,7 @@ public class NotificationService {
     }
 
     public List<NotificationDTO> findByRecipient(Long recipientId) {
-        List<Notification> notifications = notificationRepository.findByRecipientIdOrderByCreatedAtDesc(recipientId);
+        List<Notification> notifications = notificationRepository.findByRecipientIdAndDeletedAtIsNullOrderByCreatedAtDesc(recipientId);
 
         List<Long> actorIds = notifications.stream().map(Notification::getActorId).distinct().toList();
         Map<Long, String> nicknameByActorId = userRepository.findAllById(actorIds).stream()
@@ -66,7 +66,7 @@ public class NotificationService {
     }
 
     public long countUnread(Long recipientId) {
-        return notificationRepository.countByRecipientIdAndReadAtIsNull(recipientId);
+        return notificationRepository.countByRecipientIdAndReadAtIsNullAndDeletedAtIsNull(recipientId);
     }
 
 
@@ -90,6 +90,20 @@ public class NotificationService {
     @Transactional
     public void markAllAsRead(Long recipientId) {
         notificationRepository.markAllAsRead(recipientId, LocalDateTime.now());
+    }
+
+    // 삭제 — 소프트 삭제. 지운 알림은 목록/안읽음 카운트에서 빠지고, 같은 알림이 다시 오면 새로 쌓인다
+    @Transactional
+    public void delete(Long userId, Long notificationId) {
+
+        Notification notification = notificationRepository.findById(notificationId)
+                .orElseThrow(() -> new CustomException(ErrorCode.NOTIFICATION_NOT_FOUND));
+
+        if (!notification.getRecipientId().equals(userId)) {
+            throw new CustomException(ErrorCode.NOTIFICATION_NOT_RECIPIENT);
+        }
+
+        notification.delete(LocalDateTime.now());
     }
 
     private NotificationDTO toDTO(Notification notification, String actorNickname) {

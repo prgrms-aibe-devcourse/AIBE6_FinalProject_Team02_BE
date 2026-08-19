@@ -15,15 +15,16 @@ import java.util.Optional;
 @Repository
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
 
-    List<Notification> findByRecipientIdOrderByCreatedAtDesc(Long recipientId);
-    long countByRecipientIdAndReadAtIsNull(Long recipientId);
+    List<Notification> findByRecipientIdAndDeletedAtIsNullOrderByCreatedAtDesc(Long recipientId);
+    long countByRecipientIdAndReadAtIsNullAndDeletedAtIsNull(Long recipientId);
 
-    // 좋아요 토글 반복 시 안 읽은 알림이 계속 쌓이지 않도록, 만들기 전에 같은 조합의 안 읽은 알림이 있는지 본다
-    Optional<Notification> findByRecipientIdAndActorIdAndTypeAndTargetIdAndReadAtIsNull(
+    // 좋아요 토글 반복 시 안 읽은 알림이 계속 쌓이지 않도록, 만들기 전에 같은 조합의 안 읽은 알림이 있는지 본다.
+    // 지운 알림은 없는 셈 쳐야 같은 좋아요가 다시 왔을 때 새 알림이 뜬다
+    Optional<Notification> findByRecipientIdAndActorIdAndTypeAndTargetIdAndReadAtIsNullAndDeletedAtIsNull(
             Long recipientId, Long actorId, NotificationType type, Long targetId);
 
     // 한 번에 전부 읽음 처리 — 건마다 엔티티를 불러올 필요 없이 벌크 UPDATE 한 방으로 끝낸다
     @Modifying
-    @Query("UPDATE Notification n SET n.readAt = :now WHERE n.recipientId = :recipientId AND n.readAt IS NULL")
+    @Query("UPDATE Notification n SET n.readAt = :now WHERE n.recipientId = :recipientId AND n.readAt IS NULL AND n.deletedAt IS NULL")
     int markAllAsRead(@Param("recipientId") Long recipientId, @Param("now") LocalDateTime now);
 }
