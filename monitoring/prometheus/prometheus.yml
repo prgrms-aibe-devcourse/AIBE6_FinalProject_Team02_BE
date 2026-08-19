@@ -1,0 +1,28 @@
+# Prometheus 수집 설정 (로컬 부하테스트용)
+#
+# scrape_interval을 5초로 둔 이유: 부하테스트는 보통 3~10분이라 기본값 15초면
+# 데이터 포인트가 수십 개뿐이라 그래프가 각지고 순간 병목을 놓친다.
+# 대신 rate() 범위는 이 값의 최소 4배(=30s 이상)를 줘야 계산이 안정된다.
+
+global:
+    scrape_interval: 5s
+    evaluation_interval: 5s
+    external_labels:
+        env: local
+
+scrape_configs:
+    # Spring Boot
+    # 앱은 도커 밖(호스트)에서 gradlew bootRun으로 뜨므로 host.docker.internal로 나간다.
+    # 9091은 관리 포트(application.yml의 management.server.port) — 서비스 포트 8080이 아니다
+    - job_name: catcheat-backend
+      metrics_path: /actuator/prometheus
+      static_configs:
+          - targets: ['host.docker.internal:9091']
+            labels:
+                service: backend
+
+    # Prometheus 자기 자신
+    # 수집이 밀리는지(scrape_duration) 보려고 켜 둔다. 없으면 "왜 그래프가 끊기지"를 못 푼다
+    - job_name: prometheus
+      static_configs:
+          - targets: ['localhost:9090']

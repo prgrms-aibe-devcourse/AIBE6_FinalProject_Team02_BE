@@ -5,8 +5,12 @@ import com.backend_catcheat.global.jwt.JwtAuthenticationFilter;
 import com.backend_catcheat.global.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+// Boot 4에서 spring-boot-actuator-autoconfigure → spring-boot-security 로 옮겨진 클래스다.
+// 3.x 예제의 org.springframework.boot.actuate.autoconfigure.security.servlet 경로는 더 이상 없다
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -37,6 +41,18 @@ public class SecurityConfig {
 
     @Value("${app.auth.cookie-secure}")
     private boolean cookieSecure;
+
+    /** Actuator 전용 체인. 아래 서비스 체인보다 먼저 잡는다(@Order) */
+    @Bean
+    @Order(1)
+    public SecurityFilterChain actuatorFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher(EndpointRequest.toAnyEndpoint())
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                // 수집기는 CSRF 토큰을 모른다. GET만 쓰지만 명시적으로 꺼 둔다
+                .csrf(AbstractHttpConfigurer::disable);
+        return http.build();
+    }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {

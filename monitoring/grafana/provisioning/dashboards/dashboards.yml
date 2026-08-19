@@ -1,0 +1,15 @@
+# 대시보드 자동 등록. 아래 path의 *.json을 읽어 CatchEat 폴더에 넣는다.
+apiVersion: 1
+
+providers:
+    - name: catcheat
+      orgId: 1
+      folder: CatchEat
+      type: file
+      disableDeletion: false
+      # 파일을 고치면 30초 안에 화면에 반영된다 — 대시보드를 git으로 관리할 수 있게 된다
+      updateIntervalSeconds: 30
+      allowUiUpdates: true
+      options:
+          path: /etc/grafana/provisioning/dashboards
+          foldersFromFilesStructure: false
