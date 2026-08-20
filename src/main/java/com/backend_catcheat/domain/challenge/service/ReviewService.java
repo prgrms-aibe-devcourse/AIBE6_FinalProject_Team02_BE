@@ -58,7 +58,6 @@ public class ReviewService {
     private final S3PresignedUrlService s3PresignedUrlService;
     // 알림 관련
     private final ApplicationEventPublisher eventPublisher;
-    private final ChallengeDexRepository challengeDexRepository;
 
 
     @Transactional
@@ -149,8 +148,9 @@ public class ReviewService {
         List<Review> reviews = reviewRepository.findByReviewerIdOrderByCreatedAtDesc(userId);
         if (reviews.isEmpty()) return List.of();
 
+        // 삭제된 챌린짓은 행 자체가 없다(하드 삭제 + FK CASCADE) — 이름을 못 찾은 리뷰는 아래에서 걸러진다
         Map<Long, String> challengeNames = challengeDexRepository
-                .findByIdInAndDeletedAtIsNull(
+                .findByIdIn(
                         reviews.stream().map(Review::getChallengeDexId).distinct().toList())
                 .stream()
                 .collect(Collectors.toMap(ChallengeDex::getId, ChallengeDex::getName));
@@ -199,7 +199,7 @@ public class ReviewService {
         if (found.isEmpty()) return List.of();
 
         Map<Long, String> challengeNames = challengeDexRepository
-                .findByIdInAndDeletedAtIsNull(
+                .findByIdIn(
                         found.stream().map(Review::getChallengeDexId).distinct().toList())
                 .stream()
                 .collect(Collectors.toMap(ChallengeDex::getId, ChallengeDex::getName));

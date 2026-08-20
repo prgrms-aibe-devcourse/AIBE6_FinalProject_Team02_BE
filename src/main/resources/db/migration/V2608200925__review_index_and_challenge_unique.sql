@@ -1,6 +1,10 @@
--- V2608181700: 리뷰 인덱스 정리 + 챌린지 리뷰 1개 제한을 DB로 내림
+-- V2608200100: 리뷰 인덱스 정리 + 챌린지 리뷰 1개 제한을 DB로 내림
 --
 -- V36에서 리뷰를 한 테이블(review)에 FOOD/CHALLENGE 두 종류로 넣으면서 생긴 빈 자리 셋을 메운다.
+--
+-- ⚠️ 버전 주의 — 원래 V2608181700이었는데 V2608200100으로 올렸다.
+-- develop이 V2608190943~V2608191700을 먼저 넣었기 때문에, 그 아래 번호로 두면
+-- 이미 마이그레이션을 돌린 DB(팀원·배포)에서 Flyway가 out-of-order로 기동을 거부한다.
 
 -- ---------------------------------------------------------------------------
 -- 1) 챌린지 리뷰 "챌린지당 1개"를 DB가 막게 한다
@@ -12,19 +16,8 @@
 -- 부분 유니크 인덱스라 음식 리뷰(slot_id 있음)에는 영향이 없다.
 -- ---------------------------------------------------------------------------
 
--- 이미 중복이 있으면 인덱스를 만들 수 없다. 가장 먼저 쓴 것만 남긴다
--- (좋아요 행부터 지운다 — review를 먼저 지우면 가리킬 대상 없는 좋아요가 남는다)
-DELETE FROM review_like
-WHERE review_id IN (
-    SELECT id
-    FROM (SELECT id,
-                 ROW_NUMBER() OVER (PARTITION BY reviewer_id, challenge_dex_id
-                                    ORDER BY created_at, id) AS rn
-          FROM review
-          WHERE review_type = 'CHALLENGE') ranked
-    WHERE rn > 1
-);
-
+-- 이미 중복이 있으면 인덱스를 만들 수 없다. 가장 먼저 쓴 것만 남긴다.
+-- 좋아요 행은 V2608191200이 붙인 fk_review_like_review(ON DELETE CASCADE)가 알아서 지운다
 DELETE FROM review
 WHERE id IN (
     SELECT id
@@ -48,7 +41,13 @@ CREATE UNIQUE INDEX uq_review_challenge
 --
 -- 정렬 컬럼까지 넣어 ORDER BY도 인덱스로 끝낸다. slot_id가 있는 행만 담아 크기를 줄인다
 -- (slot_id = ? 조건이면 NULL이 아님이 자명하므로 부분 인덱스도 그대로 쓰인다)
+--
+-- V2608191200이 CASCADE 성능용으로 같은 이름의 (slot_id) 단독 인덱스를 먼저 만들어 둔다.
+-- slot_id가 선두인 이 인덱스가 그 용도까지 겸하므로, 둘을 두지 않고 갈아끼운다
+-- (쓰기마다 갱신 비용을 내는 물건이라 겹치는 인덱스를 남기지 않는다)
 -- ---------------------------------------------------------------------------
+DROP INDEX IF EXISTS idx_review_slot;
+
 CREATE INDEX idx_review_slot
     ON review (slot_id, like_count DESC, created_at DESC)
     WHERE slot_id IS NOT NULL;
