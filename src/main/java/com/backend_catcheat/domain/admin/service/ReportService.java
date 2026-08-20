@@ -63,7 +63,7 @@ public class ReportService {
 
         Long reporterId = report.getReporterId();
         if (reporterId != null && !reporterId.equals(adminId)) {
-            eventPublisher.publishEvent(new FoodReportApprovedEvent(reportId, adminId, reporterId));
+            eventPublisher.publishEvent(new FoodReportApprovedEvent(reportId, adminId, reporterId, report.getDescription()));
         }
     }
 
@@ -75,7 +75,7 @@ public class ReportService {
 
         Long reporterId = report.getReporterId();
         if (reporterId != null && !reporterId.equals(adminId)) {
-            eventPublisher.publishEvent(new FoodReportRejectedEvent(reportId, adminId, reporterId));
+            eventPublisher.publishEvent(new FoodReportRejectedEvent(reportId, adminId, reporterId, report.getDescription(), reason));
         }
     }
 
