@@ -35,4 +35,17 @@ public class UploadController {
         return ApiResponse.ok(s3PresignedUrlService.createUploadUrls(userId, request, UploadPurpose.LOGIT_RECORD));
     }
 
+    /**
+     * AI 일러스트의 원본 사진용. 한 장만 받는다.
+     * 용도를 따로 두는 이유는 requireUsableBy가 발급 용도까지 대조하기 때문이다 —
+     * 다른 경로로 받은 key를 여기에 쓰면 막힌다.
+     */
+    @PostMapping("/illustrations")
+    public ApiResponse<PresignedUploadResponseDTO> createIllustrationSourceUploadUrls(
+            @AuthenticationPrincipal Long userId,
+            @RequestBody PresignedUploadRequestDTO request) {
+        return ApiResponse.ok(
+                s3PresignedUrlService.createUploadUrls(userId, request, UploadPurpose.ILLUSTRATION_SOURCE));
+    }
+
 }

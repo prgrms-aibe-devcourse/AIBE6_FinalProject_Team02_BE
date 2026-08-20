@@ -5,8 +5,12 @@ import com.backend_catcheat.global.jwt.JwtAuthenticationFilter;
 import com.backend_catcheat.global.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+// Boot 4에서 spring-boot-actuator-autoconfigure → spring-boot-security 로 옮겨진 클래스다.
+// 3.x 예제의 org.springframework.boot.actuate.autoconfigure.security.servlet 경로는 더 이상 없다
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -38,19 +42,38 @@ public class SecurityConfig {
     @Value("${app.auth.cookie-secure}")
     private boolean cookieSecure;
 
+    /** Actuator 전용 체인. 아래 서비스 체인보다 먼저 잡는다(@Order) */
+    @Bean
+    @Order(1)
+    public SecurityFilterChain actuatorFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher(EndpointRequest.toAnyEndpoint())
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                // 수집기는 CSRF 토큰을 모른다. GET만 쓰지만 명시적으로 꺼 둔다
+                .csrf(AbstractHttpConfigurer::disable);
+        return http.build();
+    }
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         // SPA(React/Next.js) 환경을 위한 CSRF 설정
         CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
-        
-        // [핵심 방어] 서브도메인 쿠키 주입 방어를 위한 Prefix 및 Secure 옵션 적용
-        // 단, __Host- 접두사는 무조건 Secure(HTTPS) 속성이 필요하므로 로컬(HTTP) 환경과 분기 처리합니다.
+
+        /** 프론트(projectjm.co.kr)와 API(api.projectjm.co.kr)는 서로 다른 서브도메인이다.
+         * SPA의 CSRF 방식은 프론트 JS가 이 쿠키를 읽어 X-XSRF-TOKEN 헤더로 되돌려보내야 하는데,
+         * __Host- 접두사 쿠키는 이를 설정한 호스트(api.*)에만 묶여 프론트(projectjm.co.kr)에서 읽을 수 없다. */
+
+        /** (그래서 프론트의 document.cookie가 비어 CSRF 헤더가 안 실리고 모든 쓰기 요청이 막혔다)
+         * 운영에서는 부모 도메인으로 쿠키를 공유해 두 서브도메인이 함께 쓰게 한다.
+         * __Host-가 주던 서브도메인 격리 이점은 포기 — 프론트/백엔드가 같은 사이트라 감수 가능한 트레이드오프. */
+        csrfTokenRepository.setCookieName("XSRF-TOKEN");
         if (cookieSecure) {
-            csrfTokenRepository.setCookieName("__Host-XSRF-TOKEN");
+            csrfTokenRepository.setCookieCustomizer(cookie -> cookie
+                    .secure(true)
+                    .domain("projectjm.co.kr")); // apex + 모든 서브도메인(api.*, www.*)이 공유
         } else {
-            csrfTokenRepository.setCookieName("XSRF-TOKEN"); // 로컬 개발(http://localhost)용
+            csrfTokenRepository.setCookieCustomizer(cookie -> cookie.secure(false)); // 로컬(http://localhost)
         }
-        csrfTokenRepository.setCookieCustomizer(cookie -> cookie.secure(cookieSecure));
 
         // Spring Security 6.x 이상에서 CSRF 토큰을 매 요청마다 지연 없이 해석하기 위한 핸들러
         CsrfTokenRequestAttributeHandler requestHandler = new CsrfTokenRequestAttributeHandler();

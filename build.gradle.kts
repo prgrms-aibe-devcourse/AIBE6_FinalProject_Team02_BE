@@ -56,6 +56,9 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers:1.19.8")
 
     implementation ("org.springframework.boot:spring-boot-starter-actuator")
+
+    // Micrometer의 Prometheus 레지스트리
+    runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 }
 
 dependencyManagement {

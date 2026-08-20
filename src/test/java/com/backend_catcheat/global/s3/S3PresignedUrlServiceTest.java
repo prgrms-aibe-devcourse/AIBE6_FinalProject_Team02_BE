@@ -108,6 +108,46 @@ class S3PresignedUrlServiceTest {
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_UPLOAD_FILE);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"image/heic", "image/heif"})
+    @DisplayName("일러스트 원본은 HEIC를 거부한다 — 서버가 디코딩하지 못해 변환에서 터진다")
+    void 일러스트_원본은_HEIC를_거부한다(String contentType) {
+        assertThatThrownBy(() -> service.createUploadUrls(UPLOADER_ID,
+                new PresignedUploadRequestDTO(List.of(new FileInfo("photo", contentType))),
+                UploadPurpose.ILLUSTRATION_SOURCE))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_UPLOAD_FILE);
+    }
+
+    @Test
+    @DisplayName("일러스트 원본도 JPG·PNG는 받는다")
+    void 일러스트_원본은_JPG와_PNG를_받는다() {
+        var uploads = service.createUploadUrls(UPLOADER_ID, new PresignedUploadRequestDTO(List.of(
+                new FileInfo("a.jpg", "image/jpeg"))), UploadPurpose.ILLUSTRATION_SOURCE).uploads();
+
+        assertThat(uploads).hasSize(1);
+        assertThat(uploads.getFirst().key()).endsWith(".jpg");
+    }
+
+    @Test
+    @DisplayName("일러스트 원본은 한 장까지, 두 장은 거부한다")
+    void 일러스트_원본은_한장까지_받는다() {
+        List<FileInfo> two = List.of(
+                new FileInfo("a.jpg", "image/jpeg"),
+                new FileInfo("b.jpg", "image/jpeg"));
+
+        assertThatThrownBy(() -> service.createUploadUrls(UPLOADER_ID,
+                new PresignedUploadRequestDTO(two), UploadPurpose.ILLUSTRATION_SOURCE))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.UPLOAD_FILE_COUNT_EXCEEDED);
+    }
+
+    @Test
+    @DisplayName("다른 용도는 HEIC를 그대로 받는다 — 일러스트 제한이 새어 나가면 안 된다")
+    void 다른_용도는_HEIC를_그대로_받는다() {
+        assertThat(issueOne("photo", "image/heic").key()).endsWith(".heic");
+    }
+
     @Test
     @DisplayName("파일 이름이 없으면 거부한다")
     void 파일_이름이_없으면_거부한다() {
