@@ -174,20 +174,54 @@ public class ChallengeService {
             return paginate(userId, challengeDexRepository.findFinished(now), null, page, size);
         }
 
-        List<ChallengeDex> ongoing = challengeDexRepository.findOngoing(now); // createdAt desc
-        // 최신순: 이미 정렬됨, 점수 없음
+        return ongoingPage(userId, sort, now, page, size);
+    }
+
+    /** 진행중 목록 한 페이지 — 집계, 정렬, 페이징을 DB에서 끝냄 */
+    private PageResponse<ChallengeSummaryDTO> ongoingPage(
+            Long userId,
+            ChallengeSortType sort,
+            LocalDateTime now,
+            int page,
+            int size
+    ) {
+        int safePage = Math.max(0, page);
+        int safeSize = Math.min(Math.max(1, size), MAX_PAGE_SIZE);
+        long offset = (long) safePage * safeSize;   // 큰 page의 int 오버플로 방지
+
+        long total = challengeDexRepository.countOngoing(now);
+
+        List<Long> orderedIds;
+        Map<Long, Long> scoreByDex;
         if (sort == ChallengeSortType.LATEST) {
-            return paginate(userId, ongoing, null, page, size);
+            // 점수 없는 정렬 — 그래도 페이징은 DB가 한다(전체 조회가 고정 비용이었으므로)
+            orderedIds = challengeDexRepository.findOngoingIdsLatest(now, safeSize, offset);
+            scoreByDex = null;
+        } else {
+            // 최근 7일 = 오늘 포함 이전 6일
+            LocalDate sinceDate = now.toLocalDate().minusDays(6);
+            List<DexScore> rows = switch (sort) {
+                case VIEWS -> challengeDexRepository.findOngoingRankedByViews(
+                        now, sinceDate, safeSize, offset);
+                case PARTICIPANTS -> challengeDexRepository.findOngoingRankedByParticipants(
+                        now, sinceDate.atStartOfDay(), safeSize, offset);
+                case UNLOCKS -> challengeDexRepository.findOngoingRankedByUnlocks(
+                        now, sinceDate.atStartOfDay(), safeSize, offset);
+                case LATEST -> List.of();   // 위에서 처리됨
+            };
+            orderedIds = rows.stream().map(DexScore::getDexId).toList();
+            scoreByDex = rows.stream().collect(Collectors.toMap(DexScore::getDexId, DexScore::getScore));
         }
 
-        // 랭킹: 지표 집계 후 점수 desc 정렬(동점은 createdAt desc 유지 — 안정 정렬)
-        List<Long> ids = ongoing.stream().map(ChallengeDex::getId).toList();
-        Map<Long, Long> scoreByDex = scoreMap(sort, ids, now);
-        List<ChallengeDex> ranked = ongoing.stream()
-                .sorted(Comparator.comparingLong(
-                        (ChallengeDex c) -> scoreByDex.getOrDefault(c.getId(), 0L)).reversed())
+        // findAllById는 순서를 보장하지 않는다 — DB가 정한 순위대로 다시 세운다
+        Map<Long, ChallengeDex> byId = challengeDexRepository.findAllById(orderedIds).stream()
+                .collect(Collectors.toMap(ChallengeDex::getId, c -> c));
+        List<ChallengeDex> slice = orderedIds.stream()
+                .map(byId::get)
+                .filter(Objects::nonNull)   // 두 쿼리 사이에 삭제된 건 건너뛴다
                 .toList();
-        return paginate(userId, ranked, scoreByDex, page, size);
+
+        return buildPage(userId, slice, scoreByDex, safePage, safeSize, total);
     }
 
     @Transactional(readOnly = true)
@@ -197,24 +231,6 @@ public class ChallengeService {
         }
         List<ChallengeDex> found = challengeDexRepository.searchByNameContaining(keyword.trim());
         return paginate(userId, found, null, page, size);   // 참여자수·참여여부·hasNext 계산까지 재사용
-    }
-
-    // 선택 지표의 dex별 점수 맵
-    private Map<Long, Long> scoreMap(
-            ChallengeSortType sort,
-            List<Long> ids,
-            LocalDateTime now
-    ) {
-        if (ids.isEmpty()) return Map.of();
-        // 최근 7일 = 오늘 포함 이전 6일
-        LocalDate sinceDate = now.toLocalDate().minusDays(6);
-        List<DexScore> rows = switch (sort) {
-            case VIEWS -> viewDailyRepository.sumRecentViewsByDexIn(ids, sinceDate);
-            case PARTICIPANTS -> participantRepository.countRecentJoinsByDexIn(ids, sinceDate.atStartOfDay());
-            case UNLOCKS -> unlockRepository.countRecentUnlocksByDexIn(ids, sinceDate.atStartOfDay());
-            case LATEST -> List.of();
-        };
-        return rows.stream().collect(Collectors.toMap(DexScore::getDexId, DexScore::getScore));
     }
 
     // 정렬된 전체 목록을 페이지로 자르고, 페이지 슬라이스만 참여자수·참여여부 집계
@@ -235,6 +251,18 @@ public class ChallengeService {
         int to = (int) Math.min(fromL + safeSize, total);
         List<ChallengeDex> slice = sorted.subList(from, to);
 
+        return buildPage(userId, slice, scoreByDex, safePage, safeSize, total);
+    }
+
+    /** 한 페이지 조립 — 정해진 slice에 참여자 수, 내 참여 여부를 붙여 응답으로 만듦 */
+    private PageResponse<ChallengeSummaryDTO> buildPage(
+            Long userId,
+            List<ChallengeDex> slice,
+            Map<Long, Long> scoreByDex,
+            int safePage,
+            int safeSize,
+            long total
+    ) {
         List<Long> sliceIds = slice.stream().map(ChallengeDex::getId).toList();
         Map<Long, Long> participantByDex = sliceIds.isEmpty() ? Map.of()
                 : participantRepository.countByChallengeDexIdIn(sliceIds).stream()
