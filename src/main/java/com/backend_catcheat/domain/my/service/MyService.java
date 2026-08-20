@@ -3,6 +3,7 @@ package com.backend_catcheat.domain.my.service;
 import com.backend_catcheat.domain.auth.entity.User;
 import com.backend_catcheat.domain.auth.repository.UserRepository;
 import com.backend_catcheat.domain.my.dto.MyProfileResponse;
+import com.backend_catcheat.domain.my.dto.NicknameAvailabilityResponse;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
 import com.backend_catcheat.global.s3.S3PresignedUrlService;
@@ -66,6 +67,18 @@ public class MyService {
         if (oldKey != null) {
             s3PresignedUrlService.deleteObject(oldKey);
         }
+    }
+
+    /** 닉네임 사용 가능 여부 — 입력 중 실시간 판정용 */
+    @Transactional(readOnly = true)
+    public NicknameAvailabilityResponse checkAvailability(Long userId, String rawNickname) {
+        String nickname = normalize(rawNickname);
+        User user = findUser(userId);
+
+        if (nickname.equals(user.getNickname())) {
+            return new NicknameAvailabilityResponse(true);
+        }
+        return new NicknameAvailabilityResponse(!userRepository.existsByNickname(nickname));
     }
 
     /**

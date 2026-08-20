@@ -2,6 +2,8 @@ package com.backend_catcheat.domain.challenge.service;
 
 import com.backend_catcheat.domain.auth.entity.User;
 import com.backend_catcheat.domain.auth.repository.UserRepository;
+import com.backend_catcheat.domain.badge.entity.Badge;
+import com.backend_catcheat.domain.badge.repository.BadgeRepository;
 import com.backend_catcheat.domain.challenge.dto.*;
 import com.backend_catcheat.domain.challenge.dto.ChallengeCreateRequestDTO.SlotInput;
 import com.backend_catcheat.domain.challenge.entity.*;
@@ -35,6 +37,7 @@ public class ChallengeService {
     private final ChallengeUnlockRepository unlockRepository;
     private final ChallengeParticipantRepository participantRepository;
     private final ChallengeViewDailyRepository viewDailyRepository;
+    private final BadgeRepository badgeRepository;
     private final S3PresignedUrlService s3PresignedUrlService;
     private final ApplicationEventPublisher eventPublisher;
     private static final int SEARCH_LIMIT = 20;
@@ -274,12 +277,15 @@ public class ChallengeService {
         Set<Long> joinedIds = (userId == null || sliceIds.isEmpty()) ? Set.of()
                 : new HashSet<>(participantRepository.findJoinedDexIds(userId, sliceIds));
 
+        Map<Long, RewardBadgeDTO> badgeById = loadRewardBadges(slice);
+
         List<ChallengeSummaryDTO> content = slice.stream()
                 .map(c -> toSummary(c,
                         participantByDex.getOrDefault(c.getId(), 0L),
                         0, 0,
                         scoreByDex == null ? null : scoreByDex.getOrDefault(c.getId(), 0L),
-                        joinedIds.contains(c.getId())))
+                        joinedIds.contains(c.getId()),
+                        badgeById))
                 .toList();
 
         int totalPages = (int) Math.ceil((double) total / safeSize);
@@ -303,6 +309,8 @@ public class ChallengeService {
                                 ChallengeParticipantRepository.ParticipantCount::getDexId,
                                 ChallengeParticipantRepository.ParticipantCount::getCnt));
 
+        Map<Long, RewardBadgeDTO> badgeById = loadRewardBadges(list);
+
         return list.stream()
                 .map(c -> {
                     int totalSlots = (int) slotRepository.countByChallengeDexId(c.getId());
@@ -311,7 +319,7 @@ public class ChallengeService {
                             .map(p -> (int) unlockRepository.countByChallengeParticipantId(p.getId()))
                             .orElse(0);
                     return toSummary(c, countByDex.getOrDefault(c.getId(), 0L),
-                            totalSlots, unlocked, null, false);
+                            totalSlots, unlocked, null, false, badgeById);
                 })
                 .toList();
     }
@@ -328,7 +336,8 @@ public class ChallengeService {
             int totalSlots,
             int unlockedCount,
             Long rankScore,
-            boolean joined
+            boolean joined,
+            Map<Long, RewardBadgeDTO> badgeById
     ){
         return new ChallengeSummaryDTO(
                 c.getId(),
@@ -342,8 +351,25 @@ public class ChallengeService {
                 unlockedCount,
                 rankScore,
                 joined,
-                s3PresignedUrlService.createDownloadUrl(c.getImageKey())
+                s3PresignedUrlService.createDownloadUrl(c.getImageKey()),
+                c.getRewardBadgeId() == null ? null : badgeById.get(c.getRewardBadgeId())
         );
+    }
+
+    /** 목록에 보일 보상 뱃지를 한 번에 읽음 */
+    private Map<Long, RewardBadgeDTO> loadRewardBadges(List<ChallengeDex> slice) {
+        List<Long> badgeIds = slice.stream()
+                .map(ChallengeDex::getRewardBadgeId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (badgeIds.isEmpty()) return Map.of();
+
+        return badgeRepository.findAllById(badgeIds).stream()
+                .collect(Collectors.toMap(
+                        Badge::getId,
+                        b -> new RewardBadgeDTO(b.getId(), b.getName(), b.getCode(),
+                                s3PresignedUrlService.createDownloadUrl(b.getImageUrl()))));
     }
 
     @Transactional
