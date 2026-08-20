@@ -12,6 +12,8 @@
 대충 뭉뚱그리고 눈에 띄는 것만 남기고 나머지는 과감히 생략해줘.
 같은 모양을 자로 잰 듯 규칙적으로 줄 맞춰 반복하지 마.
 크기도 위치도 모양도 제각각으로, 손 가는 대로 그린 것처럼 흐트러뜨려줘.
+
+[대상이 음식일 때만]
 면발, 밥알, 깨, 채소 같은 작은 것은 짧은 선이나 점 몇 개로만 대충 나타내고 넘어가줘.
 그릇이나 접시를 그리게 되면 무늬 없이 한 가지 색으로만 칠해줘.
 그릇이나 접시에 줄무늬, 점무늬, 테두리 장식, 반복 패턴을 절대 그리지 마.
@@ -43,6 +45,9 @@
 원본에 글자가 있어도 그리지 말고 전부 지워줘.
 
 [대상]
+원본에 없는 것을 새로 지어내지 마. 원본에 음식이 없으면 음식을 그리지 마.
+화면 캡처처럼 여러 가지가 섞여 있으면, 그중 가장 크게 찍힌 것 하나만 골라 그리고 나머지는 지워줘.
+무엇을 그릴지 애매하더라도 원본에 없는 것으로 대신 채우지 말고, 눈에 보이는 것 중에서만 골라줘.
 사진에서 가장 중심이 되는 대상 하나만 골라서 그려줘.
 그 대상이 음식이고 원본 사진에서 그릇이나 접시에 담겨 있다면, 그 그릇도 함께 그려줘.
 음식이 아니거나 원본에 그릇이 없다면 그릇, 접시, 받침을 새로 만들어 붙이지 마.
@@ -56,4 +61,4 @@
 인물이라도 머리 위와 어깨 좌우에 반드시 여백을 남겨줘.
 배경은 완전히 투명하게 만들어줘. 도화지 질감, 그림자, 테두리를 넣지 마.
 
-childlike crude crayon and colored-pencil doodle drawn by a kindergartener, clumsy unskilled scribble, not polished, not refined, never professional illustration, wobbly broken uneven lines in darker shade of the object's own color, no black outlines, patchy uneven flat coloring with white gaps, minimal detail, omit small elements, no texture rendering, no shading, no gloss, not realistic, no face, no text
+childlike crude crayon and colored-pencil doodle drawn by a kindergartener, clumsy unskilled scribble, not polished, not refined, never professional illustration, wobbly broken uneven lines in darker shade of the object's own color, no black outlines, patchy uneven flat coloring with white gaps, minimal detail, omit small elements, no texture rendering, no shading, no gloss, not realistic, no text, draw only what is visible in the source photo, never invent food, keep any face that exists in the source photo
