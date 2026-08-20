@@ -24,13 +24,18 @@ public class AdminNotificationEventListener {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onFoodReportApproved(FoodReportApprovedEvent event) {
-        push(event.recipientId(), event.actorId(), NotificationType.FOOD_REPORT_APPROVE, event.reportId(), null);
+        String food = event.foodName() == null ? "" : "'" + event.foodName() + "' ";
+        Map<String, Object> payload = Map.of("message", "제보한 음식 " + food + "승인됐어요");
+        push(event.recipientId(), event.actorId(), NotificationType.FOOD_REPORT_APPROVE, event.reportId(), payload);
     }
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onFoodReportRejected(FoodReportRejectedEvent event) {
-        push(event.recipientId(), event.actorId(), NotificationType.FOOD_REPORT_REJECT, event.reportId(), null);
+        String food = event.foodName() == null ? "" : "'" + event.foodName() + "' ";
+        String reason = (event.reason() == null || event.reason().isBlank()) ? "" : " — " + event.reason();
+        Map<String, Object> payload = Map.of("message", "제보한 음식 " + food + "거절됐어요" + reason);
+        push(event.recipientId(), event.actorId(), NotificationType.FOOD_REPORT_REJECT, event.reportId(), payload);
     }
 
     private void push(Long recipientId, Long actorId, NotificationType type, Long targetId, Map<String, Object> payload) {
