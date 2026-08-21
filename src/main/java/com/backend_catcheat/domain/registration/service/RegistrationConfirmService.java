@@ -241,12 +241,10 @@ public class RegistrationConfirmService {
 
         Map<String, Photo> saved = new LinkedHashMap<>();
         for (String key : keys) {
-            // 해시가 내용 기반이라 메타데이터로는 안 되고 실제 바이트를 내려받아야 한다
-            String hash = photoLoader.hash(photoLoader.loadForStorage(key));
-            if (photoRepository.existsByHash(hash)) {
-                throw new CustomException(ErrorCode.DUPLICATE_PHOTO);
-            }
-            saved.put(key, photoRepository.save(Photo.of(registration.getId(), key, hash)));
+            // 용량·형식만 본다. 예전에는 해시를 뜨려고 사진을 통째로 내려받았지만,
+            // 중복 차단을 걷어내면서 그 바이트를 쓸 곳이 없어졌다
+            photoLoader.validateForStorage(key);
+            saved.put(key, photoRepository.save(Photo.of(registration.getId(), key)));
         }
         return saved;
     }

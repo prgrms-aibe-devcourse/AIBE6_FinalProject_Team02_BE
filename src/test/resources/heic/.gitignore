@@ -1,0 +1,5 @@
+# 진단용으로 받은 실제 촬영본. 테스트가 참조하지 않고 장당 2~3MB라 커밋하지 않는다.
+# 픽스처(rotated.jpg · upright.jpg · sample.heic)는 그대로 추적한다.
+IMG_*.jpeg
+IMG_*.JPEG
+sample2.*

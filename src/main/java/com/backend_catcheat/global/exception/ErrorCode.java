@@ -52,7 +52,7 @@ public enum ErrorCode {
     PHOTO_TOO_LARGE(HttpStatus.BAD_REQUEST, "사진 한 장은 10MB까지예요"),
     // 업로드는 되지만 서버가 열지 못하는 형식. 원인을 짚어 줘야 유저가 다시 올릴 방법을 안다
     PHOTO_FORMAT_NOT_ANALYZABLE(HttpStatus.BAD_REQUEST,
-            "아이폰 원본(HEIC) 사진은 확인할 수 없어요. JPG나 PNG로 올려 주세요"),
+            "이 사진은 확인할 수 없어요. 다른 사진으로 올려 주세요"),
     IMAGE_DECODE_FAILED(HttpStatus.BAD_REQUEST, "사진을 읽을 수 없어요"),
     IMAGE_ENCODE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "사진을 변환할 수 없어요"),
     IMAGE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "사진을 저장하지 못했어요"),
@@ -82,7 +82,6 @@ public enum ErrorCode {
     // 검증을 통과하지 않은 칸으로는 해금할 수 없다 (§5.2)
     SLOT_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "확인되지 않은 음식은 등록할 수 없어요"),
     PHOTO_NOT_IN_REGISTRATION(HttpStatus.BAD_REQUEST, "이 등록 건의 사진이 아니에요"),
-    DUPLICATE_PHOTO(HttpStatus.CONFLICT, "이미 등록된 사진이에요"),
     MEMO_TOO_LONG(HttpStatus.BAD_REQUEST, "메모는 100자까지 쓸 수 있어요"),
 
     // 메모 템플릿
