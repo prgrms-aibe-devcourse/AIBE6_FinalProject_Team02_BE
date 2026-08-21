@@ -39,7 +39,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @DisplayName("등록 확정 — 해금")
@@ -86,9 +88,6 @@ class RegistrationConfirmServiceTest {
         ReflectionTestUtils.setField(registration, "id", REGISTRATION_ID);
         when(registrationRepository.findById(REGISTRATION_ID)).thenReturn(Optional.of(registration));
 
-        when(photoLoader.loadForStorage(anyString())).thenReturn(new byte[]{1, 2, 3});
-        when(photoLoader.hash(any())).thenAnswer(invocation -> "hash-" + System.nanoTime());
-        when(photoRepository.existsByHash(anyString())).thenReturn(false);
         when(photoRepository.save(any(Photo.class))).thenAnswer(i -> i.getArgument(0));
         when(cardRepository.save(any(CollectionCard.class))).thenAnswer(i -> i.getArgument(0));
         when(userCollectionRepository.save(any(UserCollection.class))).thenAnswer(i -> i.getArgument(0));
@@ -214,16 +213,14 @@ class RegistrationConfirmServiceTest {
     }
 
     @Test
-    @DisplayName("같은 사진을 다시 등록하면 거부한다 (§5.2 어뷰징 방어)")
-    void 중복_사진_거부() {
+    @DisplayName("같은 사진을 다시 등록해도 막지 않는다 — 같은 음식을 또 먹는 것은 어뷰징이 아니다")
+    void 중복_사진도_등록된다() {
         verified(1, 1L);
         slotsExist(slot(1L, "김치찌개", Category.SOUP_STEW));
-        when(photoRepository.existsByHash(anyString())).thenReturn(true);
 
-        assertThatThrownBy(() -> service.confirm(USER_ID, REGISTRATION_ID,
-                request(new CardInput(1L, null, null, null))))
-                .isInstanceOf(CustomException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.DUPLICATE_PHOTO);
+        service.confirm(USER_ID, REGISTRATION_ID, request(new CardInput(1L, null, null, null)));
+
+        verify(photoRepository, atLeastOnce()).save(any(Photo.class));
     }
 
     @Test

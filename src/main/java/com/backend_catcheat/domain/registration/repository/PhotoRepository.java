@@ -9,7 +9,5 @@ import java.util.List;
 @Repository
 public interface PhotoRepository extends JpaRepository<Photo, Long> {
 
-    boolean existsByHash(String hash);
-
     List<Photo> findByRegistrationId(Long registrationId);
 }
