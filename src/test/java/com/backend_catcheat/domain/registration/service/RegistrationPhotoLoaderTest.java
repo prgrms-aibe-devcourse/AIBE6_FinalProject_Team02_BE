@@ -16,9 +16,12 @@ import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @DisplayName("등록 사진 로딩")
@@ -63,11 +66,21 @@ class RegistrationPhotoLoaderTest {
     }
 
     @Test
-    @DisplayName("저장용 로딩은 HEIC를 통과시킨다 — 해시만 계산해 디코딩이 필요 없다")
+    @DisplayName("저장용 검사는 HEIC를 통과시킨다 — 디코딩하지 않고 보관만 한다")
     void 저장용은_HEIC를_통과시킨다() {
         givenObject("image/heic", 1024);
 
-        assertThat(loader.loadForStorage(KEY)).hasSize(3);
+        assertThatCode(() -> loader.validateForStorage(KEY)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("저장용 검사는 사진을 내려받지 않는다 — 해시를 뜰 일이 없어졌다")
+    void 저장용은_내려받지_않는다() {
+        givenObject("image/jpeg", 1024);
+
+        loader.validateForStorage(KEY);
+
+        verify(s3Client, never()).getObjectAsBytes(any(GetObjectRequest.class));
     }
 
     @Test
@@ -75,7 +88,7 @@ class RegistrationPhotoLoaderTest {
     void 이미지가_아니면_막는다() {
         givenObject("application/pdf", 1024);
 
-        assertThatThrownBy(() -> loader.loadForStorage(KEY))
+        assertThatThrownBy(() -> loader.validateForStorage(KEY))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_UPLOAD_FILE);
     }

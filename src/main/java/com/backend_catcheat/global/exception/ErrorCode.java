@@ -82,7 +82,6 @@ public enum ErrorCode {
     // 검증을 통과하지 않은 칸으로는 해금할 수 없다 (§5.2)
     SLOT_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "확인되지 않은 음식은 등록할 수 없어요"),
     PHOTO_NOT_IN_REGISTRATION(HttpStatus.BAD_REQUEST, "이 등록 건의 사진이 아니에요"),
-    DUPLICATE_PHOTO(HttpStatus.CONFLICT, "이미 등록된 사진이에요"),
     MEMO_TOO_LONG(HttpStatus.BAD_REQUEST, "메모는 100자까지 쓸 수 있어요"),
 
     // 메모 템플릿
