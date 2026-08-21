@@ -59,5 +59,5 @@ jobs:
             cd /opt/catcheat/backend
             git pull upstream develop
             aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin 495264909330.dkr.ecr.ap-northeast-2.amazonaws.com
-            docker compose -f docker-compose.dev.yml --project-name catcheat-dev pull
-            docker compose -f docker-compose.dev.yml --project-name catcheat-dev up -d
+            docker compose -f docker-compose.dev.yml --project-name catcheat-dev --env-file .env.dev pull
+            docker compose -f docker-compose.dev.yml --project-name catcheat-dev --env-file .env.dev up -d
