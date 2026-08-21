@@ -26,8 +26,14 @@ public class RegistrationPhotoLoader {
     private static final Set<String> STORABLE_CONTENT_TYPES =
             Set.of("image/jpeg", "image/png", "image/heic", "image/heif");
 
-    // heic/heif는 ImageIO가 디코딩하지 못해 분석에 쓸 수 없다
-    private static final Set<String> DECODABLE_CONTENT_TYPES = Set.of("image/jpeg", "image/png");
+    /**
+     * ImageIO가 직접 읽거나, ImagePreprocessor가 변환을 거쳐 읽을 수 있는 형식.
+     * heic/heif는 heif-convert로 JPEG를 거친다.
+     *
+     * 일러스트 생성도 loadForAnalysis를 쓰므로 여기를 열면 그 경로도 함께 열린다.
+     */
+    private static final Set<String> DECODABLE_CONTENT_TYPES =
+            Set.of("image/jpeg", "image/png", "image/heic", "image/heif");
 
     private static final long MAX_BYTES = 10L * 1024 * 1024;
 
@@ -59,6 +65,8 @@ public class RegistrationPhotoLoader {
             log.warn("[등록] 사진 용량 초과 key={} size={}B", key, head.contentLength());
             throw new CustomException(ErrorCode.PHOTO_TOO_LARGE);
         }
+        // 클라이언트가 presign 때 정한 값이라 실제 내용과 다를 수 있다. 싼 사전 필터일 뿐
+        // 형식 검증이 아니다 — 실제 판별은 ImagePreprocessor가 매직 넘버로 한다
         if (head.contentType() == null || !allowedContentTypes.contains(head.contentType().toLowerCase())) {
             log.warn("[등록] 사진 형식 미지원 key={} contentType={}", key, head.contentType());
             throw new CustomException(formatError);

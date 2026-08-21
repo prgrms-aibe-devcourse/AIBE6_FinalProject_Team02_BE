@@ -45,9 +45,17 @@ class RegistrationPhotoLoaderTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"image/heic", "image/heif"})
-    @DisplayName("분석용 로딩은 HEIC에 원인을 짚어 준다 — 업로드는 되는데 왜 막히는지 알 수 없으면 안 된다")
-    void 분석용은_HEIC에_원인을_알려준다(String contentType) {
+    @DisplayName("분석용 로딩도 HEIC를 통과시킨다 — ImagePreprocessor가 heif-convert로 JPEG를 거친다")
+    void 분석용은_HEIC를_통과시킨다(String contentType) {
         givenObject(contentType, 1024);
+
+        assertThat(loader.loadForAnalysis(KEY)).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("분석용 로딩은 디코딩할 수 없는 형식에 원인을 짚어 준다")
+    void 분석용은_디코딩_불가_형식에_원인을_알려준다() {
+        givenObject("image/gif", 1024);
 
         assertThatThrownBy(() -> loader.loadForAnalysis(KEY))
                 .isInstanceOf(CustomException.class)
