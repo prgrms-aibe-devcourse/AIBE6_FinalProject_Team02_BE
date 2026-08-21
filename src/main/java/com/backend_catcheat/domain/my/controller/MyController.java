@@ -1,6 +1,7 @@
 package com.backend_catcheat.domain.my.controller;
 
 import com.backend_catcheat.domain.my.dto.MyProfileResponse;
+import com.backend_catcheat.domain.my.dto.NicknameAvailabilityResponse;
 import com.backend_catcheat.domain.my.dto.NicknameRequest;
 import com.backend_catcheat.domain.my.dto.ProfileImageRequest;
 import com.backend_catcheat.domain.my.service.MyService;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -26,6 +28,14 @@ public class MyController {
     public ApiResponse<MyProfileResponse> getProfile(
             @AuthenticationPrincipal Long userId) {
         return ApiResponse.ok(myService.getProfile(userId));
+    }
+
+    /** 닉네임 사용 가능 여부 — 입력 중 실시간 판정 */
+    @GetMapping("/nickname/availability")
+    public ApiResponse<NicknameAvailabilityResponse> checkNickname(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam String nickname) {
+        return ApiResponse.ok(myService.checkAvailability(userId, nickname));
     }
 
     /**

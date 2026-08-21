@@ -8,4 +8,7 @@ import java.util.List;
 
 public interface MadeDexCommentRepository extends JpaRepository<MadeDexComment, Long> {
     List<MadeDexComment> findByMadeDexRecordIdOrderByCreatedAtAsc(Long madeDexRecordId);
+
+    /** 내가 쓴 댓글 — 마이 -> 내 활동 */
+    List<MadeDexComment> findByAuthorIdOrderByCreatedAtDesc(Long authorId);
 }
