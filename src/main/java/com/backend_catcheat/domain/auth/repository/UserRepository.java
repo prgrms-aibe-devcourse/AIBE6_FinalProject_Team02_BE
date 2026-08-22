@@ -1,6 +1,7 @@
 package com.backend_catcheat.domain.auth.repository;
 
 import com.backend_catcheat.domain.auth.entity.Provider;
+import com.backend_catcheat.domain.auth.entity.Role;
 import com.backend_catcheat.domain.auth.entity.User;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -26,6 +27,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * 없을 때 null 대신 Optional.empty()로 안전하게 처리한다.
      */
     Optional<User> findByProviderAndProviderId(Provider provider, String providerId);
+
+    /** 관리자 계정 조회 */
+    List<User> findAllByRole(Role role);
 
     /**
      * 닉네임 중복 여부

@@ -4,12 +4,17 @@ import com.backend_catcheat.domain.admin.dto.FoodRegistrationRequestResponseDTO;
 import com.backend_catcheat.domain.admin.entity.FoodRegistrationRequest;
 import com.backend_catcheat.domain.admin.entity.RegistrationRequestStatus;
 import com.backend_catcheat.domain.admin.repository.FoodRegistrationRequestRepository;
+import com.backend_catcheat.domain.dex.basicdex.entity.BasicDexEntity;
+import com.backend_catcheat.domain.dex.basicdex.repository.BasicDexRepository;
 import com.backend_catcheat.domain.dex.collection.entity.CollectionCard;
 import com.backend_catcheat.domain.dex.collection.entity.UserCollection;
 import com.backend_catcheat.domain.dex.collection.repository.CollectionCardRepository;
 import com.backend_catcheat.domain.dex.collection.repository.UserCollectionRepository;
+import com.backend_catcheat.domain.registration.entity.Registration;
 import com.backend_catcheat.domain.registration.repository.PhotoRepository;
 import com.backend_catcheat.domain.registration.repository.RegistrationRepository;
+import com.backend_catcheat.global.event.FoodRegistrationApprovedEvent;
+import com.backend_catcheat.global.event.FoodRegistrationRejectedEvent;
 import com.backend_catcheat.global.event.SlotsUnlockedEvent;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
@@ -36,6 +41,7 @@ public class RegistrationRequestService {
     private final PhotoRepository photoRepository;
     private final S3PresignedUrlService presignedUrlService;
     private final ApplicationEventPublisher eventPublisher;
+    private final BasicDexRepository slotRepository;
 
     /** 대기 중(PENDING) 등록 요청 목록을 최신순으로. */
     @Transactional(readOnly = true)
@@ -48,23 +54,50 @@ public class RegistrationRequestService {
 
     /** 등록 완료 — 검토 대기 카드를 칸에 붙여 해금한다(별 랭크·수집률 반영). */
     @Transactional
-    public void completeRequest(Long requestId) {
+    public void completeRequest(Long adminId, Long requestId) {
         FoodRegistrationRequest request = loadPending(requestId);
-        unlockCard(request.getCollectionCardId());
+        Long slotId = unlockCard(request.getCollectionCardId());
         request.complete();
+
+        // 요청자에게 승인 알림 (관리자가 본인 등록 건을 처리한 경우는 제외)
+        Long requesterId = requesterIdOf(request);
+        if (requesterId != null && !requesterId.equals(adminId)) {
+            eventPublisher.publishEvent(
+                    new FoodRegistrationApprovedEvent(requestId, adminId, requesterId, request.getDescription(), slotId));
+        }
     }
 
     /** 등록 요청 반려 (사유 포함). 카드는 칸에 붙지 않은 채 남는다(증빙 보존). */
     @Transactional
-    public void rejectRequest(Long requestId, String reason) {
-        loadPending(requestId).reject(reason);
+    public void rejectRequest(Long adminId, Long requestId, String reason) {
+        FoodRegistrationRequest request = loadPending(requestId);
+        request.reject(reason);
+
+        Long requesterId = requesterIdOf(request);
+        if (requesterId != null && !requesterId.equals(adminId)) {
+            Long slotId = cardRepository.findById(request.getCollectionCardId())
+                    .map(CollectionCard::getSlotId)
+                    .orElse(null);
+            String category = slotId == null ? null
+                    : slotRepository.findById(slotId).map(BasicDexEntity::getCategory).map(c -> c.getDisplayName()).orElse(null);
+            eventPublisher.publishEvent(new FoodRegistrationRejectedEvent(
+                    requestId, adminId, requesterId, request.getDescription(), reason, slotId, category));
+        }
+    }
+
+    /** 등록 요청이 걸려 있는 원본 등록 건(Registration)의 작성자를 찾는다. */
+    private Long requesterIdOf(FoodRegistrationRequest request) {
+        return registrationRepository.findById(request.getRegistrationId())
+                .map(Registration::getUserId)
+                .orElse(null);
     }
 
     /**
      * 검토 대기 카드를 해당 유저의 칸에 붙인다.
      * 랭크를 등록 시점이 아니라 여기서 매기는 이유: 대기 중 다른 등록으로 같은 칸이 먼저 열렸을 수 있다.
+     * 해금한 슬롯 id를 돌려준다 — 승인 알림이 도감 상세로 라우팅할 때 쓴다.
      */
-    private void unlockCard(Long collectionCardId) {
+    private Long unlockCard(Long collectionCardId) {
         CollectionCard card = cardRepository.findById(collectionCardId)
                 .orElseThrow(() -> new CustomException(ErrorCode.REGISTRATION_NOT_FOUND));
 
@@ -86,6 +119,8 @@ public class RegistrationRequestService {
 
         // 해금됐으니 수집 뱃지 평가 트리거 (커밋 후 별도 트랜잭션에서 지급)
         eventPublisher.publishEvent(new SlotsUnlockedEvent(userId));
+
+        return card.getSlotId();
     }
 
     private FoodRegistrationRequest loadPending(Long requestId) {

@@ -23,6 +23,7 @@ import com.backend_catcheat.domain.registration.entity.VerificationAttempt;
 import com.backend_catcheat.domain.registration.repository.PhotoRepository;
 import com.backend_catcheat.domain.registration.repository.RegistrationRepository;
 import com.backend_catcheat.domain.registration.repository.VerificationAttemptRepository;
+import com.backend_catcheat.global.event.AdminRegistrationRequestEvent;
 import com.backend_catcheat.global.event.SlotsUnlockedEvent;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
@@ -104,13 +105,17 @@ public class RegistrationConfirmService {
                         registration.getId(), slot.getId(), thumbnail.getId(),
                         memo, locationName(location), lat(location), lng(location), collectedAt));
 
-                foodRegistrationRequestRepository.save(FoodRegistrationRequest.builder()
+                FoodRegistrationRequest savedRequest = foodRegistrationRequestRepository.save(FoodRegistrationRequest.builder()
                         .registrationId(registration.getId())
                         .description(slot.getName())
                         .collectionCardId(saved.getId())
                         // 증빙은 AI가 판정했던 바로 그 사진이어야 한다
                         .evidencePhotoId(evidence != null ? evidence.getId() : thumbnail.getId())
                         .build());
+
+                // 슬롯별로 발행 — 한 건에 미검증 슬롯이 여러 개면 관리자 알림도 그만큼 여러 번 간다(의도된 동작)
+                eventPublisher.publishEvent(
+                        new AdminRegistrationRequestEvent(userId, slot.getName(), savedRequest.getId()));
 
                 pending.add(new PendingSlot(
                         slot.getId(), slot.getName(), slot.getCategory().getDisplayName(), saved.getId()));
