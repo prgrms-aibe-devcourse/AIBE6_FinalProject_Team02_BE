@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatusCode;
 
 /**
  * 전역 예외 처리
@@ -66,6 +68,23 @@ public class GlobalExceptionHandler {
         log.warn("무결성 위반(동시성 등)", e);
         return ResponseEntity.status(HttpStatus.CONFLICT)
             .body(ApiResponse.fail(ErrorCode.CONCURRENT_MODIFICATION.name(), ErrorCode.CONCURRENT_MODIFICATION.getMessage()));
+    }
+
+    // ResponseStatusException(예: 재발급 401) — 상태코드를 그대로 살리고,
+    // 4xx는 WARN, 5xx만 ERROR로 로깅한다(정상적인 클라이언트 오류가 서버 장애로 집계되지 않게).
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ApiResponse<Void>> handleResponseStatus(ResponseStatusException e) {
+        HttpStatusCode status = e.getStatusCode();
+        String reason = e.getReason() != null ? e.getReason() : "요청을 처리할 수 없습니다.";
+        if (status.is5xxServerError()) {
+            log.error("서버 오류(ResponseStatusException) status={}", status.value(), e);
+        } else {
+            log.warn("클라이언트 오류 status={} reason={}", status.value(), reason);
+        }
+        String code = HttpStatus.resolve(status.value()) != null
+                ? HttpStatus.valueOf(status.value()).name()
+                : "REQUEST_FAILED";
+        return ResponseEntity.status(status).body(ApiResponse.fail(code, reason));
     }
 
     // 예상 못한 예외 — 원인은 서버 로그에만 남김
