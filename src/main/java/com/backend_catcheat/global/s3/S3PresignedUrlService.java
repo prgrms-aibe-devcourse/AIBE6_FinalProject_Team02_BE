@@ -39,7 +39,15 @@ public class S3PresignedUrlService {
     private final S3Client s3Client;
     private final S3Properties s3Properties;
     private final UploadObjectService uploadObjectService;
+    private final PresignedDownloadUrlCache downloadUrlCache;
 
+    /**
+     * 조회용 presigned URL. **같은 key는 캐시에서 재사용한다.**
+     *
+     * 서명은 1회당 약 1.94ms인데(부하테스트 실측), 목록 화면은 한 응답에 수십 개를 만든다.
+     * 로그잇 피드가 60회, 기본 도감은 200회다. 유효시간 안에서는 같은 결과를 써도 되므로
+     * 매번 다시 서명하지 않는다. TTL과 유효시간의 관계는 {@link PresignedDownloadUrlCache} 참고.
+     */
     public String createDownloadUrl(String objectLocation) {
         if (objectLocation == null || objectLocation.isBlank()) {
             return null;
@@ -49,7 +57,13 @@ public class S3PresignedUrlService {
             return objectLocation;
         }
 
+        // 캐시 키는 정규화까지 끝낸 object key다. 같은 객체를 가리키는 다른 표기('s3://버킷/…'와
+        // 'uploads/…')가 한 항목으로 모여 적중률이 올라간다
         String key = Normalizer.normalize(extractKey(objectLocation), Normalizer.Form.NFD);
+        return downloadUrlCache.get(key, this::presignGet);
+    }
+
+    private String presignGet(String key) {
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
                 .bucket(s3Properties.bucket())
                 .key(key)
@@ -76,6 +90,9 @@ public class S3PresignedUrlService {
                     .bucket(s3Properties.bucket())
                     .key(key)
                     .build());
+            // 지운 객체를 가리키는 URL이 캐시에 남아 있으면 최대 TTL 동안 깨진 이미지가 나간다.
+            // 캐시 키는 정규화된 형태이므로 여기서도 같은 방식으로 맞춰 지운다
+            downloadUrlCache.invalidate(Normalizer.normalize(key, Normalizer.Form.NFD));
             return true;
         } catch (Exception e) {
             log.warn("S3 객체 삭제 실패: {}", objectLocation, e);
