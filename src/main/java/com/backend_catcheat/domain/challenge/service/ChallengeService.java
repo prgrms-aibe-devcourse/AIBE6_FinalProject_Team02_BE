@@ -95,7 +95,7 @@ public class ChallengeService {
             ChallengeCreateRequestDTO req
     ){
         validate(req);
-        User owner = userRepository.findById(ownerId)
+        User owner = userRepository.findByIdForUpdate(ownerId) // 개설권 동시 차감 방지: 유저 행 잠금
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
         owner.useChallengeTicket(currentYearMonth());
 

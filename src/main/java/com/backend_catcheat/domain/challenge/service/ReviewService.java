@@ -274,11 +274,11 @@ public class ReviewService {
 
         if (existing.isPresent()) {
             reviewLikeRepository.delete(existing.get());
-            review.decreaseLike();
+            reviewRepository.decrementLikeCount(reviewId);   // 원자적 -1
             liked = false;
         } else {
             reviewLikeRepository.save(ReviewLike.of(reviewId, userId));
-            review.increaseLike();
+            reviewRepository.incrementLikeCount(reviewId);   // 원자적 +1
             liked = true;
         }
 
@@ -292,7 +292,9 @@ public class ReviewService {
             ));
         }
 
-        return new ReviewLikeResponseDTO(liked, review.getLikeCount());
+        // 원자 UPDATE 후 review 엔티티 likeCount는 stale → 소스(ReviewLike)에서 실제 개수를 센다
+        int likeCount = (int) reviewLikeRepository.countByReviewId(reviewId);
+        return new ReviewLikeResponseDTO(liked, likeCount);
     }
 
     private void validate(ReviewWriteRequestDTO request) {
