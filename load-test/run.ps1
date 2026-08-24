@@ -117,6 +117,17 @@ try {
 }
 catch { Write-Host '  [FAIL] scrape target        (조회 실패)'; $ok = $false }
 
+# FAIL 판정을 데이터량 조회보다 **먼저** 낸다.
+#
+# 예전에는 데이터량 블록이 앞에 있어서, docker가 꺼져 있으면 여기까지 오지 못하고
+# 그 블록에서 NativeCommandError로 죽었다. 원인은 "사전 점검 실패"인데 화면에는
+# PowerShell 스택 트레이스만 떠서 무엇을 고쳐야 하는지 알 수 없었다.
+# 서버·프로메테우스가 없으면 데이터량을 세어 봐야 의미도 없다
+if (-not $ok) {
+    Write-Host "`n사전 점검 실패. 위 FAIL 항목을 해결하고 다시 실행하세요." -ForegroundColor Red
+    exit 1
+}
+
 # 데이터량 — 도메인이 data-count.sql을 두면 세어서 알려준다.
 #
 # 부하(VU)만 성능 변수가 아니다. 목록 조회는 행 수가, 업로드는 파일 크기가 지배한다.
@@ -124,23 +135,61 @@ catch { Write-Host '  [FAIL] scrape target        (조회 실패)'; $ok = $false
 #
 # SQL은 인자 대신 stdin으로 넘긴다 — 부등호·괄호가 섞인 문자열을 네이티브 인자로 넘기면
 # PowerShell이 조용히 망가뜨리는 경우가 있다
+# 도메인이 `data-count.sql` 첫머리 주석으로 아래 셋을 선언할 수 있다. **전부 선택 사항**이고,
+# 없으면 예전 기본값(하한 100 · 시드 인자 `-v n=5000`)을 그대로 쓴다 — 기존 도메인은 동작이 안 바뀐다.
+#
+#   -- floor: 10                        이 값 미만일 때만 경고한다
+#   -- seed:  -v m=12 -v s=4 -v p=1     경고와 함께 안내할 시드 인자
+#   -- unit:  요청당 presign 서명 횟수    숫자가 무엇의 개수인지
+#
+# 왜 필요한가 — 실행기는 이 숫자가 무엇인지 모른다. 챌린지 랭킹은 "행 수"라 100 미만이면
+# 시딩을 안 한 게 맞지만, 로그잇 피드는 "요청당 서명 횟수"라 60이 사실상 상한이다.
+# 그런데도 100과 비교해 매번 경고가 떴고, 안내하는 `-v n=5000`은 그 시드가 받지도 않는
+# 인자라 시키는 대로 해도 숫자가 그대로였다. 판단 기준은 도메인이 안다.
 $n = $null
+$unit = ''
 $countSql = Join-Path $domainDir 'data-count.sql'
 if (Test-Path $countSql) {
+    $floor = 100
+    $seedArgs = '-v n=5000'
+    # -Encoding UTF8 필수. PS 5.1의 Get-Content는 BOM 없는 UTF-8을 ANSI(949)로 읽어
+    # `-- unit: 요청당 presign 서명 횟수`가 `?붿껌??presign ?쒕챸 ?잛닔`으로 깨진다.
+    # .sql은 BOM 없이 저장되는 게 정상이므로 파일이 아니라 읽는 쪽을 맞춘다
+    foreach ($line in (Get-Content $countSql -Encoding UTF8)) {
+        if ($line -match '^\s*--\s*floor:\s*(\d+)')  { $floor = [int]$Matches[1] }
+        elseif ($line -match '^\s*--\s*seed:\s*(\S.*?)\s*$')  { $seedArgs = $Matches[1] }
+        elseif ($line -match '^\s*--\s*unit:\s*(\S.*?)\s*$')  { $unit = $Matches[1] }
+    }
     # 2>$null — native stderr를 삼킨다. `2>&1`로 합치면 5.1이 ErrorRecord로 감싸고
     # $ErrorActionPreference='Stop'과 만나 스크립트가 죽는다
-    $raw = (Get-Content -Raw $countSql |
-        docker exec -i catcheat-postgres psql -U catcheat -d catcheat_dev -t -A 2>$null) |
-        Select-Object -First 1
+    # try/catch로 감싼다. `2>$null`을 붙여도 postgres 컨테이너가 없으면 docker 자체가
+    # 실패하면서 native stderr가 ErrorRecord로 감싸이고, 위의 $ErrorActionPreference='Stop'과
+    # 만나 스크립트가 그 자리에서 죽는다.
+    # 데이터량은 **알면 좋은 정보**이지 실행 조건이 아니다. 못 세면 건너뛰고 측정은 계속한다
+    $raw = $null
+    try {
+        $raw = (Get-Content -Raw $countSql |
+            docker exec -i catcheat-postgres psql -U catcheat -d catcheat_dev -t -A 2>$null) |
+            Select-Object -First 1
+    }
+    catch { $raw = $null }
+
     $n = "$raw".Trim()
     if (-not $n -or $n -notmatch '^\d+$') { $n = '?' }
-    Write-Host ("  [INFO] {0,-22} = {1}" -f '데이터량', $n)
-    if ($n -ne '?' -and [int]$n -lt 100 -and $Stage -ne 'smoke') {
-        Write-Host '         경고: 데이터가 적어 부하를 걸어도 병목이 안 나타납니다.' -ForegroundColor Yellow
-        $seedDir = Join-Path $domainDir 'seed'
-        if (Test-Path $seedDir) {
-            Get-ChildItem $seedDir -Filter 'seed-*.sql' | ForEach-Object {
-                Write-Host ("         docker exec -i catcheat-postgres psql -U catcheat -d catcheat_dev -v n=5000 < load-test/$Domain/seed/$($_.Name)") -ForegroundColor Yellow
+
+    if ($n -eq '?') {
+        Write-Host ("  [WARN] {0,-22} = ? (조회 실패 — 데이터량 점검을 건너뜁니다)" -f '데이터량') -ForegroundColor Yellow
+    }
+    else {
+        $unitPart = if ($unit) { " ($unit)" } else { '' }
+        Write-Host ("  [INFO] {0,-22} = {1}{2}" -f '데이터량', $n, $unitPart)
+        if ([int]$n -lt $floor -and $Stage -ne 'smoke') {
+            Write-Host "         경고: 데이터가 적어 부하를 걸어도 병목이 안 나타납니다. (하한 $floor)" -ForegroundColor Yellow
+            $seedDir = Join-Path $domainDir 'seed'
+            if (Test-Path $seedDir) {
+                Get-ChildItem $seedDir -Filter 'seed-*.sql' | ForEach-Object {
+                    Write-Host ("         docker exec -i catcheat-postgres psql -U catcheat -d catcheat_dev $seedArgs < load-test/$Domain/seed/$($_.Name)") -ForegroundColor Yellow
+                }
             }
         }
     }
@@ -149,16 +198,22 @@ else {
     Write-Host ("  [INFO] {0,-22} (data-count.sql 없음 — 건너뜀)" -f '데이터량')
 }
 
-if (-not $ok) {
-    Write-Host "`n사전 점검 실패. 위 FAIL 항목을 해결하고 다시 실행하세요." -ForegroundColor Red
-    exit 1
-}
-
 # --- 실행 -----------------------------------------------------------------
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $outDir = Join-Path $root 'load-test\results'
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
-$outFile = Join-Path $outDir "$Domain-$Tag-$Stage-$stamp.txt"
+# 태그는 **전후를 가르는 표시**다. 그래서 명시했을 때만 파일명에 넣는다.
+#
+# 예전에는 기본값 'before'가 단계와 무관하게 항상 들어갔다. 그래서 기준선을 잴 때
+# `-Tag`를 안 넘기면 **개선 후에 잰 파일도 이름이 `before`**가 됐다.
+# 실제로 개선 전/후·M=2/6/12·대조군까지 12개 파일이 전부 `-before-baseline-`으로 남아
+# 실행 시각으로만 구분할 수 있었다. 에러가 안 나서 실행 중에는 눈치채지 못한다.
+#
+# load는 예전부터 기본값이 파일명에 들어갔으므로 그대로 둔다 — 기존 도메인의 파일명이 바뀌지 않는다
+$useTag = $PSBoundParameters.ContainsKey('Tag') -or $Stage -eq 'load'
+$tagShown = if ($useTag) { $Tag } else { '(없음)' }
+$namePart = if ($useTag) { "$Domain-$Tag-$Stage" } else { "$Domain-$Stage" }
+$outFile = Join-Path $outDir "$namePart-$stamp.txt"
 
 # k6 자체 설정은 환경변수로만 받는다 (CLI 플래그가 없음)
 $env:K6_PROMETHEUS_RW_SERVER_URL = 'http://localhost:9090/api/v1/write'
@@ -170,7 +225,7 @@ Write-Host "`n=== RUN ===" -ForegroundColor Cyan
 # SORT는 찍지 않는다 — 쓰는 도메인만 의미가 있고, 그 도메인의 setup()이 스스로 로그를 남긴다.
 # 안 쓰는 도메인에서 `SORT=VIEWS`가 보이면 "내가 뭘 잘못 설정했나"로 읽힌다
 $dataPart = if ($n) { "데이터량=$n" } else { '데이터량=(해당 없음)' }
-Write-Host "  domain=$Domain  stage=$Stage  VUS=$Vus  $dataPart  tag=$Tag"
+Write-Host "  domain=$Domain  stage=$Stage  VUS=$Vus  $dataPart  tag=$tagShown"
 Write-Host "  결과 파일: $outFile`n"
 
 # 스크립트 값은 -e 로 명시 전달 — 셸 환경변수에 의존하지 않는다
@@ -208,7 +263,20 @@ elseif ($LASTEXITCODE -ne 0) {
 # BOM을 붙인다($true) — PS 5.1의 Get-Content는 BOM이 없으면 UTF-8을 ANSI로 읽어
 # 한글이 깨진다(`최대 VU`가 `理쒕?`로 보인다). grep·git은 BOM이 있어도 문제없다
 $raw = Get-Content -Raw $outFile
-[System.IO.File]::WriteAllText($outFile, $raw, (New-Object System.Text.UTF8Encoding($true)))
+
+# 측정 조건을 파일 맨 앞에 남긴다.
+#
+# 예전에는 조건이 콘솔에만 찍혀서, 며칠 뒤 결과 파일만 열면 **M이 몇일 때 잰 값인지 알 수 없었다.**
+# 같은 코드가 서명 10회에서 58ms, 60회에서 308ms가 되므로 조건 없는 수치는 근거가 되지 못한다
+$unitPart = if ($unit) { " ($unit)" } else { '' }
+$header = @(
+    "# domain=$Domain  stage=$Stage  VUS=$Vus  tag=$tagShown",
+    "# 데이터량=$(if ($n) { "$n$unitPart" } else { '(해당 없음)' })",
+    "# BASE_URL=$BaseUrl  실행=$stamp",
+    ''
+) -join "`r`n"
+
+[System.IO.File]::WriteAllText($outFile, $header + "`r`n" + $raw, (New-Object System.Text.UTF8Encoding($true)))
 
 $endedAt = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 
