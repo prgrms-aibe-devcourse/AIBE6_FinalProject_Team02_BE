@@ -311,13 +311,32 @@ public class ChallengeService {
 
         Map<Long, RewardBadgeDTO> badgeById = loadRewardBadges(list);
 
+        // N+1 제거 — 슬롯 수 / 내 참여 / 해금 수를 각각 한 번의 배치 쿼리로 (챌린지당 3쿼리 → 상수 3쿼리)
+        Map<Long, Long> slotCountByDex = ids.isEmpty() ? Map.of()
+                : slotRepository.countByChallengeDexIdIn(ids).stream()
+                        .collect(Collectors.toMap(
+                                ChallengeDexSlotRepository.SlotCount::getDexId,
+                                ChallengeDexSlotRepository.SlotCount::getCnt));
+
+        Map<Long, Long> myPartIdByDex = ids.isEmpty() ? Map.of()
+                : participantRepository.findByUserIdAndChallengeDexIdIn(userId, ids).stream()
+                        .collect(Collectors.toMap(
+                                ChallengeParticipant::getChallengeDexId,
+                                ChallengeParticipant::getId));
+
+        List<Long> myPartIds = List.copyOf(myPartIdByDex.values());
+        Map<Long, Long> unlockCountByPart = myPartIds.isEmpty() ? Map.of()
+                : unlockRepository.countByChallengeParticipantIdIn(myPartIds).stream()
+                        .collect(Collectors.toMap(
+                                ChallengeUnlockRepository.UnlockCount::getParticipantId,
+                                ChallengeUnlockRepository.UnlockCount::getCnt));
+
         return list.stream()
                 .map(c -> {
-                    int totalSlots = (int) slotRepository.countByChallengeDexId(c.getId());
-                    int unlocked = participantRepository
-                            .findByChallengeDexIdAndUserId(c.getId(), userId)
-                            .map(p -> (int) unlockRepository.countByChallengeParticipantId(p.getId()))
-                            .orElse(0);
+                    int totalSlots = slotCountByDex.getOrDefault(c.getId(), 0L).intValue();
+                    Long myPartId = myPartIdByDex.get(c.getId());
+                    int unlocked = myPartId == null ? 0
+                            : unlockCountByPart.getOrDefault(myPartId, 0L).intValue();
                     return toSummary(c, countByDex.getOrDefault(c.getId(), 0L),
                             totalSlots, unlocked, null, false, badgeById);
                 })

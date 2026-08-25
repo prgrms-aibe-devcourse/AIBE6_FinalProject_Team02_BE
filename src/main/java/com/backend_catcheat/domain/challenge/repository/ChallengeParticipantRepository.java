@@ -25,6 +25,9 @@ public interface ChallengeParticipantRepository extends JpaRepository<ChallengeP
     boolean existsByChallengeDexIdAndUserId(Long challengeDexId, Long userId);
     long countByChallengeDexId(Long challengeDexId);   // 참여자수(랭킹)
 
+    // 목록 화면 N+1 방지 — 내가 참여한 행을 dex 묶음으로 한 번에
+    List<ChallengeParticipant> findByUserIdAndChallengeDexIdIn(Long userId, List<Long> dexIds);
+
     // 목록 화면 N+1 방지 — 여러 챌린지의 참여자 수를 한 번에 집계
     @Query("select p.challengeDexId as dexId, count(p) as cnt " +
             "from ChallengeParticipant p " +

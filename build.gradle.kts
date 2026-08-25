@@ -59,6 +59,11 @@ dependencies {
 
     // Micrometer의 Prometheus 레지스트리
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
+
+    // presigned 다운로드 URL 캐시용 로컬 캐시.
+    // 캐시 키가 S3 object key라 사진이 늘어난 만큼 무한히 늘어난다 —
+    // 크기 상한과 만료가 없는 Map으로는 메모리 누수가 된다. 버전은 Spring Boot BOM이 관리한다
+    implementation("com.github.ben-manes.caffeine:caffeine")
 }
 
 dependencyManagement {

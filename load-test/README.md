@@ -220,6 +220,7 @@ load-test/
 │   ├── 03-load.js              5분 · 부하 곡선
 │   ├── data-count.sql          (선택) 성능을 지배하는 변수를 세는 쿼리
 │   └── seed/                   (선택) 시드·정리 SQL
+├── logit-feed/                 로그잇 식탁 피드 — 지배 변수는 요청당 presign 서명 횟수
 ├── _template/                  새 도메인 시작점 — 복사해서 쓴다
 ├── run.ps1                     실행기 (PowerShell)
 ├── run.sh                      실행기 (bash) — 둘은 같은 일을 한다

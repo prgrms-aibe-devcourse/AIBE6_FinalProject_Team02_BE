@@ -16,9 +16,12 @@ import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @DisplayName("등록 사진 로딩")
@@ -45,9 +48,17 @@ class RegistrationPhotoLoaderTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"image/heic", "image/heif"})
-    @DisplayName("분석용 로딩은 HEIC에 원인을 짚어 준다 — 업로드는 되는데 왜 막히는지 알 수 없으면 안 된다")
-    void 분석용은_HEIC에_원인을_알려준다(String contentType) {
+    @DisplayName("분석용 로딩도 HEIC를 통과시킨다 — ImagePreprocessor가 heif-convert로 JPEG를 거친다")
+    void 분석용은_HEIC를_통과시킨다(String contentType) {
         givenObject(contentType, 1024);
+
+        assertThat(loader.loadForAnalysis(KEY)).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("분석용 로딩은 디코딩할 수 없는 형식에 원인을 짚어 준다")
+    void 분석용은_디코딩_불가_형식에_원인을_알려준다() {
+        givenObject("image/gif", 1024);
 
         assertThatThrownBy(() -> loader.loadForAnalysis(KEY))
                 .isInstanceOf(CustomException.class)
@@ -55,11 +66,21 @@ class RegistrationPhotoLoaderTest {
     }
 
     @Test
-    @DisplayName("저장용 로딩은 HEIC를 통과시킨다 — 해시만 계산해 디코딩이 필요 없다")
+    @DisplayName("저장용 검사는 HEIC를 통과시킨다 — 디코딩하지 않고 보관만 한다")
     void 저장용은_HEIC를_통과시킨다() {
         givenObject("image/heic", 1024);
 
-        assertThat(loader.loadForStorage(KEY)).hasSize(3);
+        assertThatCode(() -> loader.validateForStorage(KEY)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("저장용 검사는 사진을 내려받지 않는다 — 해시를 뜰 일이 없어졌다")
+    void 저장용은_내려받지_않는다() {
+        givenObject("image/jpeg", 1024);
+
+        loader.validateForStorage(KEY);
+
+        verify(s3Client, never()).getObjectAsBytes(any(GetObjectRequest.class));
     }
 
     @Test
@@ -67,7 +88,7 @@ class RegistrationPhotoLoaderTest {
     void 이미지가_아니면_막는다() {
         givenObject("application/pdf", 1024);
 
-        assertThatThrownBy(() -> loader.loadForStorage(KEY))
+        assertThatThrownBy(() -> loader.validateForStorage(KEY))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_UPLOAD_FILE);
     }

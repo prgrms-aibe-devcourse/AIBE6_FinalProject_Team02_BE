@@ -30,6 +30,7 @@ public class ImagePreprocessor {
     private static final List<Float> QUALITY_FALLBACKS = List.of(0.6f, 0.45f, 0.3f);
 
     private final VisionProperties properties;
+    private final HeicConverter heicConverter;
 
     public PreparedImage prepare(byte[] source, String name) {
         return prepare(source, name, properties.maxLongEdgePx());
@@ -52,13 +53,22 @@ public class ImagePreprocessor {
         return prepared;
     }
 
+    /**
+     * ImageIO는 heic/heif를 읽지 못하고 null을 돌려준다. 먼저 JPEG로 바꿔 같은 경로로 합류시킨다.
+     *
+     * 판별은 Content-Type이 아니라 바이트로 한다. Content-Type은 클라이언트가 presign 때
+     * 정한 값이라, jpeg로 발급받고 HEIC를 올리면 로더의 형식 게이트를 그대로 통과한다.
+     */
     private BufferedImage decode(byte[] source) {
         try {
-            BufferedImage image = ImageIO.read(new ByteArrayInputStream(source));
+            byte[] decodable = HeicConverter.isHeic(source) ? heicConverter.toJpeg(source) : source;
+            BufferedImage image = ImageIO.read(new ByteArrayInputStream(decodable));
             if (image == null) {
                 throw new CustomException(ErrorCode.IMAGE_DECODE_FAILED);
             }
-            return image;
+            // ImageIO는 EXIF 회전을 적용하지 않는다. 아이폰 세로 사진이 눕은 채로 넘어간다.
+            // HEIC는 heif-convert가 이미 돌려서 내보내므로 여기서는 1로 읽혀 그대로 지난다
+            return ExifOrientation.apply(image, ExifOrientation.of(decodable));
         } catch (IOException e) {
             throw new CustomException(ErrorCode.IMAGE_DECODE_FAILED);
         }

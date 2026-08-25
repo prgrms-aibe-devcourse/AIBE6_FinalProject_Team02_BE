@@ -29,6 +29,7 @@ STAGE='load'
 VUS=150
 SORT='VIEWS'
 TAG='before'
+TAG_EXPLICIT=0
 BASE_URL='http://localhost:8080'
 
 PG_CONTAINER='catcheat-postgres'
@@ -43,7 +44,7 @@ while [ $# -gt 0 ]; do
         --stage)    STAGE="$2"; shift 2 ;;
         --vus)      VUS="$2"; shift 2 ;;
         --sort)     SORT="$2"; shift 2 ;;
-        --tag)      TAG="$2"; shift 2 ;;
+        --tag)      TAG="$2"; TAG_EXPLICIT=1; shift 2 ;;
         --base-url) BASE_URL="$2"; shift 2 ;;
         -h|--help)
             sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'
@@ -147,38 +148,82 @@ else
     OK=0
 fi
 
-# 데이터량 — 도메인이 data-count.sql을 두면 세어서 알려준다.
-#
-# 부하(VU)만 성능 변수가 아니다. 목록 조회는 행 수가, 업로드는 파일 크기가 지배한다.
-# 데이터가 3건인 DB에 VU 200을 때려도 "빠르다"만 나오고 아무것도 증명하지 못한다.
-N=''
-COUNT_SQL="$DOMAIN_DIR/data-count.sql"
-if [ -f "$COUNT_SQL" ]; then
-    N="$(docker exec -i "$PG_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" -t -A 2>/dev/null < "$COUNT_SQL" | head -1 | tr -d '[:space:]')"
-    case "$N" in ''|*[!0-9]*) N='?' ;; esac
-    printf '  [INFO] %-22s = %s\n' '데이터량' "$N"
-    if [ "$N" != '?' ] && [ "$N" -lt 100 ] && [ "$STAGE" != 'smoke' ]; then
-        echo '         경고: 데이터가 적어 부하를 걸어도 병목이 안 나타납니다.'
-        for s in "$DOMAIN_DIR"/seed/seed-*.sql; do
-            [ -f "$s" ] || continue
-            echo "         docker exec -i $PG_CONTAINER psql -U $PG_USER -d $PG_DB -v n=5000 < load-test/$DOMAIN/seed/$(basename "$s")"
-        done
-    fi
-else
-    printf '  [INFO] %-22s (data-count.sql 없음 — 건너뜀)\n' '데이터량'
-fi
-
+# FAIL 판정을 데이터량 조회보다 **먼저** 낸다.
+# 서버·프로메테우스가 없으면 데이터량을 세어 봐야 의미가 없고, docker까지 꺼져 있으면
+# 조회가 실패하며 화면만 지저분해진다. (run.ps1은 같은 자리에서 아예 죽었다)
 if [ "$OK" -ne 1 ]; then
     echo ""
     echo "사전 점검 실패. 위 FAIL 항목을 해결하고 다시 실행하세요."
     exit 1
 fi
 
+# 데이터량 — 도메인이 data-count.sql을 두면 세어서 알려준다.
+#
+# 부하(VU)만 성능 변수가 아니다. 목록 조회는 행 수가, 업로드는 파일 크기가 지배한다.
+# 데이터가 3건인 DB에 VU 200을 때려도 "빠르다"만 나오고 아무것도 증명하지 못한다.
+#
+# 도메인이 `data-count.sql` 첫머리 주석으로 아래 셋을 선언할 수 있다. **전부 선택 사항**이고,
+# 없으면 예전 기본값(하한 100 · 시드 인자 `-v n=5000`)을 그대로 쓴다 — 기존 도메인은 동작이 안 바뀐다.
+#
+#   -- floor: 10                        이 값 미만일 때만 경고한다
+#   -- seed:  -v m=12 -v s=4 -v p=1     경고와 함께 안내할 시드 인자
+#   -- unit:  요청당 presign 서명 횟수    숫자가 무엇의 개수인지
+#
+# 실행기는 이 숫자가 무엇인지 모른다. 챌린지 랭킹은 "행 수"라 100 미만이면 시딩을 안 한 게
+# 맞지만, 로그잇 피드는 "요청당 서명 횟수"라 60이 사실상 상한이다. 판단 기준은 도메인이 안다.
+N=''
+UNIT=''
+UNIT_PART=''   # set -u 아래에서는 미초기화 변수를 읽는 순간 죽는다. 아래 결과 파일 헤더가 이걸 쓴다
+COUNT_SQL="$DOMAIN_DIR/data-count.sql"
+if [ -f "$COUNT_SQL" ]; then
+    FLOOR=100
+    SEED_ARGS='-v n=5000'
+    # CRLF로 저장된 파일에서도 값 끝에 \r가 붙지 않게 지운다
+    META="$(tr -d '\r' < "$COUNT_SQL")"
+    v="$(printf '%s\n' "$META" | sed -n 's/^[[:space:]]*--[[:space:]]*floor:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1)"
+    [ -n "$v" ] && FLOOR="$v"
+    v="$(printf '%s\n' "$META" | sed -n 's/^[[:space:]]*--[[:space:]]*seed:[[:space:]]*\(.*[^[:space:]]\)[[:space:]]*$/\1/p' | head -1)"
+    [ -n "$v" ] && SEED_ARGS="$v"
+    v="$(printf '%s\n' "$META" | sed -n 's/^[[:space:]]*--[[:space:]]*unit:[[:space:]]*\(.*[^[:space:]]\)[[:space:]]*$/\1/p' | head -1)"
+    [ -n "$v" ] && UNIT="$v"
+
+    N="$(docker exec -i "$PG_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" -t -A 2>/dev/null < "$COUNT_SQL" | head -1 | tr -d '[:space:]')"
+    case "$N" in ''|*[!0-9]*) N='?' ;; esac
+    if [ -n "$UNIT" ]; then UNIT_PART=" ($UNIT)"; else UNIT_PART=''; fi
+    # 데이터량은 알면 좋은 정보이지 실행 조건이 아니다. 못 세면 건너뛰고 측정은 계속한다
+    if [ "$N" = '?' ]; then
+        printf '  [WARN] %-22s = ? (조회 실패 — 데이터량 점검을 건너뜁니다)\n' '데이터량'
+    else
+        printf '  [INFO] %-22s = %s%s\n' '데이터량' "$N" "$UNIT_PART"
+        if [ "$N" -lt "$FLOOR" ] && [ "$STAGE" != 'smoke' ]; then
+            echo "         경고: 데이터가 적어 부하를 걸어도 병목이 안 나타납니다. (하한 $FLOOR)"
+            for s in "$DOMAIN_DIR"/seed/seed-*.sql; do
+                [ -f "$s" ] || continue
+                echo "         docker exec -i $PG_CONTAINER psql -U $PG_USER -d $PG_DB $SEED_ARGS < load-test/$DOMAIN/seed/$(basename "$s")"
+            done
+        fi
+    fi
+else
+    printf '  [INFO] %-22s (data-count.sql 없음 — 건너뜀)\n' '데이터량'
+fi
+
 # ── 실행 ─────────────────────────────────────────────────────────────────────
 STAMP="$(date +%Y%m%d-%H%M%S)"
 OUT_DIR="$ROOT/load-test/results"
 mkdir -p "$OUT_DIR"
-OUT_FILE="$OUT_DIR/$DOMAIN-$TAG-$STAGE-$STAMP.txt"
+# 태그는 **전후를 가르는 표시**다. 그래서 명시했을 때만 파일명에 넣는다.
+#
+# 예전에는 기본값 'before'가 단계와 무관하게 항상 들어갔다. 그래서 기준선을 잴 때
+# --tag를 안 넘기면 **개선 후에 잰 파일도 이름이 `before`**가 됐다.
+# load는 예전부터 기본값이 파일명에 들어갔으므로 그대로 둔다 — 기존 도메인의 파일명이 바뀌지 않는다
+if [ "$TAG_EXPLICIT" -eq 1 ] || [ "$STAGE" = 'load' ]; then
+    NAME_PART="$DOMAIN-$TAG-$STAGE"
+    TAG_SHOWN="$TAG"
+else
+    NAME_PART="$DOMAIN-$STAGE"
+    TAG_SHOWN='(없음)'
+fi
+OUT_FILE="$OUT_DIR/$NAME_PART-$STAMP.txt"
 
 # k6 자체 설정은 환경변수로만 받는다 (CLI 플래그가 없다)
 export K6_PROMETHEUS_RW_SERVER_URL="$PROM/api/v1/write"
@@ -190,7 +235,7 @@ echo ""
 echo "=== RUN ==="
 # SORT는 찍지 않는다 — 쓰는 도메인만 의미가 있고, 그 도메인의 setup()이 스스로 로그를 남긴다
 if [ -n "$N" ]; then DATA_PART="데이터량=$N"; else DATA_PART='데이터량=(해당 없음)'; fi
-echo "  domain=$DOMAIN  stage=$STAGE  VUS=$VUS  $DATA_PART  tag=$TAG"
+echo "  domain=$DOMAIN  stage=$STAGE  VUS=$VUS  $DATA_PART  tag=$TAG_SHOWN"
 echo "  결과 파일: $OUT_FILE"
 echo ""
 
@@ -201,6 +246,18 @@ echo ""
     -e "VUS=$VUS" -e "SORT=$SORT" -e "BASE_URL=$BASE_URL" \
     "$(to_native "$SCRIPT_PATH")" | tee "$OUT_FILE"
 K6_EXIT="${PIPESTATUS[0]}"
+
+# 측정 조건을 파일 맨 앞에 남긴다.
+#
+# 예전에는 조건이 콘솔에만 찍혀서, 며칠 뒤 결과 파일만 열면 M이 몇일 때 잰 값인지 알 수 없었다.
+# 같은 코드가 서명 10회에서 58ms, 60회에서 308ms가 되므로 조건 없는 수치는 근거가 되지 못한다
+{
+    echo "# domain=$DOMAIN  stage=$STAGE  VUS=$VUS  tag=$TAG_SHOWN"
+    if [ -n "$N" ]; then echo "# 데이터량=$N$UNIT_PART"; else echo '# 데이터량=(해당 없음)'; fi
+    echo "# BASE_URL=$BASE_URL  실행=$STAMP"
+    echo ""
+    cat "$OUT_FILE"
+} > "$OUT_FILE.tmp" && mv -f "$OUT_FILE.tmp" "$OUT_FILE"
 
 # 99만 "임계값 미달"이다. 나머지 비정상 종료는 측정 실패이므로 구분해서 알려야 한다
 # (예전에는 전부 "임계값 미달"로 찍혀서, 스크립트를 못 찾은 127도 정상 완료처럼 보였다)

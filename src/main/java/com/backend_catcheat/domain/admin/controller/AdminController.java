@@ -60,17 +60,21 @@ public class AdminController {
     }
 
     @PatchMapping("/registration-requests/{requestId}/complete")
-    public ApiResponse<Void> completeRequest(@PathVariable Long requestId) {
-        registrationRequestService.completeRequest(requestId);
+    public ApiResponse<Void> completeRequest(
+            @AuthenticationPrincipal Long adminId,
+            @PathVariable Long requestId
+    ) {
+        registrationRequestService.completeRequest(adminId, requestId);
         return ApiResponse.ok();
     }
 
     @PatchMapping("/registration-requests/{requestId}/reject")
     public ApiResponse<Void> rejectRequest(
+            @AuthenticationPrincipal Long adminId,
             @PathVariable Long requestId,
             @RequestBody RejectRequestDTO request
     ) {
-        registrationRequestService.rejectRequest(requestId, request.reason());
+        registrationRequestService.rejectRequest(adminId, requestId, request.reason());
         return ApiResponse.ok();
     }
 

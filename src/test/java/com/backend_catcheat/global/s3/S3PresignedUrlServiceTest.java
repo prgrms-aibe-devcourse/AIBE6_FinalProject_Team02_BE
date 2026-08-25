@@ -19,6 +19,8 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -54,7 +56,9 @@ class S3PresignedUrlServiceTest {
         service = new S3PresignedUrlService(
                 presigner, mock(S3Client.class),
                 new S3Properties(BUCKET, "ap-northeast-2", "dummy-access-key", "dummy-secret-key", null),
-                uploadObjectService);
+                uploadObjectService,
+                // 조회 URL 캐시. 테스트마다 새로 만들어 케이스 간에 값이 새지 않게 한다
+                new PresignedDownloadUrlCache(new SimpleMeterRegistry()));
     }
 
     private PresignedUploadResponseDTO.UploadTarget issueOne(String fileName, String contentType) {

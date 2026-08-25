@@ -22,8 +22,9 @@ public class Notification extends BaseEntity {
     @Column(name="actor_id", nullable=false)
     private Long actorId;
 
+    // FOOD_REGISTRATION_REQUEST_RECEIVED가 34자라 30자 제한에 걸려 insert가 조용히(@Async라) 실패했었다
     @Enumerated(EnumType.STRING)
-    @Column(name="type", nullable=false, length=30)
+    @Column(name="type", nullable=false, length=50)
     private NotificationType type;
 
     @Column(name="target_id")
