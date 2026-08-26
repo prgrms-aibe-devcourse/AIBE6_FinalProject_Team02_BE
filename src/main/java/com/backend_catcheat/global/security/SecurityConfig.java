@@ -107,7 +107,11 @@ public class SecurityConfig {
                                 "/login/**",
                                 "/api/v1/auth/reissue",
                                 "/api/v1/auth/logout",
-                                "/api/v1/auth/test-login"
+                                "/api/v1/auth/test-login",
+                                // API 문서. 여기까지 인증을 걸면 문서를 보려고 로그인해야 한다
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**"
                         ).permitAll()
                         // 관리자 전용
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")

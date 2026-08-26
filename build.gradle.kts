@@ -57,6 +57,10 @@ dependencies {
 
     implementation ("org.springframework.boot:spring-boot-starter-actuator")
 
+    // API 문서(Swagger UI). springdoc 3.x가 Spring Boot 4 계열이다 —
+    // 2.x는 Boot 3용이라 여기에 붙이면 뜨지 않는다. 3.1.0의 부모가 spring-boot-starter-parent 4.1.0
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0")
+
     // Micrometer의 Prometheus 레지스트리
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 

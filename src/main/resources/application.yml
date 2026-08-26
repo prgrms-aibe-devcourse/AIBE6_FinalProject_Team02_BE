@@ -117,6 +117,24 @@ jwt:
   access-token-expire-ms: ${JWT_ACCESS_EXPIRE_MS:1800000}
   refresh-token-expire-ms: ${JWT_REFRESH_EXPIRE_MS:1209600000}
 
+# API 문서 (springdoc 3.x = Spring Boot 4 계열)
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: ${SWAGGER_ENABLED:true}
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: ${SWAGGER_ENABLED:true}
+    # 정렬을 고정해 새 API가 끼어들어도 문서 순서가 흔들리지 않게 한다
+    tags-sorter: alpha
+    operations-sorter: method
+    # 스키마 섹션은 접어 둔다 — DTO가 많아 펼쳐두면 화면이 그것만 남는다
+    doc-expansion: none
+    csrf:
+      # XSRF-TOKEN 쿠키를 읽어 X-XSRF-TOKEN 헤더로 되돌려보낸다.
+      # 켜지 않으면 Try it out의 POST·PATCH·DELETE가 전부 403이 된다
+      enabled: true
+
 # 로그인 성공 후 프론트로 리다이렉트할 기준 주소 (토큰 전달용)
 # 운영에서 OAUTH2_REDIRECT_URI를 빠뜨리면 로그인 콜백이 이 기본값(로컬)으로 나간다
 app:
