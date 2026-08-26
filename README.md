@@ -1,4 +1,4 @@
-# 캣칫 CatchEat — Backend
+# 캣칫 CatchEat - Backend
 
 > 먹은 음식을 사진으로 남겨 **도감으로 모으는** 수집형 기록 서비스
 
@@ -220,7 +220,7 @@ Actuator는 `health` · `prometheus` **둘만**, 그리고 **9091 루프백 전�
 ```mermaid
 erDiagram
     users ||--o{ user_collection : "해금한 칸"
-    basic_dex ||--o{ user_collection : "200칸"
+    basic_dex ||--o{ user_collection : "138칸"
     user_collection ||--o{ collection_card : "수집 카드"
 
     users ||--o{ made_dex_member : "참여"
@@ -295,7 +295,7 @@ backend_catcheat/
 ├── src/main/java/com/backend_catcheat/
 │   ├── domain/                    # 도메인 16개
 │   │   ├── auth · onboarding      # 소셜 로그인 · JWT · 첫 방문 가이드
-│   │   ├── dex                    # 베이짓 (200칸 · 수집 카드 · 별칭)
+│   │   ├── dex                    # 베이짓 (138칸 · 수집 카드 · 별칭)
 │   │   ├── registration           # 등록 플로우 (AI 판별 → 칸 해금)
 │   │   ├── made                   # 로그잇 (공동 기록 · 끼니 · 댓글 · 하루 카드)
 │   │   ├── challenge              # 챌린짓 (위치 인증 · 랭킹 · 리뷰 · 보상 뱃지)
