@@ -68,10 +68,14 @@ class MadeDexFeedServiceTest {
 
     @BeforeEach
     void setUp() {
+        // 조회는 로더가, 조립(서명)은 서비스가 한다. 트랜잭션 경계를 나누려고 빈을 갈랐다
+        // (같은 클래스 안에서 부르면 프록시를 안 타 @Transactional이 무시된다).
+        // 여기서는 진짜 로더에 목 리포지토리를 물려 준다 — 아래 stub은 그대로 쓰인다
         service = new MadeDexFeedService(
-                madeDexSlotRepository, madeDexMemberRepository, madeDexRecordRepository,
-                madeDexRecordPhotoRepository,
-                madeDexFinder, userRepository, s3PresignedUrlService, clock);
+                new MadeDexFeedLoader(
+                        madeDexSlotRepository, madeDexMemberRepository, madeDexRecordRepository,
+                        madeDexRecordPhotoRepository, madeDexFinder, userRepository, clock),
+                s3PresignedUrlService);
 
         when(madeDexFinder.readable(ME, MADE_DEX_ID))
                 .thenReturn(new MadeDexFinder.MadeDexAccess(madeDex(), MadeDexRole.MEMBER));

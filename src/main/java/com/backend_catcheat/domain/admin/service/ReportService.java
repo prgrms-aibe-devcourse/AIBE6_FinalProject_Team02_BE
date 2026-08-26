@@ -5,6 +5,7 @@ import com.backend_catcheat.domain.admin.entity.ReportStatus;
 import com.backend_catcheat.domain.admin.entity.UnidentifiedFoodReport;
 import com.backend_catcheat.domain.admin.repository.UnidentifiedFoodReportRepository;
 import com.backend_catcheat.domain.auth.repository.UserRepository;
+import com.backend_catcheat.global.event.AdminReportRequestEvent;
 import com.backend_catcheat.global.event.FoodReportApprovedEvent;
 import com.backend_catcheat.global.event.FoodReportRejectedEvent;
 import com.backend_catcheat.global.exception.CustomException;
@@ -43,6 +44,10 @@ public class ReportService {
                         .description(trimmed)
                         .reporterId(reporterId)
                         .build());
+
+        // 관리자들에게 새 제보가 들어왔음을 알린다 (본인이 ADMIN이어도 리스너에서 알림을 걸러낸다)
+        eventPublisher.publishEvent(new AdminReportRequestEvent(reporterId, trimmed, saved.getId()));
+
         return toResponse(saved);
     }
 
@@ -63,7 +68,7 @@ public class ReportService {
 
         Long reporterId = report.getReporterId();
         if (reporterId != null && !reporterId.equals(adminId)) {
-            eventPublisher.publishEvent(new FoodReportApprovedEvent(reportId, adminId, reporterId));
+            eventPublisher.publishEvent(new FoodReportApprovedEvent(reportId, adminId, reporterId, report.getDescription()));
         }
     }
 
@@ -75,7 +80,7 @@ public class ReportService {
 
         Long reporterId = report.getReporterId();
         if (reporterId != null && !reporterId.equals(adminId)) {
-            eventPublisher.publishEvent(new FoodReportRejectedEvent(reportId, adminId, reporterId));
+            eventPublisher.publishEvent(new FoodReportRejectedEvent(reportId, adminId, reporterId, report.getDescription(), reason));
         }
     }
 

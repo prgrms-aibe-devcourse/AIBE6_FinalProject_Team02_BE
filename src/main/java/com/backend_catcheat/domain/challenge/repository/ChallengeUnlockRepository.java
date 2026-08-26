@@ -32,4 +32,15 @@ public interface ChallengeUnlockRepository extends JpaRepository<ChallengeUnlock
             """)
     List<DexScore> countRecentUnlocksByDexIn(@Param("dexIds") List<Long> dexIds,
                                              @Param("since") LocalDateTime since);
+
+    // 목록 화면 N+1 방지 — 여러 참여자의 해금 수를 한 번에 집계
+    @Query("select u.challengeParticipantId as participantId, count(u) as cnt " +
+            "from ChallengeUnlock u where u.challengeParticipantId in :participantIds " +
+            "group by u.challengeParticipantId")
+    List<UnlockCount> countByChallengeParticipantIdIn(@Param("participantIds") List<Long> participantIds);
+
+    interface UnlockCount {
+        Long getParticipantId();
+        long getCnt();
+    }
 }

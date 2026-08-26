@@ -23,6 +23,7 @@ import com.backend_catcheat.domain.registration.entity.VerificationAttempt;
 import com.backend_catcheat.domain.registration.repository.PhotoRepository;
 import com.backend_catcheat.domain.registration.repository.RegistrationRepository;
 import com.backend_catcheat.domain.registration.repository.VerificationAttemptRepository;
+import com.backend_catcheat.global.event.AdminRegistrationRequestEvent;
 import com.backend_catcheat.global.event.SlotsUnlockedEvent;
 import com.backend_catcheat.global.exception.CustomException;
 import com.backend_catcheat.global.exception.ErrorCode;
@@ -104,13 +105,17 @@ public class RegistrationConfirmService {
                         registration.getId(), slot.getId(), thumbnail.getId(),
                         memo, locationName(location), lat(location), lng(location), collectedAt));
 
-                foodRegistrationRequestRepository.save(FoodRegistrationRequest.builder()
+                FoodRegistrationRequest savedRequest = foodRegistrationRequestRepository.save(FoodRegistrationRequest.builder()
                         .registrationId(registration.getId())
                         .description(slot.getName())
                         .collectionCardId(saved.getId())
                         // 증빙은 AI가 판정했던 바로 그 사진이어야 한다
                         .evidencePhotoId(evidence != null ? evidence.getId() : thumbnail.getId())
                         .build());
+
+                // 슬롯별로 발행 — 한 건에 미검증 슬롯이 여러 개면 관리자 알림도 그만큼 여러 번 간다(의도된 동작)
+                eventPublisher.publishEvent(
+                        new AdminRegistrationRequestEvent(userId, slot.getName(), savedRequest.getId()));
 
                 pending.add(new PendingSlot(
                         slot.getId(), slot.getName(), slot.getCategory().getDisplayName(), saved.getId()));
@@ -241,12 +246,10 @@ public class RegistrationConfirmService {
 
         Map<String, Photo> saved = new LinkedHashMap<>();
         for (String key : keys) {
-            // 해시가 내용 기반이라 메타데이터로는 안 되고 실제 바이트를 내려받아야 한다
-            String hash = photoLoader.hash(photoLoader.loadForStorage(key));
-            if (photoRepository.existsByHash(hash)) {
-                throw new CustomException(ErrorCode.DUPLICATE_PHOTO);
-            }
-            saved.put(key, photoRepository.save(Photo.of(registration.getId(), key, hash)));
+            // 용량·형식만 본다. 예전에는 해시를 뜨려고 사진을 통째로 내려받았지만,
+            // 중복 차단을 걷어내면서 그 바이트를 쓸 곳이 없어졌다
+            photoLoader.validateForStorage(key);
+            saved.put(key, photoRepository.save(Photo.of(registration.getId(), key)));
         }
         return saved;
     }

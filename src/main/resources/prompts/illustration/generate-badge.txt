@@ -33,14 +33,17 @@
 사진 같은 사실적인 묘사와 3D 렌더링 느낌을 완전히 제거해줘.
 
 [금지]
-음식이나 사물처럼 원래 얼굴이 없는 것에는 눈, 코, 입, 표정을 절대 그려 넣지 마.
 뺨에 분홍색 동그라미(볼터치)는 어떤 경우에도 그리지 마.
 하트, 별, 반짝이, 꽃 같은 장식 요소를 넣지 마.
-글자를 넣지 마.
+글자를 넣지 마. 설명에 숫자나 글자가 들어 있어도 그림에는 쓰지 마.
 
 [대상]
 아래 설명에 나온 것 하나만 그려줘.
 설명에 없는 물건, 배경, 장식을 덧붙이지 마.
+설명에 "뱃지", "메달", "훈장", "기념", "상" 같은 낱말이 있어도 그 낱말은 무시해줘.
+뱃지 틀, 리본, 훈장, 메달, 원형 테두리, 받침대를 절대 그리지 마.
+설명이 가리키는 실제 사물이나 음식만 그려줘.
+설명에 개수나 숫자가 있어도 그 개수만큼 그리지 말고 하나만 그려줘.
 그것이 무엇인지 한눈에 알아볼 수 있게 대표적인 형태와 색만 남겨줘.
 
 [배치]
@@ -52,4 +55,4 @@
 동그란 테두리나 원형 테두리를 그리지 마. 뱃지 틀, 리본, 훈장, 메달 모양을 그리지 마.
 배경은 완전히 투명하게 만들어줘. 도화지 질감, 그림자, 테두리를 넣지 마.
 
-childlike crude crayon and colored-pencil doodle drawn by a kindergartener, clumsy unskilled scribble, not polished, not refined, never professional illustration, wobbly broken uneven lines in darker shade of the object's own color, no black outlines, patchy uneven flat coloring with white gaps, minimal detail, no texture rendering, no shading, no gloss, not realistic, no text
+childlike crude crayon and colored-pencil doodle drawn by a kindergartener, clumsy unskilled scribble, not polished, not refined, never professional illustration, wobbly broken uneven lines in darker shade of the object's own color, no black outlines, patchy uneven flat coloring with white gaps, minimal detail, no texture rendering, no shading, no gloss, not realistic, no text, no letters, no numbers, no badge frame, no ribbon, no medal, no circular border, no pedestal, draw only the object itself

@@ -8,12 +8,16 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 public interface MadeDexRecordRepository extends JpaRepository<MadeDexRecord, Long> {
 
     Optional<MadeDexRecord> findByIdAndDeletedAtIsNull(Long id);
+
+    /** 살아 있는 기록만 조회 */
+    List<MadeDexRecord> findByIdInAndDeletedAtIsNull(Collection<Long> ids);
 
     // 수정과 삭제가 엇갈리면 지운 뒤에 사진이 다시 붙어 S3 객체가 주인 없이 남는다
     @Lock(LockModeType.PESSIMISTIC_WRITE)

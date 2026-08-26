@@ -80,7 +80,7 @@ class RegistrationRequestServiceTest {
         when(userCollectionRepository.findByUserIdAndSlotId(10L, 7L)).thenReturn(Optional.empty());
         when(userCollectionRepository.save(any())).thenReturn(unlocked);
 
-        service.completeRequest(1L);
+        service.completeRequest(999L, 1L);
 
         assertThat(request.getStatus()).isEqualTo(RegistrationRequestStatus.COMPLETED);
         assertThat(card.isAwaitingReview()).isFalse();   // 칸에 붙음 = 해금
@@ -99,7 +99,7 @@ class RegistrationRequestServiceTest {
                 .build();
         when(requestRepository.findById(1L)).thenReturn(Optional.of(request));
 
-        service.rejectRequest(1L, "등록 불가");
+        service.rejectRequest(999L, 1L, "등록 불가");
 
         assertThat(request.getStatus()).isEqualTo(RegistrationRequestStatus.REJECTED);
         assertThat(request.getRejectReason()).isEqualTo("등록 불가");
@@ -111,7 +111,7 @@ class RegistrationRequestServiceTest {
     void completeRequest_notFound() {
         when(requestRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.completeRequest(99L))
+        assertThatThrownBy(() -> service.completeRequest(999L, 99L))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.REGISTRATION_REQUEST_NOT_FOUND));
     }

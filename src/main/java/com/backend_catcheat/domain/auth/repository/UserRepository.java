@@ -1,11 +1,14 @@
 package com.backend_catcheat.domain.auth.repository;
 
 import com.backend_catcheat.domain.auth.entity.Provider;
+import com.backend_catcheat.domain.auth.entity.Role;
 import com.backend_catcheat.domain.auth.entity.User;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 
 import java.util.List;
 import java.util.Optional;
@@ -26,6 +29,17 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * 없을 때 null 대신 Optional.empty()로 안전하게 처리한다.
      */
     Optional<User> findByProviderAndProviderId(Provider provider, String providerId);
+
+    /** 관리자 계정 조회 */
+    List<User> findAllByRole(Role role);
+
+    /**
+     * 개설권 차감처럼 "읽고→검사→쓰기"가 원자적이어야 하는 경우 유저 행을 잠그고 읽는다.
+     * 같은 유저의 동시 요청을 직렬화해 카운터가 어긋나는 것을 막는다(PESSIMISTIC_WRITE).
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from User u where u.id = :id")
+    Optional<User> findByIdForUpdate(@Param("id") Long id);
 
     /**
      * 닉네임 중복 여부

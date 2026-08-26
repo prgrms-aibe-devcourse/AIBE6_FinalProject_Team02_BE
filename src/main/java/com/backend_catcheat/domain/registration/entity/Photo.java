@@ -21,17 +21,12 @@ public class Photo extends BaseEntity {
     @Column(name = "url", nullable = false, length = 500)
     private String url;
 
-    // 전역 유일. 같은 사진으로 반복 등록하는 어뷰징을 막는다
-    @Column(name = "hash", nullable = false, unique = true)
-    private String hash;
-
-    private Photo(Long registrationId, String url, String hash) {
+    private Photo(Long registrationId, String url) {
         this.registrationId = registrationId;
         this.url = url;
-        this.hash = hash;
     }
 
-    public static Photo of(Long registrationId, String key, String hash) {
-        return new Photo(registrationId, key, hash);
+    public static Photo of(Long registrationId, String key) {
+        return new Photo(registrationId, key);
     }
 }

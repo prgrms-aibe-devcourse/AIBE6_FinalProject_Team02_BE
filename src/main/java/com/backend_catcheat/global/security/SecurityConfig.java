@@ -107,7 +107,11 @@ public class SecurityConfig {
                                 "/login/**",
                                 "/api/v1/auth/reissue",
                                 "/api/v1/auth/logout",
-                                "/api/v1/auth/test-login"
+                                "/api/v1/auth/test-login",
+                                // API 문서. 여기까지 인증을 걸면 문서를 보려고 로그인해야 한다
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**"
                         ).permitAll()
                         // 관리자 전용
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
@@ -136,7 +140,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("https://projectjm.co.kr", "http://localhost:3000")); // 프론트 주소(운영 시 실제 도메인 추가)
+        config.setAllowedOrigins(List.of("https://projectjm.co.kr", "https://dev.projectjm.co.kr","http://localhost:3000")); // 프론트 주소(운영 시 실제 도메인 추가)
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true); // 쿠키 전송 허용 (httpOnly 쿠키 인증에 필수)

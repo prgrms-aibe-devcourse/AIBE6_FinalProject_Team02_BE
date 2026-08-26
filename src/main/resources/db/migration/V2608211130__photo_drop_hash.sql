@@ -1,0 +1,11 @@
+-- V2608211130: photo.hash 컬럼을 지운다 (CATCHEAT-89)
+--
+-- V2608211100이 유니크만 풀었는데, 그러고 나니 이 값을 읽는 곳이 하나도 없다.
+-- 그런데 값을 채우려면 확정 시점에 사진을 S3에서 통째로 내려받아야 했다(장당 최대 10MB,
+-- 한 건에 최대 5장). 아무것도 강제하지 않으면서 그 비용만 계속 내는 컬럼이다.
+--
+-- 용량·형식 검사는 사라지지 않는다. RegistrationPhotoLoader.validateForStorage가
+-- HeadObject만으로 그대로 본다 — 바이트를 받지 않을 뿐이다.
+--
+-- 되돌려야 하면 S3 객체에서 다시 계산할 수 있다. 원본은 그대로 있다.
+ALTER TABLE photo DROP COLUMN IF EXISTS hash;

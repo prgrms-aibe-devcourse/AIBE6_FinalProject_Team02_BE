@@ -74,6 +74,14 @@ public class ChallengeParticipationService {
 
         ChallengeDex dex = challengeDexRepository.findById(challengeDexId)
                 .orElseThrow(()-> new CustomException(ErrorCode.CHALLENGE_NOT_FOUND));
+
+        // 종료(기간 만료 또는 수동 종료)된 챌린지는 더 이상 해금 불가
+        if (dex.getPeriodType() == PeriodType.LIMITED
+                && dex.getEndsAt() != null
+                && !dex.getEndsAt().isAfter(LocalDateTime.now())) {
+            throw new CustomException(ErrorCode.CHALLENGE_ENDED);
+        }
+
             if (lat == null || lng == null || slot.getLat() == null || slot.getLng() == null) {
                 throw new CustomException(ErrorCode.CHALLENGE_LOCATION_REQUIRED);
             }
