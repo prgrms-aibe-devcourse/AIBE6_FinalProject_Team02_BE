@@ -50,6 +50,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SERVER_PORT: 8080
+      TZ: Asia/Seoul
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-catcheat_dev}
       DB_USERNAME: ${POSTGRES_USER:-catcheat}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
